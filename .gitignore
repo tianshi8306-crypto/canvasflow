@@ -8,3 +8,7 @@ src-tauri/target
 *.log
 .env
 .env.*
+package-lock.json
+.cursor/
+.cursorignore
+.cursorignore.txt
