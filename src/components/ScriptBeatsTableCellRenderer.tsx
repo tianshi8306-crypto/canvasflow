@@ -1,0 +1,82 @@
+import type { Dispatch, SetStateAction } from "react";
+import type { ScriptBeat } from "@/lib/types";
+import {
+  type ScriptBeatsTableVariant,
+  type TableColKey,
+} from "@/lib/scriptBeatsTableModel";
+import { ScriptCharactersCell } from "@/components/ScriptCharactersCell";
+import { ScriptBeatsRoleFieldCell } from "@/components/ScriptBeatsRoleFieldCell";
+import { ScriptBeatsScalarFieldCell } from "@/components/ScriptBeatsScalarFieldCell";
+
+type Props = {
+  beat: ScriptBeat;
+  rowIndex: number;
+  colKey: TableColKey;
+  variant: ScriptBeatsTableVariant;
+  descRows: number;
+  normRows: ScriptBeat[];
+  projectPath?: string | null;
+  onStatusText?: (msg: string) => void;
+  onPersistRows: (next: ScriptBeat[]) => void;
+  roleEditorRowId: string | null;
+  setRoleEditorRowId: Dispatch<SetStateAction<string | null>>;
+};
+
+export function ScriptBeatsTableCellRenderer({
+  beat,
+  rowIndex,
+  colKey,
+  variant,
+  descRows,
+  normRows,
+  projectPath,
+  onStatusText,
+  onPersistRows,
+  roleEditorRowId,
+  setRoleEditorRowId,
+}: Props) {
+  if (colKey.startsWith("roleName:") || colKey.startsWith("roleDesc:") || colKey.startsWith("roleImage:")) {
+    return (
+      <ScriptBeatsRoleFieldCell
+        beat={beat}
+        rowIndex={rowIndex}
+        normRows={normRows}
+        colKey={colKey}
+        projectPath={projectPath}
+        onStatusText={onStatusText}
+        onPersistRows={onPersistRows}
+      />
+    );
+  }
+
+  if (colKey === "characters") {
+    return (
+      <ScriptCharactersCell
+        beat={beat}
+        rowIndex={rowIndex}
+        variant={variant}
+        descRows={descRows}
+        normRows={normRows}
+        projectPath={projectPath}
+        onStatusText={onStatusText}
+        onPersistRows={onPersistRows}
+        roleEditorRowId={roleEditorRowId}
+        setRoleEditorRowId={setRoleEditorRowId}
+      />
+    );
+  }
+
+  return (
+    <ScriptBeatsScalarFieldCell
+      beat={beat}
+      rowIndex={rowIndex}
+      normRows={normRows}
+      colKey={colKey}
+      variant={variant}
+      descRows={descRows}
+      projectPath={projectPath}
+      onStatusText={onStatusText}
+      onPersistRows={onPersistRows}
+    />
+  );
+}
