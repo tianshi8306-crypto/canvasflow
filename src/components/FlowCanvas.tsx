@@ -38,6 +38,7 @@ import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { CanvasFlowChrome } from "@/components/canvas/CanvasFlowChrome";
 import { NodeMaximizedOverlay } from "@/components/canvas/NodeMaximizedOverlay";
+import { ZoomControls } from "@/components/canvas/ZoomControls";
 import { SubjectCreationPanel } from "@/components/SubjectCreationPanel";
 import { LeftAddDock } from "@/components/LeftAddDock";
 import { FFmpegNode } from "@/components/nodes/FFmpegNode";
@@ -747,6 +748,8 @@ function FlowCanvasInner() {
           />
         </Panel>
       </ReactFlow>
+
+      <ZoomControls />
 
       {marqueeRect ? (
         <div
