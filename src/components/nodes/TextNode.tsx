@@ -22,6 +22,7 @@ import { TextNodePasteImportModal } from "@/components/nodes/TextNodePasteImport
 import {
   TextNodeTextToMusicPanel,
   TextNodeTextToVideoPanel,
+  TextNodeScriptSyncPanel,
 } from "@/components/nodes/TextNodeWorkflowPanels";
 import { useProjectStore } from "@/store/projectStore";
 import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
@@ -57,6 +58,12 @@ type TextParams = {
   providerId?: string;
   /** DAG 执行时指定模型（默认沿用 Provider 的 model） */
   model?: string;
+  /** 关联的视频节点 ID（textToVideo 模式） */
+  videoNodeId?: string;
+  /** 关联的音频节点 ID（textToMusic 模式） */
+  audioNodeId?: string;
+  /** 关联的脚本节点 ID（用于从脚本同步内容） */
+  scriptNodeId?: string;
 };
 const DEEP_THINKING_MAX_INPUT_CHARS = 200000;
 
@@ -80,6 +87,9 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
   const textChrome = Boolean(params.textChrome);
   const textWorkflow = params.textWorkflow;
   const modelInput = (params.textModelInput ?? "").toString();
+  const videoNodeId = params.videoNodeId;
+  const audioNodeId = params.audioNodeId;
+  const scriptNodeId = params.scriptNodeId;
 
   const [editing, setEditing] = useState(false);
   const [expandEditOpen, setExpandEditOpen] = useState(false);
@@ -386,9 +396,11 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
 
   const workflowBottomPanel =
     selected && !editing && textWorkflow === "textToVideo" ? (
-      <TextNodeTextToVideoPanel />
+      <TextNodeTextToVideoPanel videoNodeId={videoNodeId} />
     ) : selected && !editing && textWorkflow === "textToMusic" ? (
-      <TextNodeTextToMusicPanel />
+      <TextNodeTextToMusicPanel audioNodeId={audioNodeId} />
+    ) : selected && !editing && textWorkflow === "scriptToText" ? (
+      <TextNodeScriptSyncPanel textNodeId={id} scriptNodeId={scriptNodeId} />
     ) : null;
 
   const rootClass = [
@@ -407,30 +419,89 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
   const splitExpanded =
     selected && !editing && Boolean(composer || workflowBottomPanel);
 
-  const textUpperSplit = (
-    <>
-      {!hasBody && textWorkflow === undefined ? (
+  /** 渲染空状态按钮（选择 textWorkflow） */
+  const renderEmptyState = () => (
+    <button
+      type="button"
+      className={`scriptGenEmptyCard textNodeFigure3Empty ${RF_NODE_INPUT_CLASS}`}
+      onPointerDown={stop}
+      onClick={(e) => {
+        stop(e);
+        mergeParams({ textWorkflow: "writeSelf" });
+        setStatusText("在此输入正文");
+      }}
+    >
+      <p className="textNodeFigure3Hint">请编写内容，开始你的创作。</p>
+      <div className="scriptGenEmptyGlyph" aria-hidden>
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
+    </button>
+  );
+
+  /** 渲染 writeSelf 编辑器 */
+  const renderWriteSelfEditor = () => (
+    <div className={`textNodeEditChrome textNodeWriteSelfHost ${RF_NODE_INPUT_CLASS}`} onPointerDown={stop}>
+      <TextNodeFormatToolbar
+        onExec={exec}
+        onCopy={() => void copyContent()}
+        onPasteImport={openPasteImportForPrompt}
+        onExpand={openExpandEdit}
+      />
+      <div
+        ref={editRef}
+        className={`textNodeEditable textNodeWriteSelfEditable ${RF_NODE_INPUT_CLASS}`}
+        contentEditable
+        suppressContentEditableWarning
+        data-placeholder="输入内容..."
+        onPointerDown={stop}
+        onWheel={stopWheel}
+        onBlur={() => saveWriteSelfFromEditor()}
+        onPaste={clampEditableAfterPaste}
+      />
+    </div>
+  );
+
+  /** 渲染 imageToPrompt 空状态 */
+  const renderImageToPromptEmpty = () => (
+    <div className={`scriptGenEmptyCard ${RF_NODE_INPUT_CLASS}`}>
+      <div className="scriptGenEmptyGlyph" aria-hidden>
+        <span />
+        <span />
+        <span />
+        <span />
+      </div>
+    </div>
+  );
+
+  /** 渲染正文区域（编辑态/只读态） */
+  const renderBodyContent = () => (
+    <div className="textNodeBodyWrap">
+      {textChrome ? (
         <button
           type="button"
-          className={`scriptGenEmptyCard textNodeFigure3Empty ${RF_NODE_INPUT_CLASS}`}
+          className={`textNodeDownloadFloat ${RF_NODE_INPUT_CLASS}`}
+          title="下载为 .txt"
           onPointerDown={stop}
           onClick={(e) => {
             stop(e);
-            mergeParams({ textWorkflow: "writeSelf" });
-            setStatusText("在此输入正文");
+            downloadTxt();
           }}
         >
-          <p className="textNodeFigure3Hint">请编写内容，开始你的创作。</p>
-          <div className="scriptGenEmptyGlyph" aria-hidden>
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+            <path
+              d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+            />
+          </svg>
         </button>
       ) : null}
-      {uiSelected && !hasBody && textWorkflow === "writeSelf" ? (
-        <div className={`textNodeEditChrome textNodeWriteSelfHost ${RF_NODE_INPUT_CLASS}`} onPointerDown={stop}>
+      {editing ? (
+        <div className={`textNodeEditChrome ${RF_NODE_INPUT_CLASS}`} onPointerDown={stop}>
           <TextNodeFormatToolbar
             onExec={exec}
             onCopy={() => void copyContent()}
@@ -439,100 +510,77 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
           />
           <div
             ref={editRef}
-            className={`textNodeEditable textNodeWriteSelfEditable ${RF_NODE_INPUT_CLASS}`}
+            className={`textNodeEditable ${RF_NODE_INPUT_CLASS}`}
             contentEditable
             suppressContentEditableWarning
-            data-placeholder="输入内容..."
             onPointerDown={stop}
             onWheel={stopWheel}
-            onBlur={() => saveWriteSelfFromEditor()}
+            onBlur={() => {
+              saveFromEditor();
+              setEditing(false);
+            }}
             onPaste={clampEditableAfterPaste}
           />
         </div>
-      ) : null}
-      {uiSelected && !hasBody && textWorkflow === "imageToPrompt" ? (
-        <div className={`scriptGenEmptyCard ${RF_NODE_INPUT_CLASS}`}>
-          <div className="scriptGenEmptyGlyph" aria-hidden>
-            <span />
-            <span />
-            <span />
-            <span />
-          </div>
+      ) : (
+        <div
+          className={`textNodeReadOnly mono ${RF_NODE_INPUT_CLASS} ${textChrome ? "textNodeReadOnly--chrome" : ""}`}
+          title="双击可编辑正文"
+          onDoubleClick={onBodyDoubleClick}
+          onPointerDown={stop}
+          onWheel={stopWheel}
+        >
+          {prompt}
         </div>
-      ) : null}
-      {hasBody ? (
-        <div className="textNodeBodyWrap">
-          {textChrome ? (
-            <button
-              type="button"
-              className={`textNodeDownloadFloat ${RF_NODE_INPUT_CLASS}`}
-              title="下载为 .txt"
-              onPointerDown={stop}
-              onClick={(e) => {
-                stop(e);
-                downloadTxt();
-              }}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"
-                  stroke="currentColor"
-                  strokeWidth="1.8"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </button>
-          ) : null}
-          {editing ? (
-            <div className={`textNodeEditChrome ${RF_NODE_INPUT_CLASS}`} onPointerDown={stop}>
-              <TextNodeFormatToolbar
-                onExec={exec}
-                onCopy={() => void copyContent()}
-                onPasteImport={openPasteImportForPrompt}
-                onExpand={openExpandEdit}
-              />
-              <div
-                ref={editRef}
-                className={`textNodeEditable ${RF_NODE_INPUT_CLASS}`}
-                contentEditable
-                suppressContentEditableWarning
-                onPointerDown={stop}
-                onWheel={stopWheel}
-                onBlur={() => {
-                  saveFromEditor();
-                  setEditing(false);
-                }}
-                onPaste={clampEditableAfterPaste}
-              />
-            </div>
-          ) : (
-            <div
-              className={`textNodeReadOnly mono ${RF_NODE_INPUT_CLASS} ${textChrome ? "textNodeReadOnly--chrome" : ""}`}
-              title="双击可编辑正文"
-              onDoubleClick={onBodyDoubleClick}
-              onPointerDown={stop}
-              onWheel={stopWheel}
-            >
-              {prompt}
-            </div>
-          )}
-        </div>
-      ) : null}
+      )}
+    </div>
+  );
+
+  /** 渲染 textToVideo/textToMusic 工作流提示 */
+  const renderWorkflowHint = () =>
+    !hasBody && (textWorkflow === "textToVideo" || textWorkflow === "textToMusic") ? (
+      <div className="textNodeWorkflowHint mono">
+        {textWorkflow === "textToVideo"
+          ? "已连接下游视频节点，可在下方配置文生视频参数。"
+          : "已连接下游音频节点，可在下方配置音乐生成。"}
+      </div>
+    ) : null;
+
+  /** 分体模式下：上卡主体内容 */
+  const upperBodyContent = (
+    <>
+      {!hasBody && textWorkflow === undefined ? renderEmptyState() : null}
+      {uiSelected && !hasBody && textWorkflow === "writeSelf" ? renderWriteSelfEditor() : null}
+      {uiSelected && !hasBody && textWorkflow === "imageToPrompt" ? renderImageToPromptEmpty() : null}
+      {hasBody ? renderBodyContent() : null}
       <MagneticNodeAnchors nodeId={id} nodeType={type} />
     </>
   );
 
-  const textLowerSplit = (
+  /** 分体模式下：下浮层内容 */
+  const lowerPanelContent = (
     <>
-      {!hasBody && (textWorkflow === "textToVideo" || textWorkflow === "textToMusic") ? (
-        <div className="textNodeWorkflowHint mono">
-          {textWorkflow === "textToVideo"
-            ? "已连接下游视频节点，可在下方配置文生视频参数。"
-            : "已连接下游音频节点，可在下方配置音乐生成。"}
-        </div>
-      ) : null}
+      {renderWorkflowHint()}
       {composer}
       {workflowBottomPanel}
+    </>
+  );
+
+  /** 非分体模式下的 children 内容 */
+  const childrenContent = (
+    <>
+      {!hasBody && textWorkflow === undefined ? renderEmptyState() : null}
+      {uiSelected && !hasBody && textWorkflow === "writeSelf" ? renderWriteSelfEditor() : null}
+      {uiSelected && !hasBody && textWorkflow === "imageToPrompt" ? renderImageToPromptEmpty() : null}
+      {renderWorkflowHint()}
+      {hasBody ? (
+        <>
+          {renderBodyContent()}
+          {composer}
+          {workflowBottomPanel}
+        </>
+      ) : null}
+      <MagneticNodeAnchors nodeId={id} nodeType={type} />
     </>
   );
 
@@ -548,137 +596,11 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
         subtitle={textNodeSubtitle(hasBody, prompt)}
         rootClassName={rootClass}
         expandedSplit={splitExpanded}
-        upperBody={splitExpanded ? textUpperSplit : undefined}
-        floatingBottomOverlay={splitExpanded ? <div className="nodeFloatingBottomPanel">{textLowerSplit}</div> : undefined}
+        upperBody={splitExpanded ? upperBodyContent : undefined}
+        floatingBottomOverlay={splitExpanded ? <div className="nodeFloatingBottomPanel">{lowerPanelContent}</div> : undefined}
         lowerBody={undefined}
       >
-        {!splitExpanded ? (
-          <>
-            {!hasBody && textWorkflow === undefined ? (
-              <button
-                type="button"
-                className={`scriptGenEmptyCard textNodeFigure3Empty ${RF_NODE_INPUT_CLASS}`}
-                onPointerDown={stop}
-                onClick={(e) => {
-                  stop(e);
-                  mergeParams({ textWorkflow: "writeSelf" });
-                  setStatusText("在此输入正文");
-                }}
-              >
-                <p className="textNodeFigure3Hint">请编写内容，开始你的创作。</p>
-                <div className="scriptGenEmptyGlyph" aria-hidden>
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </button>
-            ) : null}
-            {uiSelected && !hasBody && textWorkflow === "writeSelf" ? (
-              <div className={`textNodeEditChrome textNodeWriteSelfHost ${RF_NODE_INPUT_CLASS}`} onPointerDown={stop}>
-                <TextNodeFormatToolbar
-                  onExec={exec}
-                  onCopy={() => void copyContent()}
-                  onPasteImport={openPasteImportForPrompt}
-                  onExpand={openExpandEdit}
-                />
-                <div
-                  ref={editRef}
-                  className={`textNodeEditable textNodeWriteSelfEditable ${RF_NODE_INPUT_CLASS}`}
-                  contentEditable
-                  suppressContentEditableWarning
-                  data-placeholder="输入内容..."
-                  onPointerDown={stop}
-                  onWheel={stopWheel}
-                  onBlur={() => saveWriteSelfFromEditor()}
-                  onPaste={clampEditableAfterPaste}
-                />
-              </div>
-            ) : null}
-            {uiSelected && !hasBody && textWorkflow === "imageToPrompt" ? (
-              <div className={`scriptGenEmptyCard ${RF_NODE_INPUT_CLASS}`}>
-                <div className="scriptGenEmptyGlyph" aria-hidden>
-                  <span />
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </div>
-            ) : null}
-            {uiSelected && !hasBody && (textWorkflow === "textToVideo" || textWorkflow === "textToMusic") ? (
-              <>
-                <div className="textNodeWorkflowHint mono">
-                  {textWorkflow === "textToVideo"
-                    ? "已连接下游视频节点，可在下方配置文生视频参数。"
-                    : "已连接下游音频节点，可在下方配置音乐生成。"}
-                </div>
-                {workflowBottomPanel}
-              </>
-            ) : null}
-            {hasBody ? (
-              <div className="textNodeBodyWrap">
-                {textChrome ? (
-                  <button
-                    type="button"
-                    className={`textNodeDownloadFloat ${RF_NODE_INPUT_CLASS}`}
-                    title="下载为 .txt"
-                    onPointerDown={stop}
-                    onClick={(e) => {
-                      stop(e);
-                      downloadTxt();
-                    }}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-                      <path
-                        d="M12 3v12m0 0 4-4m-4 4-4-4M5 21h14"
-                        stroke="currentColor"
-                        strokeWidth="1.8"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
-                ) : null}
-                {editing ? (
-                  <div className={`textNodeEditChrome ${RF_NODE_INPUT_CLASS}`} onPointerDown={stop}>
-                    <TextNodeFormatToolbar
-                      onExec={exec}
-                      onCopy={() => void copyContent()}
-                      onPasteImport={openPasteImportForPrompt}
-                      onExpand={openExpandEdit}
-                    />
-                    <div
-                      ref={editRef}
-                      className={`textNodeEditable ${RF_NODE_INPUT_CLASS}`}
-                      contentEditable
-                      suppressContentEditableWarning
-                      onPointerDown={stop}
-                      onWheel={stopWheel}
-                      onBlur={() => {
-                        saveFromEditor();
-                        setEditing(false);
-                      }}
-                      onPaste={clampEditableAfterPaste}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className={`textNodeReadOnly mono ${RF_NODE_INPUT_CLASS} ${textChrome ? "textNodeReadOnly--chrome" : ""}`}
-                    title="双击可编辑正文"
-                    onDoubleClick={onBodyDoubleClick}
-                    onPointerDown={stop}
-                    onWheel={stopWheel}
-                  >
-                    {prompt}
-                  </div>
-                )}
-                {composer}
-                {workflowBottomPanel}
-              </div>
-            ) : null}
-
-            <MagneticNodeAnchors nodeId={id} nodeType={type} />
-          </>
-        ) : null}
+        {!splitExpanded ? childrenContent : null}
       </NodeFrame>
 
       <TextNodeExpandEditModal

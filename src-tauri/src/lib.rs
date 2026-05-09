@@ -56,6 +56,7 @@ pub fn run() {
             commands::runs_cmd::list_runs,
             commands::runs_cmd::list_run_events,
             commands::runs_cmd::append_agent_event,
+            commands::runs_cmd::append_node_agent_event,
             commands::assets_cmd::list_assets,
             commands::assets_cmd::get_asset_by_id,
             commands::assets_cmd::get_asset_by_rel_path,
@@ -77,6 +78,7 @@ pub fn run() {
             commands::video_cmd::video_gen_get_job,
             commands::video_cmd::video_gen_cancel,
             commands::project_cmd::open_project_dir,
+            commands::file_cmd::read_file_as_base64,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

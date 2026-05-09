@@ -92,10 +92,21 @@ function AnchorSide({ zoneRef, side, menuDirection, handleId, handleType, onMenu
   const [hot, setHot] = useState(false);
   const [knobPos, setKnobPos] = useState<KnobPos>({ left: 0, top: 0 });
   const connectionInProgress = useStore((s) => s.connection.inProgress);
+  const connectionToNode = useStore((s) => s.connection.toNode);
+  const connectionIsValid = useStore((s) => s.connection.isValid);
   const nodeId = useNodeId();
   const updateNodeInternals = useUpdateNodeInternals();
 
   const show = hot || connectionInProgress;
+
+  const isConnectTarget = connectionInProgress && connectionToNode?.id === nodeId;
+  const zoneClass = isConnectTarget
+    ? connectionIsValid === false
+      ? "flowMagnetZone--connectTarget flowMagnetZone--connectTargetInvalid"
+      : "flowMagnetZone--connectTarget flowMagnetZone--connectTargetValid"
+    : hot
+      ? "flowMagnetZone--hot"
+      : "";
 
   const placeOnEdge = useCallback(() => {
     const z = zoneRef.current;
@@ -129,7 +140,7 @@ function AnchorSide({ zoneRef, side, menuDirection, handleId, handleType, onMenu
   return (
     <div
       ref={zoneRef as Ref<HTMLDivElement>}
-      className={`flowMagnetZone flowMagnetZone--${side} ${hot ? "flowMagnetZone--hot" : ""}`}
+      className={`flowMagnetZone flowMagnetZone--${side} ${zoneClass}`}
       data-side={side}
       onPointerEnter={() => {
         setHot(true);

@@ -1,7 +1,7 @@
 # 当前进度与下一步规划（异地协作）
 
 > **固定入口**：本文档为「进度 + 规划 + 代码索引」的**主文档**，请在异地开发时优先阅读本文。  
-> 更新日期：**2026-05-06**  
+> 更新日期：**2026-05-07**  
 > 仓库：**vibevideo**（Tauri + React + React Flow）  
 > 历史同名快照：`REMOTE_DEV_HANDOFF_2026-04-28.md`（内容与本文同步后仅作锚点，见该文件说明）。
 
@@ -32,15 +32,19 @@
 
 ## 3. 路线图位置（粗粒度）
 
-按 `ROADMAP_V2.md` 的 R 划分，当前更接近 **R2～R3 已大量落地，R4 部分起步**：
+按 `ROADMAP_V2.md` 的 R 划分，当前 **R1～R4 主体已落地，C.1/C.2/C.3 架构能力已实现**：
 
-| 阶段 | 状态（主观） | 说明 |
-|------|----------------|------|
+| 阶段 | 状态 | 说明 |
+|------|------|------|
 | R1 工程与保存 | 基本具备 | 工程 JSON、撤销重做、顶栏状态等。 |
 | R2 五类节点画布体验 | 持续迭代 | 节点尺寸、加载动效、连线在运行中可编辑等已做过多轮。 |
 | R3 脚本工作台 | **主体可用** | 全屏表、批量操作、模板（localStorage）、角色列与缩略图上传等。 |
-| R4 分镜 | **部分可用** | `storyboardShots`、`ScriptStoryboardSection`、与 `scriptBeatId` 绑定链路在演进。 |
-| R5+ | 未作为单轮闭环 | 视频参数编排、时间线导出等仍以路线图描述为主。 |
+| R4 分镜 | **产品化完成** | `storyboardShots`、`ScriptStoryboardSection` + Hermes 自动串联、失败重试。 |
+| R5 多模态输入 | **UI 已实现** | `VideoMultimodalInputPanel` 多模态输入面板，参数分组待完善。 |
+| R6 时间线合成 | **基础实现** | `FFmpegConcatPanel` FFmpeg 拼接面板，时间轴编辑能力待完善。 |
+| C.1 节点状态机 | ✅ 已实现 | 节点执行状态可见（idle/pending/running/succeeded/failed/skipped）。 |
+| C.2 失败策略 | ✅ 已存在 | 后端自动标记下游 skipped，`abortWorkflowOnFailure` 配置。 |
+| C.3 子图重跑 | ✅ 已存在 | 后端 `run_subgraph_inner`，前端"重跑失败子图"按钮。 |
 
 ---
 
@@ -134,10 +138,102 @@
 
 ```bash
 npm run quality:gate       # typecheck + lint + vitest coverage + rust test（日常提交）
-npm run quality:gate:full  # quality:gate + playwright e2e（CI 完整门禁）
+npm run quality:gate:full # quality:gate + playwright e2e（CI 完整门禁）
 ```
 
 覆盖区间：lines 60% / functions 60% / branches 50% / statements 60%
+
+### 4.8 R4 分镜产品化 + Hermes 自动串联（2026-05-07 实现）
+
+#### 4.8.1 R4 分镜产品化增强
+
+`ScriptStoryboardSection` 分镜网格增强：
+
+- **状态分类统计**：新增 `generatedShots`、`failedShots`、`idleShots`、`generatingShots` 及数量计数
+- **健康状态栏增强**：显示"已生成 X"和"失败 X"；生成中时动态更新
+- **批量重试失败**：新增"重试失败（X）"按钮，批量重试所有失败的分镜生成
+- **卡片样式增强**：
+  - `.storyboardCard--generated`：成功状态绿色边框和淡绿背景
+  - `.storyboardStatusBadge--generated`：绿色成功徽章 ✓
+- **Hermes 手动触发**：新增"Hermes 串联（X）"按钮，为已生成分镜的镜头创建下游节点
+
+关键文件：`src/components/ScriptStoryboardSection.tsx`
+
+#### 4.8.2 Hermes 自动串联核心
+
+新增 `src/lib/hermes/` 模块：
+
+| 文件 | 作用 |
+|------|------|
+| `src/lib/hermes/index.ts` | 入口，`initHermesAutoChain()` 初始化全局事件监听 |
+| `src/lib/hermes/autoChain.ts` | 核心逻辑，监听 `node-agent-event`，自动创建 `imageNode` + `videoNode` 配对 |
+| `src/lib/hermes/shotNodeFactory.ts` | 节点工厂，计算位置、创建节点数据 |
+| `src/lib/hermes/types.ts` | 类型定义 `HermesShotNodeGroup`、`HermesAutoChainResult` |
+
+触发条件：`scriptNode` 执行完成（`agentName === "脚本调度 Agent"` 且 `phase === "end"`）
+
+### 4.9 C.1 节点状态机（2026-05-07 实现）
+
+#### 4.9.1 节点状态类型
+
+新增类型定义（`src/lib/types.ts`）：
+
+```typescript
+export type NodeExecutionStatus = "idle" | "pending" | "running" | "succeeded" | "failed" | "skipped";
+
+export type NodeStatus = {
+  status: NodeExecutionStatus;
+  updatedAt: number;
+  agentName?: string;
+  phase?: string;
+  error?: string;
+  progress?: number;
+};
+```
+
+`FlowNodeData` 新增可选字段：`status?: NodeStatus`
+
+#### 4.9.2 状态监听 Hook
+
+新增 `src/hooks/useNodeStatus.ts`：
+
+- **`useNodeStatus(nodeId)`**：单节点状态读写
+- **`useNodeStatusListener()`**：全局事件监听，自动将 Agent phase 映射为执行状态
+
+#### 4.9.3 状态徽章组件
+
+新增 `src/components/nodes/NodeStatusBadge.tsx`：
+
+- 集成到 `NodeFrame` 标题栏
+- 支持状态：idle（隐藏）、pending（灰）、running（蓝+脉冲）、succeeded（绿）、failed（红）、skipped（灰）
+
+CSS 样式新增：`.nodeStatus*` 系列类名，动画效果
+
+### 4.10 C.2 失败策略 + C.3 子图重跑（确认已实现）
+
+#### C.2 失败策略 ✅
+
+**后端（`src-tauri/src/executor/engine.rs`）**：
+- 节点失败时自动将下游标记为 `skipped`（`downstream_descendants`）
+- `abort_workflow_on_failure` 配置控制是否中断整图
+
+**前端（`src/components/SettingsPanel.tsx`）**：
+- `abortWorkflowOnFailure` 开关已存在
+
+**UI（`src/components/RunPanel.tsx`）**：
+- 显示失败节点列表
+- 显示跳过原因统计
+
+#### C.3 子图重跑 ✅
+
+**后端**：`run_subgraph_inner` 函数支持从指定节点重跑，force 参数强制重跑已成功节点
+
+**前端（`src/store/projectWorkflowRuns.ts`）**：
+- `rerunFailedSubgraphImpl`：重跑失败子图
+- `runNodeSubgraphImpl`：从指定节点重跑
+
+**UI（`src/components/RunPanel.tsx`）**：
+- "重跑失败子图"按钮
 
 ---
 
@@ -146,7 +242,11 @@ npm run quality:gate:full  # quality:gate + playwright e2e（CI 完整门禁）
 | 主题 | 说明 |
 |------|------|
 | 视频任务引擎（R4/R5） | ~~pending~~ ✅ 已实现（`video_cmd.rs` 三命令 + 两阶段 poll + ffmpeg mock fallback）。真实 API 轮询（`poll_video_job_http`）仍为 stub，待接入 Doubao Seedance API。 |
-| 设计 vs 实现差距 | `architecture-spec-vs-implementation.md`：端口类型系统、DAG 并行/续跑、执行器只认 asset ID 等仍为 ⚠️/❌。 |
+| R4 分镜产品化 | ~~pending~~ ✅ 已实现（2026-05-07）。增强分镜网格状态、批量重试、Hermes 串联。 |
+| C.1 节点状态机 | ~~pending~~ ✅ 已实现（2026-05-07）。`node.data.status` 字段、全局事件监听、状态徽章 UI。 |
+| C.2 失败策略 | ~~pending~~ ✅ 已存在。后端自动标记下游 skipped，`abortWorkflowOnFailure` 配置。 |
+| C.3 子图重跑 | ~~pending~~ ✅ 已存在。后端 `run_subgraph_inner`，前端"重跑失败子图"按钮。 |
+| 设计 vs 实现差距 | `architecture-spec-vs-implementation.md`：端口类型系统、DAG 并行、执行器只认 asset ID 等仍为 ⚠️/❌。 |
 | 参考视频与多模态 | 当前为「路径 + 文本约束」；若产品要**真视频理解**，需单独方案（模型与成本）。 |
 | `global.css` 体积 | 单文件过大，长期建议按模块拆分（非功能阻断）。 |
 | `ScriptNodeWorkbench.tsx` | 体量大，后续可拆子组件或抽 hooks（非功能阻断）。 |
@@ -184,39 +284,45 @@ npm run quality:gate:full  # quality:gate + playwright e2e（CI 完整门禁）
 
 以下为**建议优先级**，可按人力拆 PR；每轮仍建议遵守 `ROADMAP_V2` 的「单核目标 + 验收步骤」。
 
-### P0 — 生产链路「可感知闭环」
+### P0 — 生产链路「可感知闭环」 ✅ 已完成
 
-1. **R4 分镜侧产品化**
-   - 强化 `ScriptStoryboardSection` / 分镜网格：进度、失败重试文案、与 `scriptBeatId` 一致性自检。
-   - 验收：单镜头 / 多镜头勾选生成、刷新后数据仍在工程 JSON 中。
+1. **~~R4 分镜侧产品化~~** ✅ 已实现（2026-05-07）
+   - 分镜网格状态增强、批量重试、Hermes 串联按钮
 
-2. **下游节点与脚本绑定「画布内可见」**
-   - Inspector 已支持下拉；可在 **图片 / 视频节点展开区** 只读或快捷修改当前绑定镜头，与侧栏一致。
-   - 验收：不打开 Inspector 也能看到当前绑定哪条 beat。
+2. **~~C.1 节点状态机~~** ✅ 已实现（2026-05-07）
+   - `node.data.status` 字段、全局事件监听、状态徽章 UI
 
-3. **~~视频异步任务引擎（提交→轮询→下载落盘→入库→可观测）~~** ✅ 已实现（2026-05）
-   - `video_gen_start` / `video_gen_get_job` / `video_gen_cancel` 三命令已完成。
-   - 真实 API 轮询（`poll_video_job_http`）仍为 stub，待接入 Doubao Seedance API。
-   - 设计与落地步骤见：[`docs/iterations/iteration-07-video-task-engine.md`](iteration-07-video-task-engine.md)
+3. **~~C.2 失败策略~~** ✅ 已存在
+   - 后端自动标记下游 skipped，`abortWorkflowOnFailure` 配置
+
+4. **~~C.3 子图重跑~~** ✅ 已存在
+   - 后端 `run_subgraph_inner`，前端"重跑失败子图"按钮
+
+5. **~~视频异步任务引擎~~** ✅ 已实现（2026-05）
+   - `video_gen_start` / `video_gen_get_job` / `video_gen_cancel` 三命令已完成
+   - 真实 API 轮询（`poll_video_job_http`）仍为 stub，待接入 Doubao Seedance API
 
 ### P1 — 脚本工作台与体验
 
-3. **Workbench 可维护性**  
-   - 拆分 `ScriptNodeWorkbench.tsx` 或提取批量/模板逻辑到 `src/lib/`。  
+1. **Workbench 可维护性**
+   - 拆分 `ScriptNodeWorkbench.tsx` 或提取批量/模板逻辑到 `src/lib/`。
 
-4. **样式拆分**  
+2. **样式拆分**
    - 从 `global.css` 抽出脚本工作台 / 画布浮层等 scoped 片段，减少合并冲突。
 
 ### P2 — 架构纵轴（与对照表一致，改动面大）
 
-5. **执行器与资产 ID**  
-   - 按 `architecture-spec-vs-implementation.md` 结论，选一纵轴：**DAG 内更多只认 `assetId` + 元数据表**，再扩端口类型。  
+3. **执行器与资产 ID**
+   - 按 `architecture-spec-vs-implementation.md` 结论，选一纵轴：**DAG 内更多只认 `assetId` + 元数据表**，再扩端口类型。
    - 需单独里程碑文档与迁移策略（旧工程兼容）。
+
+4. **视频节点参数分组 / 失败态固定区域**
+   - R5 视频生成参数面板完善
 
 ### P3 — 路线图后续 R5～R6
 
-6. 视频节点参数分组、失败态固定区域。  
-7. 时间线合成与导出闭环（与现有 `ffmpegConcat` 能力衔接）。
+5. 时间线合成与导出闭环
+   - 增强现有 `ffmpegConcat` 能力，添加时间轴编辑 UI
 
 ---
 
@@ -226,12 +332,15 @@ npm run quality:gate:full  # quality:gate + playwright e2e（CI 完整门禁）
 |------|------|
 | 画布与菜单 | `src/components/FlowCanvas.tsx`、`src/components/canvas/CanvasContextMenus.tsx`、`src/components/canvas/menuConstants.ts` |
 | 工程状态 | `src/store/projectStore.ts` |
-| 类型与序列化 | `src/lib/types.ts`、`src/lib/serialization.ts` |
+| 类型与序列化 | `src/lib/types.ts`（含 `NodeExecutionStatus`、`NodeStatus`）、`src/lib/serialization.ts` |
 | 脚本分镜数据 | `src/lib/scriptBeatHelpers.ts`、`src/lib/incomingScriptBinding.ts` |
 | 脚本节点 UI | `src/components/nodes/ScriptNode.tsx`、全屏 `ScriptNodeFullscreenOverlay.tsx`（若存在） |
 | 脚本工作台 | `src/components/ScriptNodeWorkbench.tsx`、`src/components/ScriptBeatsEditorTable.tsx` |
+| 分镜网格 | `src/components/ScriptStoryboardSection.tsx`（R4 产品化） |
+| 节点状态 | `src/hooks/useNodeStatus.ts`（C.1）、`src/components/nodes/NodeStatusBadge.tsx` |
+| Hermes 自动串联 | `src/lib/hermes/index.ts`、`src/lib/hermes/autoChain.ts`、`src/lib/hermes/shotNodeFactory.ts` |
 | 侧栏 | `src/components/Inspector.tsx` |
-| DAG 执行 | `src-tauri/src/executor.rs`、`src-tauri/src/graph.rs` |
+| DAG 执行 | `src-tauri/src/executor.rs`、`src-tauri/src/executor/engine.rs` |
 | 运行事件 / DB | `src-tauri/src/db.rs`（及与 `run_events` 相关调用） |
 | **视频生成** | `src-tauri/src/commands/video_cmd.rs`（三命令）、`src/lib/videoGeneration/mode.ts`（模式开关）、`src/lib/videoGeneration/bridge.ts`（路由）、`src/lib/videoGeneration/apiPool.ts`（mock client）、`src/hooks/useVideoNodeGeneration.ts` |
 | **测试基础设施** | `vitest.config.ts`（jsdom 环境）、`vitest.setup.ts`（jest-dom 全局） |

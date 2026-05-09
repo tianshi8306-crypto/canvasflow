@@ -128,31 +128,8 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
   if (!props.open) return null;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(0,0,0,0.55)",
-        display: "grid",
-        placeItems: "center",
-        zIndex: 50,
-      }}
-      onMouseDown={(e) => {
-        if (e.target === e.currentTarget) props.onClose();
-      }}
-    >
-      <div
-        style={{
-          width: "min(920px, calc(100vw - 24px))",
-          maxHeight: "min(720px, calc(100vh - 24px))",
-          overflow: "auto",
-          border: "1px solid var(--border)",
-          borderRadius: 14,
-          background: "var(--panel)",
-          padding: 14,
-        }}
-        onMouseDown={(e) => e.stopPropagation()}
-      >
+    <div className="settings-overlay" onMouseDown={(e) => { if (e.target === e.currentTarget) props.onClose(); }}>
+      <div className="settings-modal">
         <SettingsHeaderBar
           importFileRef={importFileRef}
           onImportFile={importSettingsJson}
@@ -162,28 +139,20 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
 
         {!settings ? (
           error ? (
-            <div style={{ color: "var(--danger)", marginBottom: 10, lineHeight: 1.5, whiteSpace: "pre-wrap" }}>{error}</div>
+            <div className="settings-error">{error}</div>
           ) : (
-            <div style={{ color: "var(--muted)" }}>加载中…</div>
+            <div className="settings-loading">加载中…</div>
           )
         ) : (
           <>
-            {notice ? <div style={{ color: "#22c55e", marginBottom: 10 }}>{notice}</div> : null}
-            {error ? <div style={{ color: "var(--danger)", marginBottom: 10 }}>{error}</div> : null}
+            {notice ? <div className="settings-notice">{notice}</div> : null}
+            {error ? <div className="settings-error">{error}</div> : null}
             {Object.keys(keyPreviews).length > 0 ? (
-              <div
-                style={{
-                  border: "1px solid var(--border)",
-                  borderRadius: 10,
-                  padding: 10,
-                  marginBottom: 10,
-                  background: "rgba(255,255,255,0.02)",
-                }}
-              >
-                <div style={{ fontWeight: 600, marginBottom: 6 }}>已保存密钥（脱敏）</div>
-                <div style={{ display: "grid", gap: 4, fontSize: 12, color: "var(--muted)" }}>
+              <div className="settings-key-previews">
+                <div className="settings-key-previews__title">已保存密钥（脱敏）</div>
+                <div className="settings-key-previews__list">
                   {Object.entries(keyPreviews).map(([id, item]) => (
-                    <div key={id} style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                    <div key={id} className="settings-key-previews__item">
                       <span title={id}>
                         {keyOwnerLabel(id, settings)} · <span className="mono">{item.masked || "******"}</span>
                       </span>
@@ -202,58 +171,57 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
               />
             </SettingsFormField>
 
-            <div className="field">
-              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
+            <div className="settings-checkbox-row">
+              <label>
                 <input
                   type="checkbox"
                   checked={settings.abortWorkflowOnFailure}
                   onChange={(e) =>
                     setSettings({ ...settings, abortWorkflowOnFailure: e.target.checked })
                   }
-                  style={{ marginTop: 3 }}
                 />
-                <span style={{ lineHeight: 1.45 }}>
-                  任一节点失败时中止整图（默认关闭：失败则跳过下游节点并标记为「跳过」）
-                </span>
+                <span>任一节点失败时中止整图（默认关闭：失败则跳过下游节点并标记为「跳过」）</span>
               </label>
             </div>
 
-            <SettingsTextProvidersSection
-              settings={settings}
-              setSettings={setSettings}
-              keys={keys}
-              setKeys={setKeys}
-              hasKey={hasKey}
-            />
+            <div className="settings-sections">
+              <SettingsTextProvidersSection
+                settings={settings}
+                setSettings={setSettings}
+                keys={keys}
+                setKeys={setKeys}
+                hasKey={hasKey}
+              />
 
-            <SettingsImageModelsSection
-              settings={settings}
-              setSettings={setSettings}
-              imageModelKeys={imageModelKeys}
-              setImageModelKeys={setImageModelKeys}
-              hasImageModelKey={hasImageModelKey}
-              testingModelId={testingModelId}
-              setTestingModelId={setTestingModelId}
-              setError={setError}
-              customModelNameValue={CUSTOM_MODEL_NAME_VALUE}
-              customModelVariantValue={CUSTOM_MODEL_VARIANT_VALUE}
-            />
+              <SettingsImageModelsSection
+                settings={settings}
+                setSettings={setSettings}
+                imageModelKeys={imageModelKeys}
+                setImageModelKeys={setImageModelKeys}
+                hasImageModelKey={hasImageModelKey}
+                testingModelId={testingModelId}
+                setTestingModelId={setTestingModelId}
+                setError={setError}
+                customModelNameValue={CUSTOM_MODEL_NAME_VALUE}
+                customModelVariantValue={CUSTOM_MODEL_VARIANT_VALUE}
+              />
 
-            <SettingsAudioModelsSection
-              settings={settings}
-              setSettings={setSettings}
-              audioModelKeys={audioModelKeys}
-              setAudioModelKeys={setAudioModelKeys}
-              hasAudioModelKey={hasAudioModelKey}
-            />
+              <SettingsAudioModelsSection
+                settings={settings}
+                setSettings={setSettings}
+                audioModelKeys={audioModelKeys}
+                setAudioModelKeys={setAudioModelKeys}
+                hasAudioModelKey={hasAudioModelKey}
+              />
 
-            <SettingsVideoModelsSection
-              settings={settings}
-              setSettings={setSettings}
-              videoModelKeys={videoModelKeys}
-              setVideoModelKeys={setVideoModelKeys}
-              hasVideoModelKey={hasVideoModelKey}
-            />
+              <SettingsVideoModelsSection
+                settings={settings}
+                setSettings={setSettings}
+                videoModelKeys={videoModelKeys}
+                setVideoModelKeys={setVideoModelKeys}
+                hasVideoModelKey={hasVideoModelKey}
+              />
+            </div>
 
             <SettingsSaveBar onSave={handleSave} />
           </>

@@ -61,6 +61,7 @@ function AudioMusicGlyph() {
           strokeWidth="1"
         />
       </svg>
+      <span className="nodeEmptyHint">点击上传或拖入音频</span>
     </div>
   );
 }

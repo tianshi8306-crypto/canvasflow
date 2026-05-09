@@ -1,4 +1,4 @@
-import { memo, type CSSProperties, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { memo, type Dispatch, type ReactNode, type SetStateAction } from "react";
 import type { AssetSummary } from "@/shared/api/assets";
 import { useAssetIdVisibilityPreference } from "@/hooks/useAssetIdVisibilityPreference";
 import { clampContextMenuPosition } from "@/lib/clampFloatingUi";
@@ -9,37 +9,12 @@ import {
   edgeToggleActionLabel,
   isEdgeDisabled,
 } from "@/lib/edgeState";
+import { addTextMaterial } from "@/lib/textMaterialStorage";
 import type { FlowCanvasMenuState } from "@/components/canvas/flowCanvasMenuState";
 import { FLOW_MENU, flowMenuWidth } from "@/components/canvas/menuConstants";
 import { getUndoRedoAvailability } from "@/store/projectStore";
 import { useProjectStore } from "@/store/projectStore";
 import type { FlowNodeData } from "@/lib/types";
-
-const MENU_BTN: CSSProperties = {
-  borderRadius: 0,
-  border: "none",
-  textAlign: "left" as const,
-};
-
-const MENU_BTN_DIVIDER: CSSProperties = {
-  ...MENU_BTN,
-  borderBottom: "1px solid var(--border)",
-};
-
-const MENU_SEP: CSSProperties = {
-  height: 1,
-  margin: 0,
-  border: "none",
-  background: "var(--canvas-float-border)",
-  opacity: 0.65,
-};
-
-const MENU_SHORTCUT: CSSProperties = {
-  fontSize: 11,
-  color: "var(--muted)",
-  flexShrink: 0,
-  fontVariantNumeric: "tabular-nums",
-};
 
 function canvasModHints(): { copy: string; paste: string; del: string; undo: string; redo: string } {
   const mac =
@@ -156,6 +131,33 @@ function PaneL1Row({
       className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l1"
     >
       <span>{children}</span>
+      {shortcut ? <span className="canvasPaneCtxMenu__shortcut">{shortcut}</span> : null}
+    </button>
+  );
+}
+
+function CtxRow({
+  children,
+  shortcut,
+  disabled,
+  title,
+  onClick,
+}: {
+  children: ReactNode;
+  shortcut?: string;
+  disabled?: boolean;
+  title?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      title={title}
+      onClick={onClick}
+      className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l1"
+    >
+      <span style={{ flex: 1, textAlign: "left" }}>{children}</span>
       {shortcut ? <span className="canvasPaneCtxMenu__shortcut">{shortcut}</span> : null}
     </button>
   );
@@ -299,6 +301,7 @@ export type CanvasContextMenusProps = {
   undo: () => void;
   redo: () => void;
   setMenuState: Dispatch<SetStateAction<FlowCanvasMenuState | null>>;
+  onOpenSubjectCreation: (nodeId: string) => void;
 };
 
 function CanvasContextMenusInner(props: CanvasContextMenusProps) {
@@ -319,6 +322,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
     undo,
     redo,
     setMenuState,
+    onOpenSubjectCreation,
   } = props;
 
   const w = flowMenuWidth(menuState);
@@ -338,6 +342,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
       ? nodes.find((n) => n.id === menuState.nodeId)
       : null;
   const isTextNodeCtx = ctxNode?.type === "textNode";
+  const isImageNodeCtx = ctxNode?.type === "imageNode";
   const ctxEdge =
     menuState.mode === "context-edge" && menuState.edgeId
       ? edges.find((e) => e.id === menuState.edgeId)
@@ -550,37 +555,24 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
         )
       ) : menuState.mode === "context-node" ? (
         isTextNodeCtx && ctxNode && menuState.nodeId ? (
-          <div style={{ display: "grid" }} role="menu">
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN_DIVIDER}
-              onClick={() => {
-                setStatusText("保存到我的素材（敬请期待）");
-                onDismiss();
-              }}
-            >
+          <div className="canvasPaneCtxMenu__shell" role="menu">
+            <CtxRow onClick={() => {
+              const content = (ctxNode.data as FlowNodeData).prompt ?? "";
+              if (content.trim()) {
+                addTextMaterial(content);
+                setStatusText("已保存到我的素材");
+              } else {
+                setStatusText("文本内容为空，无法保存");
+              }
+              onDismiss();
+            }}>
               保存到我的素材
-            </button>
-            <button type="button" className="btn" style={MENU_BTN_DIVIDER} disabled title="即将支持">
-              创建主体
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN_DIVIDER}
-              onClick={() => {
-                setStatusText("优化工作流布局（敬请期待）");
-                onDismiss();
-              }}
-            >
+            </CtxRow>
+            <CtxRow onClick={() => { setStatusText("优化工作流布局（敬请期待）"); onDismiss(); }}>
               优化工作流布局
-            </button>
+            </CtxRow>
             {textBody ? (
-              <button
-                type="button"
-                className="btn"
-                style={MENU_BTN_DIVIDER}
+              <CtxRow
                 title="显示下载与缩放手柄"
                 onClick={() => {
                   const base =
@@ -595,170 +587,73 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
                 }}
               >
                 {textChromeOn ? "隐藏文本工具与下载" : "文本工具与下载"}
-              </button>
+              </CtxRow>
             ) : null}
-            <hr style={MENU_SEP} />
-            <button
-              type="button"
-              className="btn"
-              style={{ ...MENU_BTN_DIVIDER, display: "flex", justifyContent: "space-between", gap: 10 }}
-              onClick={() => {
-                copySelection();
-                onDismiss();
-              }}
-            >
-              <span style={{ flex: "1 1 auto", textAlign: "left" }}>复制节点</span>
-              <span style={MENU_SHORTCUT}>{sk.copy}</span>
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN_DIVIDER}
-              onClick={() => {
-                copySelection();
-                pasteSelection();
-                onDismiss();
-              }}
-            >
+            <PaneSep />
+            <CtxRow shortcut={sk.copy} onClick={() => { copySelection(); onDismiss(); }}>
+              复制节点
+            </CtxRow>
+            <CtxRow onClick={() => { copySelection(); pasteSelection(); onDismiss(); }}>
               创建副本
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={{ ...MENU_BTN_DIVIDER, display: "flex", justifyContent: "space-between", gap: 10 }}
+            </CtxRow>
+            <CtxRow
+              shortcut={sk.paste}
               disabled={flowClipboardCount === 0}
               title={flowClipboardCount === 0 ? "请先在画布中复制节点" : undefined}
-              onClick={() => {
-                pasteSelection();
-                onDismiss();
-              }}
+              onClick={() => { pasteSelection(); onDismiss(); }}
             >
-              <span style={{ flex: "1 1 auto", textAlign: "left" }}>粘贴</span>
-              <span style={MENU_SHORTCUT}>{sk.paste}</span>
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={{ ...MENU_BTN_DIVIDER, display: "flex", justifyContent: "space-between", gap: 10 }}
-              onClick={() => {
-                deleteSelection();
-                onDismiss();
-              }}
-            >
-              <span style={{ flex: "1 1 auto", textAlign: "left" }}>删除</span>
-              <span style={MENU_SHORTCUT}>{sk.del}</span>
-            </button>
-            <hr style={MENU_SEP} />
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN}
+              粘贴
+            </CtxRow>
+            <CtxRow shortcut={sk.del} onClick={() => { deleteSelection(); onDismiss(); }}>
+              删除
+            </CtxRow>
+            <PaneSep />
+            <CtxRow
               onClick={() => {
                 const raw = (ctxNode.data as FlowNodeData).prompt ?? "";
                 void navigator.clipboard.writeText(raw).then(
-                  () => {
-                    setStatusText("已复制正文到剪贴板");
-                    onDismiss();
-                  },
-                  () => {
-                    setStatusText("复制失败，请手动选择文本");
-                    onDismiss();
-                  },
+                  () => { setStatusText("已复制正文到剪贴板"); onDismiss(); },
+                  () => { setStatusText("复制失败，请手动选择文本"); onDismiss(); },
                 );
               }}
             >
               复制到剪贴板
-            </button>
+            </CtxRow>
+          </div>
+        ) : isImageNodeCtx && ctxNode && menuState.nodeId ? (
+          <div className="canvasPaneCtxMenu__shell" role="menu">
+            <CtxRow onClick={() => {
+              onDismiss();
+              onOpenSubjectCreation(menuState.nodeId!);
+            }}>
+              创建主体
+            </CtxRow>
+            <PaneSep />
+            <CtxRow onClick={() => { copySelection(); onDismiss(); }}>复制</CtxRow>
+            <CtxRow onClick={() => { copySelection(); pasteSelection(); onDismiss(); }}>复制副本</CtxRow>
+            <CtxRow onClick={() => { undo(); onDismiss(); }}>撤销</CtxRow>
+            <CtxRow onClick={() => { redo(); onDismiss(); }}>重做</CtxRow>
+            <CtxRow onClick={() => { deleteSelection(); onDismiss(); }}>删除</CtxRow>
           </div>
         ) : (
-          <div style={{ display: "grid" }} role="menu">
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN_DIVIDER}
-              onClick={() => {
-                copySelection();
-                onDismiss();
-              }}
-            >
-              复制
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN_DIVIDER}
-              onClick={() => {
-                copySelection();
-                pasteSelection();
-                onDismiss();
-              }}
-            >
-              复制副本
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN_DIVIDER}
-              onClick={() => {
-                undo();
-                onDismiss();
-              }}
-            >
-              撤销（Ctrl/Cmd+Z）
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN_DIVIDER}
-              onClick={() => {
-                redo();
-                onDismiss();
-              }}
-            >
-              重做（Ctrl/Cmd+Shift+Z）
-            </button>
-            <button
-              type="button"
-              className="btn"
-              style={MENU_BTN}
-              onClick={() => {
-                deleteSelection();
-                onDismiss();
-              }}
-            >
-              删除
-            </button>
+          <div className="canvasPaneCtxMenu__shell" role="menu">
+            <CtxRow onClick={() => { copySelection(); onDismiss(); }}>复制</CtxRow>
+            <CtxRow onClick={() => { copySelection(); pasteSelection(); onDismiss(); }}>复制副本</CtxRow>
+            <CtxRow onClick={() => { undo(); onDismiss(); }}>撤销</CtxRow>
+            <CtxRow onClick={() => { redo(); onDismiss(); }}>重做</CtxRow>
+            <CtxRow onClick={() => { deleteSelection(); onDismiss(); }}>删除</CtxRow>
           </div>
         )
       ) : menuState.mode === "context-edge" ? (
-        <div style={{ display: "grid" }} role="menu">
-          <button
-            type="button"
-            className="btn"
-            style={MENU_BTN_DIVIDER}
+        <div className="canvasPaneCtxMenu__shell" role="menu">
+          <CtxRow
             disabled={selectedEdgeCount === 0}
-            onClick={() => {
-              toggleSelectedEdgesDisabled(!allSelectedEdgesDisabled);
-              onDismiss();
-            }}
+            onClick={() => { toggleSelectedEdgesDisabled(!allSelectedEdgesDisabled); onDismiss(); }}
           >
             {edgeToggleActionLabel(!allSelectedEdgesDisabled, selectedEdgeCount)}
-          </button>
-          <button
-            type="button"
-            className="btn"
-            style={MENU_BTN_DIVIDER}
-            onClick={() => {
-              deleteSelection();
-              onDismiss();
-            }}
-          >
-            删除连线
-          </button>
-          <button
-            type="button"
-            className="btn"
-            style={MENU_BTN_DIVIDER}
+          </CtxRow>
+          <CtxRow onClick={() => { deleteSelection(); onDismiss(); }}>删除连线</CtxRow>
+          <CtxRow
             disabled={!ctxEdge}
             onClick={() => {
               if (!ctxEdge) return;
@@ -769,11 +664,8 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
             }}
           >
             定位上游节点
-          </button>
-          <button
-            type="button"
-            className="btn"
-            style={MENU_BTN}
+          </CtxRow>
+          <CtxRow
             disabled={!ctxEdge}
             onClick={() => {
               if (!ctxEdge) return;
@@ -784,7 +676,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
             }}
           >
             定位下游节点
-          </button>
+          </CtxRow>
         </div>
       ) : menuState.mode === "context-pane" ? (
         menuState.paneAddSubmenu ? (

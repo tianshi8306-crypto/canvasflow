@@ -1,5 +1,6 @@
 pub mod assets_cmd;
 pub mod download_cmd;
+pub mod file_cmd;
 pub mod generic_api_cmd;
 pub mod graph_cmd;
 pub mod media_gen_cmd;

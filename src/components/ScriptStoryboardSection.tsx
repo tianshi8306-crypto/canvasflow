@@ -6,6 +6,7 @@ import { normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
 import { formatUserError } from "@/lib/errors";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { scriptStoryboardGenerateAgentRuntime } from "@/lib/nodeAgentRuntime/scriptStoryboardAgent";
+import { handleScriptNodeCompleted } from "@/lib/hermes/autoChain";
 import { pickImagePathsForImport } from "@/lib/tauriMediaPaths";
 import { resolveProjectAssetSrc } from "@/lib/projectMediaUrl";
 import { makeFlowEdge } from "@/lib/flowEdge";
@@ -68,6 +69,11 @@ export function ScriptStoryboardSection({
       const s = shotByBeat.get(b.id);
       return Boolean(s && !s.visualPrompt?.trim());
     });
+    // 增强：按生成状态分类
+    const generatedShots = list.filter((s) => s.status === "generated" && s.visualPrompt?.trim());
+    const failedShots = list.filter((s) => s.status === "failed");
+    const idleShots = list.filter((s) => !s.status || s.status === "idle");
+    const generatingShots = list.filter((s) => s.status === "generating");
     return {
       totalBeats: beatsNorm.length,
       totalShots: list.length,
@@ -75,6 +81,15 @@ export function ScriptStoryboardSection({
       duplicateShotIds,
       missingShotBeats,
       emptyPromptBeats,
+      // 新增状态统计
+      generatedShots,
+      failedShots,
+      idleShots,
+      generatingShots,
+      generatedCount: generatedShots.length,
+      failedCount: failedShots.length,
+      idleCount: idleShots.length,
+      generatingCount: generatingShots.length,
     };
   }, [beatsNorm, shotByBeat, shots]);
 
@@ -146,6 +161,37 @@ export function ScriptStoryboardSection({
       return;
     }
     void runGenerate(picked);
+  };
+
+  /** 批量重试所有失败的镜头 */
+  const retryFailedShots = () => {
+    if (storyboardHealth.failedCount === 0) {
+      setStatusText("当前没有失败的分镜条目");
+      return;
+    }
+    // 找到失败条目对应的 beat
+    const failedBeatIds = storyboardHealth.failedShots.map((s) => s.scriptBeatId);
+    const picked = beatsNorm.filter((b) => failedBeatIds.includes(b.id));
+    if (picked.length === 0) {
+      setStatusText("无法找到失败条目对应的脚本镜头");
+      return;
+    }
+    void runGenerate(picked);
+  };
+
+  /** 手动触发 Hermes 自动串联（为已生成分镜的镜头创建下游节点） */
+  const triggerHermesAutoChain = () => {
+    const generatedShots = shots?.filter((s) => s.status === "generated" && s.visualPrompt?.trim()) ?? [];
+    if (generatedShots.length === 0) {
+      setStatusText("当前没有已生成分镜的镜头，请先生成分镜");
+      return;
+    }
+    const result = handleScriptNodeCompleted(nodeId);
+    if (result.total === 0) {
+      setStatusText("Hermes 串联：未找到可创建的下游节点");
+    } else {
+      setStatusText(`Hermes 串联完成：${result.succeeded} 个节点组已创建` + (result.failed > 0 ? `，${result.failed} 个失败` : ""));
+    }
   };
 
   const generateSelected = () => {
@@ -424,6 +470,15 @@ export function ScriptStoryboardSection({
         >
           生成音频链路（试点）
         </button>
+        <button
+          type="button"
+          className="btn btnPrimary"
+          disabled={generating || storyboardHealth.generatedCount === 0}
+          title="为已生成分镜的镜头自动创建下游图片+视频节点链路"
+          onClick={triggerHermesAutoChain}
+        >
+          {generating ? "串联中…" : `Hermes 串联（${storyboardHealth.generatedCount}）`}
+        </button>
       </div>
       <p className="storyboardHint">
         LLM 生成分镜文案；可在详情中从本机选择一张图导入工程并关联为「分镜图」（不出云端图生）。须已打开工程，桌面端选择文件。
@@ -448,6 +503,18 @@ export function ScriptStoryboardSection({
             {storyboardHealth.duplicateShotIds.length > 0 ? (
               <span className="storyboardHealthWarn mono">重复 {storyboardHealth.duplicateShotIds.length}</span>
             ) : null}
+            {generating ? (
+              <span className="storyboardHealthWarn mono">生成中 {storyboardHealth.generatingCount > 0 ? `（${storyboardHealth.generatingCount} 条）` : ""}</span>
+            ) : (
+              <>
+                {storyboardHealth.generatedCount > 0 && (
+                  <span className="storyboardHealthOk mono">已生成 {storyboardHealth.generatedCount}</span>
+                )}
+                {storyboardHealth.failedCount > 0 && (
+                  <span className="storyboardHealthWarn mono">失败 {storyboardHealth.failedCount}</span>
+                )}
+              </>
+            )}
           </div>
           <div className="storyboardHealthActions">
             <button
@@ -467,6 +534,15 @@ export function ScriptStoryboardSection({
               title="只为分镜文案为空的镜头补全（会覆盖空文案）"
             >
               补生成（空文案）
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={generating || storyboardHealth.failedCount === 0}
+              onClick={retryFailedShots}
+              title="重试所有失败的分镜生成"
+            >
+              重试失败（{storyboardHealth.failedCount}）
             </button>
             <button
               type="button"
@@ -492,38 +568,70 @@ export function ScriptStoryboardSection({
         <div className="storyboardEmpty">请先在脚本工作台添加或生成脚本条目。</div>
       ) : sbView === "grid" ? (
         <div className="storyboardGrid">
-          {orderedRows.map(({ beat, shot }) => (
-            <button
-              key={beat.id}
-              type="button"
-              className="storyboardCard"
-              onClick={() =>
-                setDetail(
-                  shot ?? {
-                    scriptBeatId: beat.id,
-                    visualPrompt: "",
-                  },
-                )
-              }
-            >
-              {shot?.imagePath && resolveProjectAssetSrc(projectPath, shot.imagePath) ? (
-                <div className="storyboardCardThumb">
-                  <img
-                    alt=""
-                    src={resolveProjectAssetSrc(projectPath, shot.imagePath) ?? undefined}
-                  />
+          {orderedRows.map(({ beat, shot }) => {
+            const status = shot?.status ?? "idle";
+            const videoStatus = shot?.videoStatus;
+            const isGenerating = status === "generating";
+            const isFailed = status === "failed";
+            const isGenerated = status === "generated" && shot?.visualPrompt?.trim();
+            const isVideoGenerating = videoStatus === "generating";
+            const isVideoFailed = videoStatus === "failed";
+            const isVideoGenerated = videoStatus === "generated";
+            return (
+              <button
+                key={beat.id}
+                type="button"
+                className={`storyboardCard${isGenerating ? " storyboardCard--generating" : ""}${isFailed ? " storyboardCard--failed" : ""}${isGenerated ? " storyboardCard--generated" : ""}`}
+                onClick={() =>
+                  setDetail(
+                    shot ?? {
+                      scriptBeatId: beat.id,
+                      visualPrompt: "",
+                      status: "idle",
+                    },
+                  )
+                }
+              >
+                {shot?.imagePath && resolveProjectAssetSrc(projectPath, shot.imagePath) ? (
+                  <div className="storyboardCardThumb">
+                    <img
+                      alt=""
+                      src={resolveProjectAssetSrc(projectPath, shot.imagePath) ?? undefined}
+                    />
+                  </div>
+                ) : null}
+                <div className="storyboardCardMeta mono">
+                  {(beat.shotNumber ?? "").trim() || "未标镜号"}
+                  {isGenerating ? <span className="storyboardStatusBadge storyboardStatusBadge--generating">生成中</span> : null}
+                  {isFailed ? (
+                    <span className="storyboardStatusBadge storyboardStatusBadge--failed" title={shot?.error}>
+                      失败{shot?.retryCount ? ` · 重试 ${shot.retryCount}` : ""}
+                    </span>
+                  ) : isGenerated ? (
+                    <span className="storyboardStatusBadge storyboardStatusBadge--generated">✓</span>
+                  ) : null}
+                  {isVideoGenerating ? (
+                    <span className="storyboardStatusBadge storyboardStatusBadge--video">视频生成中</span>
+                  ) : isVideoFailed ? (
+                    <span className="storyboardStatusBadge storyboardStatusBadge--video storyboardStatusBadge--failed" title={shot?.videoError}>
+                      视频失败
+                    </span>
+                  ) : isVideoGenerated ? (
+                    <span className="storyboardStatusBadge storyboardStatusBadge--video storyboardStatusBadge--generated">✓ 视频</span>
+                  ) : null}
                 </div>
-              ) : null}
-              <div className="storyboardCardMeta mono">
-                {(beat.shotNumber ?? "").trim() || "未标镜号"}
-              </div>
-              <div className="storyboardCardPreview">
-                {shot?.visualPrompt?.trim()
-                  ? `${shot.visualPrompt.slice(0, 120)}${shot.visualPrompt.length > 120 ? "…" : ""}`
-                  : "待生成 · 点击填写或生成后查看全文"}
-              </div>
-            </button>
-          ))}
+                <div className="storyboardCardPreview">
+                  {shot?.visualPrompt?.trim()
+                    ? `${shot.visualPrompt.slice(0, 120)}${shot.visualPrompt.length > 120 ? "…" : ""}`
+                    : status === "generating"
+                      ? "正在生成镜头描述…"
+                      : status === "failed"
+                        ? `生成失败：${shot?.error ?? "未知错误"}`
+                        : "待生成 · 点击填写或生成后查看全文"}
+                </div>
+              </button>
+            );
+          })}
         </div>
       ) : (
         <div className="storyboardListWrap">
@@ -533,48 +641,66 @@ export function ScriptStoryboardSection({
                 <th style={{ width: 52 }}>图</th>
                 <th>场次</th>
                 <th>画面描述摘要</th>
+                <th style={{ width: 80 }}>视频</th>
                 <th style={{ width: 72 }}>回看</th>
               </tr>
             </thead>
             <tbody>
-              {orderedRows.map(({ beat, shot }) => (
-                <tr key={beat.id}>
-                  <td>
-                    {shot?.imagePath && resolveProjectAssetSrc(projectPath, shot.imagePath) ? (
-                      <img
-                        className="storyboardListThumb"
-                        alt=""
-                        src={resolveProjectAssetSrc(projectPath, shot.imagePath) ?? undefined}
-                      />
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td className="mono">{beat.shotNumber}</td>
-                  <td>
-                    {shot?.visualPrompt?.trim()
-                      ? `${shot.visualPrompt.slice(0, 80)}${shot.visualPrompt.length > 80 ? "…" : ""}`
-                      : "—"}
-                  </td>
-                  <td>
-                    <button
-                      type="button"
-                      className="btn"
-                      style={{ padding: "4px 8px" }}
-                      onClick={() =>
-                        setDetail(
-                          shot ?? {
-                            scriptBeatId: beat.id,
-                            visualPrompt: "",
-                          },
-                        )
-                      }
-                    >
-                      全文
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {orderedRows.map(({ beat, shot }) => {
+                const videoStatus = shot?.videoStatus;
+                const isVideoGenerating = videoStatus === "generating";
+                const isVideoFailed = videoStatus === "failed";
+                const isVideoGenerated = videoStatus === "generated";
+                return (
+                  <tr key={beat.id}>
+                    <td>
+                      {shot?.imagePath && resolveProjectAssetSrc(projectPath, shot.imagePath) ? (
+                        <img
+                          className="storyboardListThumb"
+                          alt=""
+                          src={resolveProjectAssetSrc(projectPath, shot.imagePath) ?? undefined}
+                        />
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="mono">{beat.shotNumber}</td>
+                    <td>
+                      {shot?.visualPrompt?.trim()
+                        ? `${shot.visualPrompt.slice(0, 80)}${shot.visualPrompt.length > 80 ? "…" : ""}`
+                        : "—"}
+                    </td>
+                    <td>
+                      {isVideoGenerating ? (
+                        <span className="storyboardStatusBadge storyboardStatusBadge--video">视频生成中</span>
+                      ) : isVideoFailed ? (
+                        <span className="storyboardStatusBadge storyboardStatusBadge--video storyboardStatusBadge--failed" title={shot?.videoError}>
+                          视频失败
+                        </span>
+                      ) : isVideoGenerated ? (
+                        <span className="storyboardStatusBadge storyboardStatusBadge--video storyboardStatusBadge--generated">✓ 视频</span>
+                      ) : "—"}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ padding: "4px 8px" }}
+                        onClick={() =>
+                          setDetail(
+                            shot ?? {
+                              scriptBeatId: beat.id,
+                              visualPrompt: "",
+                            },
+                          )
+                        }
+                      >
+                        全文
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -624,6 +750,38 @@ export function ScriptStoryboardSection({
               <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
                 {detail.imagePath ?? "未关联"}
               </span>
+              {detail.status === "failed" ? (
+                <button
+                  type="button"
+                  className="btn btnDanger"
+                  onClick={() => {
+                    const beat = beatsNorm.find((b) => b.id === detail.scriptBeatId);
+                    if (!beat || !projectPath) return;
+                    void (async () => {
+                      setGenerating(true);
+                      try {
+                        await runNodeTaskAgent(
+                          scriptStoryboardGenerateAgentRuntime,
+                          { targetBeats: [beat], themePrompt, prevShots: shots },
+                          { nodeId, projectPath, updateNodeData, setStatusText },
+                        );
+                      } finally {
+                        setGenerating(false);
+                      }
+                    })();
+                  }}
+                  disabled={generating}
+                >
+                  重试生成
+                </button>
+              ) : detail.status === "generating" ? (
+                <span className="storyboardStatusBadge storyboardStatusBadge--generating mono">生成中…</span>
+              ) : null}
+              {detail.status === "failed" && detail.error ? (
+                <span className="mono" style={{ fontSize: 12, color: "var(--danger)" }} title={detail.error}>
+                  错误：{detail.error}
+                </span>
+              ) : null}
             </div>
             <div className="field">
               <label>画面描述（visualPrompt）</label>

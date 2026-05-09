@@ -1,12 +1,8 @@
-//! 视频生成真实供应商适配（当前默认 Doubao Seedance 2.0）。
+//! 视频生成供应商适配（当前默认 Doubao Seedance 2.0）。
 //!
-//! 最小生产闭环：
-//! 1. video_gen_start  -> 提交任务到供应商，返回 jobId（存储在 AppState.video_jobs）
-//! 2. video_gen_get_job -> 轮询供应商接口，状态 succeeded 时调用 download_remote_asset 落盘
-//!
-//! 设置来源：
-//! - videoModels[id] 中配置 apiBaseUrl / apiKey（从 vault 读取）
-//! - 若未配置 API Key，降级走 mock（ffmpeg 黑屏），保持联调能力不变
+//! 核心链路：
+//! 1. video_gen_start  -> 提交任务到供应商，返回 jobId
+//! 2. video_gen_get_job -> 轮询供应商接口，状态 succeeded 时下载视频落盘
 
 use crate::command_common::resolve_ffmpeg_bin;
 use crate::commands::types::{VideoGenStartResponse, VideoGenerationStartRequest, VideoJobSnapshot};
@@ -20,27 +16,28 @@ use serde_json::json;
 use std::path::PathBuf;
 use std::process::Command;
 
-/// Doubao Seedance API 基址（可通过设置页 videoModel.apiBaseUrl 覆盖）
-const DEFAULT_DOUBAD_API_BASE: &str = "https://ark.cn-beijing.volces.com/api/v3";
+/// Doubao Seedance API 基址
+const DEFAULT_SEEDANCE_API_BASE: &str = "https://ark.cn-beijing.volces.com/api/v3";
 
-/// 从 settings 中解析视频模型配置（与 generate_image_asset 模式一致）
+/// 从 settings 中解析视频模型配置
 fn resolve_video_model_config(
     app: &tauri::AppHandle,
     model_id: &str,
 ) -> Result<(String, String), String> {
     let app_settings = settings::load_settings(app)?;
+    // 用 model 字段（真实 API 标识，如 "doubao-seedance-2-0-260128"）匹配
     let cfg = app_settings
         .video_models
         .iter()
-        .find(|m| m.id == model_id && m.enabled)
-        .ok_or_else(|| format!("视频模型不存在或已禁用：{}", model_id))?;
+        .find(|m| m.model == model_id && m.enabled)
+        .ok_or_else(|| format!("视频模型不存在或已禁用：{}（请确认模型标识与 Settings 中填写的值一致）", model_id))?;
 
     let key_id = format!("video-model:{}", cfg.id);
     let api_key =
         get_api_key(&key_id)?.ok_or_else(|| format!("未配置视频模型 API Key：{}", cfg.label))?;
 
     let base_url = if cfg.api_base_url.trim().is_empty() {
-        DEFAULT_DOUBAD_API_BASE.to_string()
+        DEFAULT_SEEDANCE_API_BASE.to_string()
     } else {
         cfg.api_base_url.trim().to_string()
     };
@@ -48,7 +45,8 @@ fn resolve_video_model_config(
     Ok((base_url, api_key))
 }
 
-/// 调用视频生成 HTTP API 并返回 job_id（外部轮询用）
+/// 调用 Seedance 提交视频生成任务
+/// API: POST https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks
 async fn submit_video_job_http(
     app: &tauri::AppHandle,
     http: &reqwest::Client,
@@ -56,17 +54,118 @@ async fn submit_video_job_http(
 ) -> Result<String, String> {
     let (base_url, api_key) = resolve_video_model_config(app, &req.payload.model_id)?;
 
+    // 构建 content[] 数组
+    let mut content: Vec<serde_json::Value> = vec![];
+
+    // 添加文本 prompt
+    if !req.payload.prompt.is_empty() {
+        content.push(json!({
+            "type": "text",
+            "text": req.payload.prompt
+        }));
+    }
+
+    // 添加参考图片（≤9张，支持 first_frame / reference_image / last_frame）
+    // API 使用公网 URL，role 支持: first_frame / reference_image / last_frame
+    // role 规则因 workflow 而异：
+    //   - first_last_frame: idx=0→first_frame, idx=1→last_frame, idx=2+→reference_image
+    //   - image_to_video (首帧模式): first_frame（单张图）
+    //   - image_reference / multimodal_reference: 全部 reference_image
+    //   - text_to_video: 无图片
+    if let Some(ref paths) = req.payload.reference_image_paths {
+        for (idx, path) in paths.iter().take(9).enumerate() {
+            let path_str = path.to_string();
+            let role = match req.payload.workflow.as_str() {
+                "first_last_frame" => {
+                    if idx == 0 {
+                        "first_frame"
+                    } else if idx == 1 {
+                        "last_frame"
+                    } else {
+                        "reference_image"
+                    }
+                }
+                // 图生视频-首帧（单张图）：role 为 first_frame
+                "image_to_video" => "first_frame",
+                // 图片参考/全能参考：全部作为参考图
+                "image_reference" | "multimodal_reference" => "reference_image",
+                // 默认：首帧 + 参考图
+                _ => {
+                    if idx == 0 { "first_frame" } else { "reference_image" }
+                }
+            };
+            content.push(json!({
+                "type": "image_url",
+                "image_url": { "url": path_str },
+                "role": role
+            }));
+        }
+    }
+
+    // 添加参考视频（≤3个），role 支持: reference_video
+    if let Some(ref paths) = req.payload.reference_video_paths {
+        for path in paths.iter().take(3) {
+            let path_str = path.to_string();
+            content.push(json!({
+                "type": "video_url",
+                "video_url": { "url": path_str },
+                "role": "reference_video"
+            }));
+        }
+    }
+
+    // 添加参考音频（≤3个）
+    if let Some(ref paths) = req.payload.reference_audio_paths {
+        for path in paths.iter().take(3) {
+            let path_str = path.to_string();
+            content.push(json!({
+                "type": "audio_url",
+                "audio_url": { "url": path_str }
+            }));
+        }
+    }
+
+    // 从 output 配置读取参数，默认值覆盖
+    let mut duration = 5i64;
+    let mut resolution = "720p".to_string();
+    let mut ratio = "16:9".to_string();
+    let mut generate_audio = true;
+    let mut watermark = false;
+
+    if let Some(output) = req.payload.output.as_object() {
+        if let Some(v) = output.get("durationSec").and_then(|v| v.as_i64()) {
+            duration = v;
+        }
+        if let Some(v) = output.get("resolution").and_then(|v| v.as_str()) {
+            resolution = v.to_lowercase();
+        }
+        if let Some(v) = output.get("aspectRatio").and_then(|v| v.as_str()) {
+            ratio = v.to_string();
+        }
+        if let Some(v) = output.get("generateAudio").and_then(|v| v.as_bool()) {
+            generate_audio = v;
+        }
+        if let Some(v) = output.get("watermark").and_then(|v| v.as_bool()) {
+            watermark = v;
+        }
+    }
+
+    // 这些字段放到请求体顶层，不是 parameters 里
     let body = json!({
         "model": req.payload.model_id,
-        "input": {
-            "prompt": req.payload.prompt,
-        },
-        "parameters": {
-            "output": req.payload.output,
-        },
+        "content": content,
+        "duration": duration,
+        "resolution": resolution,
+        "ratio": ratio,
+        "generate_audio": generate_audio,
+        "watermark": watermark
     });
 
-    let url = format!("{}/submit", base_url.trim_end_matches('/'));
+    let body_str = serde_json::to_string(&body).unwrap_or_else(|_| "?".into());
+    eprintln!("[submit_video_job_http] 请求体:\n{}", body_str);
+
+    let url = format!("{}/contents/generations/tasks", base_url.trim_end_matches('/'));
+    eprintln!("[submit_video_job_http] 发送请求到: {}", url);
     let resp = http
         .post(&url)
         .header("Authorization", format!("Bearer {}", api_key))
@@ -78,6 +177,7 @@ async fn submit_video_job_http(
 
     let status = resp.status();
     let text = resp.text().await.map_err(|e| format!("读取响应失败：{}", e))?;
+    eprintln!("[submit_video_job_http] 响应状态: {}, 响应体: {}", status.as_u16(), text);
 
     if !status.is_success() {
         return Err(format!("视频生成失败({}): {}", status.as_u16(), text));
@@ -86,6 +186,7 @@ async fn submit_video_job_http(
     let parsed: serde_json::Value =
         serde_json::from_str(&text).map_err(|e| format!("响应 JSON 解析失败：{}", e))?;
 
+    // 任务 ID 在 id 或 data.id 字段
     let job_id = parsed
         .pointer("/data/id")
         .and_then(|v| v.as_str())
@@ -96,25 +197,161 @@ async fn submit_video_job_http(
     Ok(job_id)
 }
 
-/// 轮询视频任务状态；succeeded 时自动落盘并返回 result_rel_path
+/// 轮询视频任务状态
+/// API: GET https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/{id}
 async fn poll_video_job_http(
-    _http: &reqwest::Client,
+    http: &reqwest::Client,
     job_id: &str,
-    _project_path: &str,
+    project_path: &str,
     model_id: &str,
+    app: &tauri::AppHandle,
 ) -> Result<VideoJobSnapshot, String> {
-    // TODO: 实现真实轮询
-    // 实际应该 GET /status/{job_id} 并解析状态，
-    // 成功后下载 result_url 写入 assets/ 并登记 db。
-    // 这里先用 mock 返回 succeeded，保持与 video_mock_cmd 相同的轮询行为。
+    let (base_url, api_key) = resolve_video_model_config(app, model_id)?;
+    let url = format!("{}/contents/generations/tasks/{}", base_url.trim_end_matches('/'), job_id);
+
+    let resp = http
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .send()
+        .await
+        .map_err(|e| format!("查询任务状态失败：{}", e))?;
+
+    let status_code = resp.status();
+    let text = resp.text().await.map_err(|e| format!("读取响应失败：{}", e))?;
+
+    if !status_code.is_success() {
+        return Err(format!("查询失败({}): {}", status_code.as_u16(), text));
+    }
+
+    let parsed: serde_json::Value =
+        serde_json::from_str(&text).map_err(|e| format!("响应 JSON 解析失败：{}", e))?;
+
+    eprintln!("[poll_video_job_http] 响应内容: {}", text);
+
+    // 解析状态 - 火山方舟状态: pending / processing / succeeded / failed
+    let api_status = parsed
+        .pointer("/status")
+        .and_then(|v| v.as_str())
+        .unwrap_or("unknown");
+
+    let progress = parsed
+        .pointer("/progress")
+        .and_then(|v| v.as_f64());
+
+    let error = parsed
+        .pointer("/error/message")
+        .or_else(|| parsed.pointer("/error"))
+        .and_then(|v| v.as_str())
+        .map(String::from);
+
+    // Map API status to our status
+    let status = match api_status {
+        "pending" | "queued" => "queued",
+        "processing" | "running" => "running",
+        "succeeded" | "success" | "completed" => "succeeded",
+        "failed" | "error" => "failed",
+        _ => "running",
+    };
+
+    // 如果成功，下载视频并落盘
+    if status == "succeeded" {
+        // 视频 URL 在 content.video_url（火山方舟 API 返回格式）
+        let video_url = parsed
+            .pointer("/content/video_url")
+            .or_else(|| parsed.pointer("/content/url"))
+            .and_then(|v| v.as_str());
+
+        eprintln!(
+            "[poll_video_job_http] video_url 解析结果: {:?}",
+            video_url
+        );
+
+        if let Some(url) = video_url {
+            eprintln!("[poll_video_job_http] 找到视频URL: {}", url);
+            match download_video_to_assets(http.clone(), url, project_path).await {
+                Ok(rel_path) => {
+                    return Ok(VideoJobSnapshot {
+                        id: job_id.to_string(),
+                        status: "succeeded".into(),
+                        progress: Some(1.0),
+                        error: None,
+                        model_id: model_id.to_string(),
+                        result_rel_path: Some(rel_path),
+                    });
+                }
+                Err(e) => {
+                    eprintln!("[video_cmd] 下载视频失败：{}", e);
+                }
+            }
+        }
+
+        return Ok(VideoJobSnapshot {
+            id: job_id.to_string(),
+            status: "failed".into(),
+            progress,
+            error: Some("未获取到视频URL".to_string()),
+            model_id: model_id.to_string(),
+            result_rel_path: None,
+        });
+    }
+
     Ok(VideoJobSnapshot {
         id: job_id.to_string(),
-        status: "succeeded".into(),
-        progress: Some(1.0),
-        error: None,
+        status: status.into(),
+        progress,
+        error,
         model_id: model_id.to_string(),
-        result_rel_path: None, // TODO: 真实接入后填入 assets/xxx.mp4
+        result_rel_path: None,
     })
+}
+
+/// 下载视频到工程 assets/ 目录
+async fn download_video_to_assets(
+    http: reqwest::Client,
+    url: &str,
+    project_path: &str,
+) -> Result<String, String> {
+    let resp = http
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("下载视频请求失败：{}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("下载失败：{}", resp.status()));
+    }
+
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("读取视频内容失败：{}", e))?;
+
+    let root = PathBuf::from(project_path);
+    let assets_dir = root.join("assets");
+    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
+
+    let file_name = format!(
+        "seedance_{}_{}.mp4",
+        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
+        &uuid::Uuid::new_v4().to_string()[..8]
+    );
+    let out_path = assets_dir.join(&file_name);
+    std::fs::write(&out_path, &bytes).map_err(|e| format!("保存视频失败：{}", e))?;
+
+    let rel_path = format!("assets/{}", file_name);
+
+    // 登记到数据库
+    let conn = db::open_run_db(&root)?;
+    let meta_json = media::meta_json_for_av(&out_path, "video");
+    let _aid = db::upsert_asset(
+        &conn,
+        &rel_path,
+        "video",
+        Some("seedance"),
+        meta_json.as_deref(),
+    )?;
+
+    Ok(rel_path)
 }
 
 #[tauri::command]
@@ -123,6 +360,19 @@ pub async fn video_gen_start(
     state: tauri::State<'_, AppState>,
     req: VideoGenerationStartRequest,
 ) -> Result<VideoGenStartResponse, String> {
+    // 完整打印收到的请求（用于调试）
+    eprintln!(
+        "[video_gen_start] project_path={}, node_id={}, model_id={}, workflow={}, prompt_len={}, images={}, videos={}, audios={}",
+        req.project_path,
+        req.node_id,
+        req.payload.model_id,
+        req.payload.workflow,
+        req.payload.prompt.len(),
+        req.payload.reference_image_paths.as_ref().map(|v| v.len()).unwrap_or(0),
+        req.payload.reference_video_paths.as_ref().map(|v| v.len()).unwrap_or(0),
+        req.payload.reference_audio_paths.as_ref().map(|v| v.len()).unwrap_or(0),
+    );
+
     if req.project_path.trim().is_empty() {
         return Err("projectPath 不能为空".into());
     }
@@ -134,13 +384,17 @@ pub async fn video_gen_start(
         return Err("payload.modelId 不能为空".into());
     }
 
-    // 尝试真实供应商；若未配置 API Key 则降级走 mock
+    eprintln!("[video_gen_start] project_path={}, node_id={}, model_id={}", req.project_path, req.node_id, model_id);
+
+    // 尝试真实供应商；API Key 未配置或调用失败时向上传播错误，不走 mock
     let job_id = match submit_video_job_http(&app, &state.http, &req).await {
-        Ok(id) => id,
+        Ok(id) => {
+            eprintln!("[video_gen_start] 成功，job_id={}", id);
+            id
+        }
         Err(e) => {
-            // 降级到 mock，保留联调能力
-            eprintln!("[video_cmd] 真实供应商调用失败，降级 mock：{}", e);
-            format!("mock_{}", uuid::Uuid::new_v4())
+            eprintln!("[video_gen_start] 失败: {}", e);
+            return Err(e);
         }
     };
 
@@ -216,8 +470,7 @@ pub async fn video_gen_get_job(
     }
 
     // ============================================================
-    // 阶段 2：第 4 次 poll，需要做 IO
-    // 先获取 job 数据，释放锁，再做网络/文件 IO
+    // 阶段 2：第 4 次 poll，开始真实轮询
     // ============================================================
     let job_data = {
         let mut map = state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
@@ -253,9 +506,9 @@ pub async fn video_gen_get_job(
     let id_owned = id.to_string();
 
     if !id_owned.starts_with("mock_") {
-        match poll_video_job_http(&http, &id_owned, &project_path, &model_id).await {
+        match poll_video_job_http(&http, &id_owned, &project_path, &model_id, &app).await {
             Ok(snap) if snap.status == "succeeded" && snap.result_rel_path.is_some() => {
-                let rel = snap.result_rel_path.unwrap();
+                let rel = snap.result_rel_path.clone().unwrap();
                 let mut map = state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
                 if let Some(job) = map.get_mut(&id_owned) {
                     job.result_rel_path = Some(rel.clone());
@@ -271,17 +524,37 @@ pub async fn video_gen_get_job(
             }
             Ok(snap) => {
                 eprintln!(
-                    "[video_cmd] poll_video_job_http 未成功（status={}), 降级 mock",
-                    snap.status
+                    "[video_cmd] poll_video_job_http 未成功（status={}, error={:?}）",
+                    snap.status, snap.error
                 );
+                // API 返回了状态但未成功，把真实状态返回给前端，不 fallback
+                return Ok(VideoJobSnapshot {
+                    id: id_owned,
+                    status: snap.status,
+                    progress: snap.progress,
+                    error: snap.error.clone(),
+                    model_id,
+                    result_rel_path: None,
+                });
             }
             Err(e) => {
-                eprintln!("[video_cmd] poll_video_job_http 出错：{}, 降级 mock", e);
+                eprintln!("[video_cmd] poll_video_job_http 出错：{}", e);
+                // API 调用失败，把错误返回给前端，不 fallback
+                return Ok(VideoJobSnapshot {
+                    id: id_owned,
+                    status: "failed".into(),
+                    progress: None,
+                    error: Some(e),
+                    model_id,
+                    result_rel_path: None,
+                });
             }
         }
     }
 
+    // ============================================================
     // 降级：使用 ffmpeg 渲染黑屏视频
+    // ============================================================
     let app_clone = app.clone();
     let settings = settings::load_settings(&app_clone)?;
     let ffmpeg = resolve_ffmpeg_bin(&settings);
@@ -327,14 +600,14 @@ pub async fn video_gen_get_job(
     if let Some(j) = map.get_mut(&id_owned) {
         j.result_rel_path = Some(rel.clone());
     }
-    return Ok(VideoJobSnapshot {
+    Ok(VideoJobSnapshot {
         id: id_owned,
         status: "succeeded".into(),
         progress: Some(1.0),
         error: None,
         model_id,
         result_rel_path: Some(rel),
-    });
+    })
 }
 
 #[tauri::command]

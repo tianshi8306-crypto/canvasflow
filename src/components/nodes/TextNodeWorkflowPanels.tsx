@@ -1,5 +1,6 @@
 import {
   buildVideoDraftPromptFromScriptBeatBinding,
+  buildTextPromptFromScriptBinding,
   getScriptBeatIdFromParams,
   incomingScriptUpstreamState,
   scriptSyncButtonTitle,
@@ -16,7 +17,8 @@ import {
   type VideoIncomingRefItem,
 } from "@/hooks/useVideoIncomingReferenceItems";
 import { useVideoNodeGeneration } from "@/hooks/useVideoNodeGeneration";
-import { listModelsForWorkflow, VIDEO_WORKFLOW_TAB_LABELS } from "@/lib/videoGeneration";
+import { useVideoModels } from "@/hooks/useVideoModels";
+import { VIDEO_WORKFLOW_TAB_LABELS } from "@/lib/videoGeneration";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
 import { TtvVideoRefThumb } from "@/components/nodes/TtvVideoRefThumb";
@@ -95,39 +97,7 @@ function TtvIncomingReferenceStrip({ items }: { items: VideoIncomingRefItem[] })
   );
 }
 
-/** 线框示意：在固定视口内按比例画内框 */
-function TtvAspectWireframe({ id }: { id: TextToVideoAspectId }) {
-  const maxW = 30;
-  const maxH = 20;
-  const inner = (() => {
-    switch (id) {
-      case "auto":
-        return { w: 10, h: 18 };
-      case "16:9":
-        return { w: maxW, h: Math.round((maxW * 9) / 16) };
-      case "4:3":
-        return { w: Math.min(24, maxW), h: Math.round((Math.min(24, maxW) * 3) / 4) };
-      case "1:1":
-        return { w: 16, h: 16 };
-      case "3:4":
-        return { w: 14, h: Math.round((14 * 4) / 3) };
-      case "9:16":
-        return { w: 11, h: Math.round((11 * 16) / 9) };
-      case "21:9":
-        return { w: maxW, h: Math.round((maxW * 9) / 21) };
-      default:
-        return { w: 16, h: 16 };
-    }
-  })();
-  return (
-    <div className="textNodeTtvWireViewport" aria-hidden>
-      <div
-        className="textNodeTtvWireInner"
-        style={{ width: inner.w, height: Math.min(inner.h, maxH) }}
-      />
-    </div>
-  );
-}
+import { TtvAspectWireframe } from "./TtvAspectWireframe";
 
 function TtvSpeakerIcon({ muted }: { muted?: boolean }) {
   return (
@@ -334,13 +304,14 @@ export function TextNodeTextToVideoPanel({ videoNodeId }: TextNodeTextToVideoPan
     return `任务：${activeJob.status}`;
   }, [activeJob]);
 
-  const modelOptions = useMemo(() => listModelsForWorkflow(draft.workflow), [draft.workflow]);
+  const { models: videoModels, loading: modelsLoading, defaultModel } = useVideoModels();
 
   useEffect(() => {
-    if (!modelOptions.some((m) => m.id === draft.modelId) && modelOptions[0]) {
-      patchDraft({ modelId: modelOptions[0].id });
+    if (modelsLoading) return;
+    if (!videoModels.some((m) => m.id === draft.modelId) && defaultModel) {
+      patchDraft({ modelId: defaultModel.id });
     }
-  }, [draft.modelId, modelOptions, patchDraft]);
+  }, [draft.modelId, modelsLoading, videoModels, defaultModel, patchDraft]);
 
   const onSend = () => {
     void startGeneration();
@@ -504,12 +475,21 @@ export function TextNodeTextToVideoPanel({ videoNodeId }: TextNodeTextToVideoPan
             value={draft.modelId}
             onChange={(e) => patchDraft({ modelId: e.target.value as VideoModelId })}
             onPointerDown={(e) => e.stopPropagation()}
+            disabled={modelsLoading}
           >
-            {modelOptions.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
+            {modelsLoading ? (
+              <option value="">加载中…</option>
+            ) : videoModels.filter((m) => m.enabled).length > 0 ? (
+              videoModels
+                .filter((m) => m.enabled)
+                .map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.label}
+                  </option>
+                ))
+            ) : (
+              <option value="">请在设置中配置视频模型</option>
+            )}
           </select>
           <span className="textNodeTtvCaret">▾</span>
         </div>
@@ -651,7 +631,7 @@ export function TextNodeTextToVideoPanel({ videoNodeId }: TextNodeTextToVideoPan
 }
 
 /** 文字生音乐：底部占位面板 */
-export function TextNodeTextToMusicPanel() {
+export function TextNodeTextToMusicPanel({ audioNodeId: _audioNodeId }: { audioNodeId?: string }) {
   return (
     <div className={`textNodeTtmPanel ${RF_NODE_INPUT_CLASS}`} onPointerDown={(e) => e.stopPropagation()}>
       <div className="textNodeTtmRow">
@@ -662,6 +642,53 @@ export function TextNodeTextToMusicPanel() {
         <span className="mono textNodeTtmModel">Suno（占位）</span>
         <button type="button" className="btn textNodeTtmBtn">
           生成
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** 脚本→文本：底部同步面板 */
+export function TextNodeScriptSyncPanel({
+  textNodeId,
+  scriptNodeId,
+}: {
+  textNodeId: string;
+  scriptNodeId?: string;
+}) {
+  const nodes = useProjectStore((s) => s.nodes);
+  const edges = useProjectStore((s) => s.edges);
+  const updateNodeData = useProjectStore((s) => s.updateNodeData);
+  const setStatusText = useProjectStore((s) => s.setStatusText);
+
+  const syncedContent = useMemo(
+    () => (scriptNodeId ? buildTextPromptFromScriptBinding(nodes, edges, textNodeId) : null),
+    [nodes, edges, textNodeId, scriptNodeId],
+  );
+
+  const handleSync = () => {
+    if (!syncedContent) {
+      setStatusText("未能从上游脚本节点获取内容");
+      return;
+    }
+    updateNodeData(textNodeId, { prompt: syncedContent });
+    setStatusText("已从脚本同步内容到文本节点");
+  };
+
+  return (
+    <div
+      className={`textNodeScriptSyncPanel ${RF_NODE_INPUT_CLASS}`}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div className="textNodeScriptSyncRow">
+        <span className="textNodeScriptSyncLabel">脚本内容</span>
+        <button
+          type="button"
+          className="btn textNodeScriptSyncBtn"
+          disabled={!syncedContent}
+          onClick={handleSync}
+        >
+          从脚本同步
         </button>
       </div>
     </div>

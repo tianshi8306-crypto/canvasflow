@@ -14,17 +14,22 @@ import {
   scriptSyncButtonTitle,
   scriptSyncDisabledOnlyStatus,
 } from "@/lib/incomingScriptBinding";
+import { buildImagePromptWithSubject } from "@/lib/imageGeneration/helpers";
 import { ScriptBeatBindingInline } from "@/components/nodes/ScriptBeatBindingInline";
 import { imageGenerationAgentRuntime } from "@/lib/nodeAgentRuntime/imageGenerationAgent";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { IMAGE_GENERATION_PROMPT_MAX_CHARS } from "@/lib/promptLimits";
+import { loadSubjects, getSubjectById } from "@/lib/subjectStorage";
 import { useProjectStore } from "@/store/projectStore";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
 
 type ImageGenerationPanelProps = {
   nodeId: string;
   /** 图生图：当前参考图，显示在工具栏为缩略图 */
   referenceImagePath?: string;
   referenceImageAssetId?: string;
+  /** 用于触发主体列表刷新 */
+  subjectListVersion?: number;
 };
 
 /**
@@ -59,6 +64,19 @@ export function ImageGenerationPanel({
   const [model, setModel] = useState(IMAGE_MODEL_OPTIONS[0]?.id ?? "omnigen-v2");
   const [task, setTask] = useState<ImageTaskMode>("text_to_image");
   const [generating, setGenerating] = useState(false);
+  const [subjectId, setSubjectId] = useState<string | undefined>(() => {
+    const n = nodes.find((x) => x.id === nodeId);
+    return (n?.data.params as { subjectId?: string })?.subjectId;
+  });
+  const canvasSubjectListVersion = useCanvasUiStore((s) => s.subjectListVersion);
+  const subjects = useMemo(() => {
+    void canvasSubjectListVersion;
+    return loadSubjects();
+  }, [canvasSubjectListVersion]);
+  const currentSubject = useMemo(
+    () => (subjectId ? getSubjectById(subjectId) : null),
+    [subjectId],
+  );
   const hasRef = Boolean(referenceImagePath?.trim() || referenceImageAssetId?.trim());
   const taskNeedsRef = task !== "text_to_image";
   const canGenerate = useMemo(() => {
@@ -134,10 +152,14 @@ export function ImageGenerationPanel({
     void (async () => {
       setGenerating(true);
       try {
+        const enhancedPrompt = buildImagePromptWithSubject(
+          prompt.slice(0, IMAGE_GENERATION_PROMPT_MAX_CHARS),
+          subjectId,
+        );
         await runNodeTaskAgent(
           imageGenerationAgentRuntime,
           {
-            prompt: prompt.slice(0, IMAGE_GENERATION_PROMPT_MAX_CHARS),
+            prompt: enhancedPrompt,
             modelId: model,
             customModels,
             task,
@@ -177,6 +199,46 @@ export function ImageGenerationPanel({
         )}
         <span className="imageGenPanelToolbarSpacer" />
         <span className="imageGenPanelExpandHint mono">{generating ? "生成中…" : "就绪"}</span>
+      </div>
+      <div className="imageGenPanelSubjectRow">
+        <select
+          className="imageGenPanelFeat imageGenPanelFeat--compact"
+          value={subjectId ?? ""}
+          onChange={(e) => {
+            const sid = e.target.value || undefined;
+            setSubjectId(sid);
+            updateNodeData(nodeId, {
+              params: { ...(node?.data.params as object), subjectId: sid },
+            });
+          }}
+          title="关联主体"
+        >
+          <option value="">选择主体…</option>
+          {subjects.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.name}
+            </option>
+          ))}
+        </select>
+        {currentSubject?.description && (
+          <div className="imageGenPanelSubjectPreview">
+            <span className="imageGenPanelSubjectLabel">主体特征：</span>
+            <span className="imageGenPanelSubjectDesc">{currentSubject.description}</span>
+            <button
+              type="button"
+              className="imageGenPanelSubjectClear"
+              onClick={() => {
+                setSubjectId(undefined);
+                updateNodeData(nodeId, {
+                  params: { ...(node?.data.params as object), subjectId: undefined },
+                });
+              }}
+              title="解除主体关联"
+            >
+              ×
+            </button>
+          </div>
+        )}
       </div>
       <textarea
         className={`imageGenPanelTextarea ${RF_NODE_INPUT_CLASS}`}

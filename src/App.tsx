@@ -1,4 +1,5 @@
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
+import { appendNodeAgentEvent } from "@/shared/api/runs";
 import { useEffect, useState } from "react";
 import { FlowCanvas } from "@/components/FlowCanvas";
 import { AppTopBar } from "@/components/AppTopBar";
@@ -6,6 +7,8 @@ import { SettingsPanel } from "@/components/SettingsPanel";
 import { ScriptNodeFullscreenOverlay } from "@/components/ScriptNodeFullscreenOverlay";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
 import { useProjectStore } from "@/store/projectStore";
+import { initHermesAutoChain } from "@/lib/hermes";
+import { useNodeStatusListener } from "@/hooks/useNodeStatus";
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -13,6 +16,7 @@ export default function App() {
   const scriptFullscreenNodeId = useProjectStore((s) => s.scriptFullscreenNodeId);
   const projectPath = useProjectStore((s) => s.projectPath);
   const lastRunId = useProjectStore((s) => s.lastRunId);
+  const setLastRunId = useProjectStore((s) => s.setLastRunId);
   const groupSelectedNodes = useProjectStore((s) => s.groupSelectedNodes);
   const copySelection = useProjectStore((s) => s.copySelection);
   const pasteSelection = useProjectStore((s) => s.pasteSelection);
@@ -106,28 +110,42 @@ export default function App() {
   useEffect(() => {
     const onAgentEvent = (ev: Event) => {
       if (!isTauri()) return;
-      if (!projectPath || !lastRunId) return;
+      if (!projectPath) return;
       const detail = (ev as CustomEvent<NodeAgentRuntimeEvent>).detail;
       if (!detail) return;
-      void invoke("append_agent_event", {
+      void appendNodeAgentEvent({
         projectPath,
-        runId: lastRunId,
         nodeId: detail.nodeId,
         agentName: detail.agentName,
         phase: detail.phase,
         elapsedMs: detail.elapsedMs,
-        error: detail.error ?? null,
+        error: detail.error,
+        runId: lastRunId ?? undefined,
+      }).then((newRunId) => {
+        // 若当前无 run_id，将新生成的 run_id 回填到 store（单节点即席运行场景）
+        if (!lastRunId) {
+          setLastRunId(newRunId);
+        }
       });
     };
     window.addEventListener("node-agent-event", onAgentEvent);
     return () => window.removeEventListener("node-agent-event", onAgentEvent);
-  }, [lastRunId, projectPath]);
+  }, [lastRunId, projectPath, setLastRunId]);
 
   useEffect(() => {
     const onOpenSettings = () => setSettingsOpen(true);
     window.addEventListener("r3-open-settings", onOpenSettings);
     return () => window.removeEventListener("r3-open-settings", onOpenSettings);
   }, []);
+
+  // 初始化 Hermes 自动串联
+  useEffect(() => {
+    const cleanup = initHermesAutoChain();
+    return cleanup;
+  }, []);
+
+  // 初始化节点状态监听器
+  useNodeStatusListener();
 
   return (
     <div className="appShell">

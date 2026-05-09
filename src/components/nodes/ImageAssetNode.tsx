@@ -43,6 +43,7 @@ function ImageImageGlyph() {
         />
         <circle cx="8.5" cy="9.5" r="1.2" fill="currentColor" />
       </svg>
+      <span className="nodeEmptyHint">点击上传或拖入图片</span>
     </div>
   );
 }
@@ -82,6 +83,7 @@ export function ImageAssetNode({ id, data, selected, type }: NodeProps<Node<Flow
   const edges = useProjectStore((s) => s.edges);
   const imageI2iTargetNodeId = useCanvasUiStore((s) => s.imageI2iTargetNodeId);
   const setImageI2iTargetNodeId = useCanvasUiStore((s) => s.setImageI2iTargetNodeId);
+  const subjectListVersion = useCanvasUiStore((s) => s.subjectListVersion);
   const hasPath = Boolean(data.path?.trim() || data.assetId?.trim());
   const path = data.path;
   const assetId = data.assetId;
@@ -193,6 +195,7 @@ export function ImageAssetNode({ id, data, selected, type }: NodeProps<Node<Flow
               nodeId={id}
               referenceImagePath={incomingRef.path}
               referenceImageAssetId={incomingRef.assetId}
+              subjectListVersion={subjectListVersion}
             />
           </div>
         ) : (

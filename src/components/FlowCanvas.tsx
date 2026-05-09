@@ -8,6 +8,7 @@ import {
   type Edge,
   type NodeTypes,
   useReactFlow,
+  useStore,
   type Viewport,
 } from "@xyflow/react";
 import { isTauri } from "@tauri-apps/api/core";
@@ -17,12 +18,14 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useRef, useState, type DragEvent } from "react";
 import { MultiSelectionToolbar } from "@/components/canvas/MultiSelectionToolbar";
+import { NodeSelectionToolbar } from "@/components/canvas/NodeSelectionToolbar";
+import { MarkerToolbar } from "@/components/canvas/MarkerToolbar";
 import { SelectionBoundsOverlay } from "@/components/canvas/SelectionBoundsOverlay";
 import { CanvasContextMenus } from "@/components/canvas/CanvasContextMenus";
 import { FLOW_MENU } from "@/components/canvas/menuConstants";
 import type { FlowCanvasMenuState } from "@/components/canvas/flowCanvasMenuState";
 import { assetNodeKindForMediaType, ASSET_LIST_DEFAULT_LIMIT, sortAssetsForGallery } from "@/lib/canvasAssets";
-import { validateConnection } from "@/lib/flowConnectionPolicy";
+import { validateConnection, connectionRejectedReason } from "@/lib/flowConnectionPolicy";
 import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
 import { clampContextMenuPosition } from "@/lib/clampFloatingUi";
 import { formatUserError } from "@/lib/errors";
@@ -35,6 +38,7 @@ import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { CanvasFlowChrome } from "@/components/canvas/CanvasFlowChrome";
 import { NodeMaximizedOverlay } from "@/components/canvas/NodeMaximizedOverlay";
+import { SubjectCreationPanel } from "@/components/SubjectCreationPanel";
 import { LeftAddDock } from "@/components/LeftAddDock";
 import { FFmpegNode } from "@/components/nodes/FFmpegNode";
 import { ImageAssetNode } from "@/components/nodes/ImageAssetNode";
@@ -139,6 +143,10 @@ function FlowCanvasInner() {
   const [menuState, setMenuState] = useState<FlowCanvasMenuState | null>(null);
   const [hoverEdge, setHoverEdge] = useState<EdgeHoverState | null>(null);
   const [marqueeRect, setMarqueeRect] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const [leftAddDockOpen, setLeftAddDockOpen] = useState(false);
+  const [subjectCreationNodeId, setSubjectCreationNodeId] = useState<string | null>(null);
+  const subjectPanelNodeIdRef = useRef<string | null>(null);
+  const connectionHint = useStore((s) => s.connection);
   const marqueeDragRef = useRef<{ sx: number; sy: number } | null>(null);
   const marqueeGeomRef = useRef<{ x: number; y: number; w: number; h: number } | null>(null);
   const suppressPaneContextRef = useRef(false);
@@ -503,6 +511,12 @@ function FlowCanvasInner() {
     const p = clampContextMenuPosition(240, 200, FLOW_MENU.widths.gallery, FLOW_MENU.clampEstimatedHeight);
     setMenuState({ x: p.x, y: p.y, mode: "add-panel", nodeId: null, addPanelTab: "gallery" });
   }, []);
+
+  const openSubjectCreationAt = useCallback((nodeId: string) => {
+    subjectPanelNodeIdRef.current = nodeId;
+    setSubjectCreationNodeId(nodeId);
+  }, []);
+
   const { edgeView, nodesView, summarizeEdgePayload } = useEdgeViewModel({
     nodes,
     edges,
@@ -568,6 +582,8 @@ function FlowCanvasInner() {
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
         onConnect={onConnect}
+        onConnectStart={() => {}}
+        onConnectEnd={() => {}}
         isValidConnection={isValidConnection}
         nodesConnectable={!isGraphRunning}
         edgesReconnectable={!isGraphRunning}
@@ -631,6 +647,7 @@ function FlowCanvasInner() {
           setSelectedEdgeIds([]);
           setMenuState(null);
           setAudioTtsPanelNodeId(null);
+          setLeftAddDockOpen(false);
         }}
         onPaneContextMenu={(ev) => {
           ev.preventDefault();
@@ -720,9 +737,17 @@ function FlowCanvasInner() {
         ) : null}
         <CanvasFlowChrome />
         <Panel position="center-left" style={{ margin: 10 }}>
-          <LeftAddDock projectPath={projectPath} onRequestUploadFiles={onRequestUploadFiles} onOpenGallery={openGalleryFromDock} />
+          <LeftAddDock
+            open={leftAddDockOpen}
+            onOpen={() => setLeftAddDockOpen(true)}
+            onClose={() => setLeftAddDockOpen(false)}
+            projectPath={projectPath}
+            onRequestUploadFiles={onRequestUploadFiles}
+            onOpenGallery={openGalleryFromDock}
+          />
         </Panel>
       </ReactFlow>
+
       {marqueeRect ? (
         <div
           className="canvasMarqueeRect"
@@ -740,6 +765,8 @@ function FlowCanvasInner() {
       ) : null}
       <SelectionBoundsOverlay marqueeActive={Boolean(marqueeRect)} />
       <MultiSelectionToolbar marqueeActive={Boolean(marqueeRect)} />
+      <NodeSelectionToolbar />
+      <MarkerToolbar />
       {dragging || importing ? (
         <div
           style={{
@@ -773,6 +800,30 @@ function FlowCanvasInner() {
           {hoverEdge.summary}
         </div>
       ) : null}
+      {connectionHint.inProgress && connectionHint.toNode ? (
+        (() => {
+          const reason = connectionRejectedReason(
+            connectionHint.fromNode?.type ?? null,
+            connectionHint.toNode?.type ?? null,
+          );
+          const isValid = connectionHint.isValid ?? false;
+          const screenPos = reactFlow.flowToScreenPosition(connectionHint.pointer ?? { x: 0, y: 0 });
+          return (
+            <div
+              className={`flowEdgeHoverTooltip mono ${isValid ? "flowConnectHint--valid" : "flowConnectHint--invalid"}`}
+              style={{
+                position: "fixed",
+                left: screenPos.x + 14,
+                top: screenPos.y - 40,
+                zIndex: FLOW_MENU.dropOverlayZIndex + 3,
+                pointerEvents: "none",
+              }}
+            >
+              {isValid ? "可连接" : (reason ?? "类型不匹配")}
+            </div>
+          );
+        })()
+      ) : null}
       {menuState ? (
         <CanvasContextMenus
           menuState={menuState}
@@ -805,9 +856,16 @@ function FlowCanvasInner() {
           undo={undo}
           redo={redo}
           setMenuState={setMenuState}
+          onOpenSubjectCreation={openSubjectCreationAt}
         />
       ) : null}
       <NodeMaximizedOverlay />
+      <SubjectCreationPanel
+        open={subjectCreationNodeId !== null}
+        nodeId={subjectCreationNodeId ?? ""}
+        onClose={() => setSubjectCreationNodeId(null)}
+        onSubjectsChanged={() => useCanvasUiStore.getState().bumpSubjectListVersion()}
+      />
       <input
         ref={fileInputRef}
         type="file"

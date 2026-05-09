@@ -72,12 +72,21 @@ export function ScriptCreativeViewGrid({ beats, shots, projectPath }: Props) {
         const dur = (beat.durationHint || "").trim() || "—";
         const sceneLabel = beat.scene.trim() ? `场景 ${beat.scene.trim()}` : `场景 ${i + 1}`;
         const shotLabel = (beat.shotSize || "").trim();
+        const status = shot?.status ?? "idle";
+        const isGenerating = status === "generating";
+        const isFailed = status === "failed";
 
         return (
-          <div key={beat.id} className="scriptCreativeCard" role="listitem">
+          <div key={beat.id} className={`scriptCreativeCard${isGenerating ? " scriptCreativeCard--generating" : ""}${isFailed ? " scriptCreativeCard--failed" : ""}`} role="listitem">
             <div className="scriptCreativeCardTop">
               <span className="scriptCreativeCardNo mono">{shotNo}</span>
               <span className="scriptCreativeCardDur mono">{dur}</span>
+              {isGenerating ? <span className="storyboardStatusBadge storyboardStatusBadge--generating">生成中</span> : null}
+              {isFailed ? (
+                <span className="storyboardStatusBadge storyboardStatusBadge--failed" title={shot?.error}>
+                  失败{shot?.retryCount ? ` · ${shot.retryCount}` : ""}
+                </span>
+              ) : null}
             </div>
             <div className="scriptCreativeThumb">
               {imgSrc ? (

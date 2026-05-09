@@ -205,3 +205,20 @@ export function buildAudioTtsTextFromScriptBeatBinding(
   if (parts.length === 0) return null;
   return parts.join("\n");
 }
+
+/** 获取直连上游脚本节点的内容，供 TextNode「从脚本同步」使用。 */
+export function buildTextPromptFromScriptBinding(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  textNodeId: string,
+): string | null {
+  const node = nodes.find((n) => n.id === textNodeId);
+  if (node?.type !== "textNode") return null;
+  const scriptIds = orderedIncomingScriptNodeIds(nodes, edges, textNodeId);
+  const scriptNode = scriptIds
+    .map((id) => nodes.find((n) => n.id === id))
+    .find((n) => n?.type === "scriptNode");
+  if (!scriptNode) return null;
+  const content = (scriptNode.data.prompt ?? "").trim();
+  return content.length > 0 ? content : null;
+}

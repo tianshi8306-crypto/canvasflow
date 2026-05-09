@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getVideoJobViaBridge } from "@/lib/videoGeneration";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { videoGenerationAgentRuntime } from "@/lib/nodeAgentRuntime/videoGenerationAgent";
 import { videoAsyncTaskAgentRuntime, type VideoAsyncConfig } from "@/lib/nodeAgentRuntime/videoAsyncTaskAgent";
 import { defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
+import { invoke } from "@tauri-apps/api/core";
+import type { AppSettings } from "@/lib/settingsPanelTypes";
 import { useProjectStore } from "@/store/projectStore";
 
 /**
@@ -18,6 +20,28 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
   );
   const activeJob = videoBlock?.activeJob;
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // 缓存 Settings 中的有效模型 ID
+  const [validModelIds, setValidModelIds] = useState<string[]>([]);
+  useEffect(() => {
+    void (async () => {
+      try {
+        const raw = await invoke<AppSettings>("load_settings");
+        setValidModelIds((raw.videoModels ?? []).filter((m) => m.enabled).map((m) => m.model));
+      } catch {
+        setValidModelIds([]);
+      }
+    })();
+  }, []);
+
+  /** 若当前 modelId 不在 Settings 有效模型中，自动替换为第一个有效值 */
+  const resolveModelId = useCallback(
+    (modelId: string): string => {
+      if (validModelIds.includes(modelId)) return modelId;
+      return validModelIds[0] ?? modelId;
+    },
+    [validModelIds],
+  );
 
   const clearPoll = useCallback(() => {
     if (pollRef.current) {
@@ -41,6 +65,13 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
       ? (node.data.params as Record<string, unknown>).videoAsync
       : undefined) as unknown;
 
+    // 若当前 modelId 在 Settings 有效模型列表中不存在，自动替换
+    const resolvedModelId = resolveModelId(vb.draft.modelId);
+    const videoBlockWithResolvedModel: typeof vb =
+      resolvedModelId !== vb.draft.modelId
+        ? { ...vb, draft: { ...vb.draft, modelId: resolvedModelId } }
+        : vb;
+
     try {
       if (asyncCfg && typeof asyncCfg === "object") {
         await runNodeTaskAgent(
@@ -51,7 +82,7 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
       } else {
         await runNodeTaskAgent(
           videoGenerationAgentRuntime,
-          { videoBlock: vb },
+          { videoBlock: videoBlockWithResolvedModel },
           {
             nodeId: videoNodeId,
             projectPath,

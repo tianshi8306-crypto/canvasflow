@@ -1,74 +1,7 @@
 import { isTauri } from "@tauri-apps/api/core";
 import { useMemo } from "react";
 import { DESKTOP_SHELL_HINT } from "@/lib/tauriEnv";
-import { getUndoRedoAvailability } from "@/store/projectStore";
 import { useProjectStore } from "@/store/projectStore";
-
-function IconUndo() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M9 14 4 9l5-5M5 9h11a4 4 0 0 1 4 4v1"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconRedo() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="m15 10 5 5-5 5M19 15H8a4 4 0 0 1-4-4V10"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-function IconCopy() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="8" y="8" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M6 16H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
-  );
-}
-
-function IconPaste() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M9 4h6l2 2v14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9 12h6M9 16h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconTrash() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 7h16M10 11v6M14 11v6M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M7 7l1 12a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2l1-12" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
-  );
-}
-
-function IconGroup() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="3" y="5" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <rect x="13" y="11" width="8" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M11 9h6M14 6v6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
 
 function IconSettings() {
   return (
@@ -88,10 +21,69 @@ function IconCloseApp() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path
-        d="M12 3v8M7.2 5.8a7.5 7.5 0 1 0 9.6 0"
+        d="M18 6 6 18M6 6l12 12"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function IconNewProject() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"
         stroke="currentColor"
         strokeWidth="1.5"
         strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M12 11v6M9 14h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IconOpenProject() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function IconSave() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path d="M17 21v-8H7v8M7 3v5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IconRun() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M5 3l14 9-14 9V3z"
+        fill="currentColor"
+        stroke="currentColor"
+        strokeWidth="1"
+        strokeLinecap="round"
+        strokeLinejoin="round"
       />
     </svg>
   );
@@ -107,24 +99,11 @@ export function AppTopBar({ onOpenSettings }: Props) {
   const lastRunId = useProjectStore((s) => s.lastRunId);
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodeCount = useProjectStore((s) => s.nodes.length);
-  const selectedNodeIds = useProjectStore((s) => s.selectedNodeIds);
-  const selectedEdgeIds = useProjectStore((s) => s.selectedEdgeIds);
-  const flowClipboardCount = useProjectStore((s) => s.flowClipboardCount);
 
   const newProject = useProjectStore((s) => s.newProject);
   const openProject = useProjectStore((s) => s.openProject);
   const saveProject = useProjectStore((s) => s.saveProject);
   const runWorkflow = useProjectStore((s) => s.runWorkflow);
-  const groupSelectedNodes = useProjectStore((s) => s.groupSelectedNodes);
-  const copySelection = useProjectStore((s) => s.copySelection);
-  const pasteSelection = useProjectStore((s) => s.pasteSelection);
-  const deleteSelection = useProjectStore((s) => s.deleteSelection);
-  const undo = useProjectStore((s) => s.undo);
-  const redo = useProjectStore((s) => s.redo);
-
-  const nodes = useProjectStore((s) => s.nodes);
-  const edges = useProjectStore((s) => s.edges);
-  const { canUndo, canRedo } = useMemo(() => getUndoRedoAvailability(), [nodes, edges]);
 
   const savedShort = useMemo(() => {
     if (!lastSavedAt) return "";
@@ -138,11 +117,6 @@ export function AppTopBar({ onOpenSettings }: Props) {
     if (lastRunId) parts.push(`Run ${lastRunId}`);
     return parts.join(" · ");
   }, [lastRunId, savedShort, statusText]);
-
-  const canCopy = selectedNodeIds.length > 0;
-  const canPaste = flowClipboardCount > 0;
-  const canDelete = selectedNodeIds.length > 0 || selectedEdgeIds.length > 0;
-  const canGroup = selectedNodeIds.length >= 2;
 
   const closeApp = () => {
     void (async () => {
@@ -175,103 +149,41 @@ export function AppTopBar({ onOpenSettings }: Props) {
         <span className="appTopChromeDivider" aria-hidden />
 
         <div className="appTopCluster">
-          <button type="button" className="appTopChip" onClick={() => void newProject()}>
-            新建工程
+          <button type="button" className="appTopChip appTopChip--icon" onClick={() => void newProject()} title="新建工程">
+            <IconNewProject />
+            <span>新建工程</span>
           </button>
-          <button type="button" className="appTopChip" onClick={() => void openProject()}>
-            打开工程
+          <button type="button" className="appTopChip appTopChip--icon" onClick={() => void openProject()} title="打开工程">
+            <IconOpenProject />
+            <span>打开工程</span>
           </button>
-          <button type="button" className="appTopChip" onClick={() => void saveProject()} disabled={!projectPath}>
-            保存
+          <button type="button" className="appTopChip appTopChip--icon" onClick={() => void saveProject()} disabled={!projectPath} title="保存工程">
+            <IconSave />
+            <span>保存</span>
           </button>
           <button
             type="button"
-            className="appTopChip appTopChip--primary"
+            className="appTopChip appTopChip--icon appTopChip--primary"
             onClick={() => void runWorkflow()}
             disabled={!projectPath}
             title={!projectPath ? "请先打开工程" : "运行当前工作流"}
           >
-            运行工作流
+            <IconRun />
+            <span>运行工作流</span>
           </button>
-          <button type="button" className="appTopChip" title="打开设置（API Key / 模型）" aria-label="设置" onClick={onOpenSettings}>
+          <button type="button" className="appTopChip appTopChip--icon" title="打开设置（API Key / 模型）" aria-label="设置" onClick={onOpenSettings}>
             <IconSettings />
             <span>设置</span>
           </button>
           <button
             type="button"
-            className="leftAddDockFab"
+            className="appTopChip appTopChip--icon appTopChip--danger"
             title="关闭窗口"
             aria-label="关闭窗口"
             onClick={closeApp}
           >
             <IconCloseApp />
-          </button>
-        </div>
-
-        <span className="appTopChromeDivider" aria-hidden />
-
-        <div className="appTopCluster appTopCluster--icons">
-          <button
-            type="button"
-            className="leftAddDockFab"
-            disabled={!canUndo}
-            title="撤销 (Ctrl+Z)"
-            aria-label="撤销"
-            onClick={() => undo()}
-          >
-            <IconUndo />
-          </button>
-          <button
-            type="button"
-            className="leftAddDockFab"
-            disabled={!canRedo}
-            title="重做 (Ctrl+Shift+Z / Ctrl+Y)"
-            aria-label="重做"
-            onClick={() => redo()}
-          >
-            <IconRedo />
-          </button>
-          <span className="appTopClusterGap" aria-hidden />
-          <button
-            type="button"
-            className="leftAddDockFab"
-            disabled={!canCopy}
-            title="复制 (Ctrl+C)"
-            aria-label="复制"
-            onClick={() => copySelection()}
-          >
-            <IconCopy />
-          </button>
-          <button
-            type="button"
-            className="leftAddDockFab"
-            disabled={!canPaste}
-            title="粘贴 (Ctrl+V)"
-            aria-label="粘贴"
-            onClick={() => pasteSelection()}
-          >
-            <IconPaste />
-          </button>
-          <span className="appTopClusterGap" aria-hidden />
-          <button
-            type="button"
-            className="leftAddDockFab"
-            disabled={!canDelete}
-            title="删除选中 (Delete)"
-            aria-label="删除"
-            onClick={() => deleteSelection()}
-          >
-            <IconTrash />
-          </button>
-          <button
-            type="button"
-            className="leftAddDockFab"
-            disabled={!canGroup}
-            title="打组 (Ctrl+G)"
-            aria-label="打组"
-            onClick={() => groupSelectedNodes()}
-          >
-            <IconGroup />
+            <span>关闭</span>
           </button>
         </div>
 

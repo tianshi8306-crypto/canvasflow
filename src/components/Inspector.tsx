@@ -67,7 +67,34 @@ export function Inspector() {
   if (!node) {
     return (
       <div className="panelBody">
-        <div style={{ color: "var(--muted)", fontSize: 13 }}>在画布上选择一项以编辑参数。</div>
+        <div className="inspectorEmpty">
+          <div className="inspectorEmpty__icon" aria-hidden>
+            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+              <rect x="6" y="10" width="36" height="28" rx="4" stroke="currentColor" strokeWidth="1.5" opacity="0.4" />
+              <rect x="10" y="14" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" opacity="0.6" />
+              <rect x="26" y="14" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" opacity="0.6" />
+              <rect x="10" y="26" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" opacity="0.6" />
+              <rect x="26" y="26" width="12" height="8" rx="1.5" stroke="currentColor" strokeWidth="1.2" opacity="0.6" />
+              <circle cx="24" cy="24" r="18" stroke="currentColor" strokeWidth="1.5" strokeDasharray="4 3" opacity="0.25" />
+            </svg>
+          </div>
+          <p className="inspectorEmpty__title">选择节点以编辑属性</p>
+          <p className="inspectorEmpty__hint">点击画布上的节点可查看和编辑其参数</p>
+          <div className="inspectorEmpty__tips">
+            <div className="inspectorEmpty__tip">
+              <kbd>双击</kbd>
+              <span>画布空白处添加节点</span>
+            </div>
+            <div className="inspectorEmpty__tip">
+              <kbd>Delete</kbd>
+              <span>删除选中节点</span>
+            </div>
+            <div className="inspectorEmpty__tip">
+              <kbd>Ctrl+D</kbd>
+              <span>复制节点</span>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

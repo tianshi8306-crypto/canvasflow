@@ -3,6 +3,7 @@ import { type ReactNode, type Ref, useEffect, useRef, useState } from "react";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import { useProjectStore } from "@/store/projectStore";
 import { NodeRunBadge } from "@/components/nodes/NodeRunBadge";
+import { NodeStatusBadge } from "@/components/nodes/NodeStatusBadge";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
 
 type NodeFrameProps = {
@@ -12,7 +13,7 @@ type NodeFrameProps = {
   label?: string;
   nodeId: string;
   selected: boolean;
-  tone: "text" | "script" | "image" | "video" | "audio";
+  tone: "text" | "script" | "image" | "video" | "audio" | "llm" | "mediaImport";
   subtitle?: string;
   /** 标题左侧图标（如脚本生成器文档图标） */
   icon?: ReactNode;
@@ -52,6 +53,8 @@ const toneLabel: Record<NodeFrameProps["tone"], string> = {
   image: "图片",
   video: "视频",
   audio: "音频",
+  llm: "LLM",
+  mediaImport: "媒体导入",
 };
 
 export function NodeFrame({
@@ -79,6 +82,8 @@ export function NodeFrame({
 }: NodeFrameProps) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const runState = useProjectStore((s) => s.nodeRunStateById[nodeId]);
+  const nodes = useProjectStore((s) => s.nodes);
+  const nodeStatus = nodes.find((n) => n.id === nodeId)?.data.status;
   const displayName = label?.trim() ? label.trim() : defaultTitle;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(displayName);
@@ -189,7 +194,7 @@ export function NodeFrame({
                   left: `${overlayGeom.centerX}px`,
                   top: `${overlayGeom.upperTop - floatingTopOffsetPx}px`,
                   transform: "translate(-50%, -100%)",
-                  zIndex: 60,
+                  zIndex: 40,
                 }}
               >
                 {floatingTopOverlay}
@@ -203,7 +208,7 @@ export function NodeFrame({
                   left: `${overlayGeom.centerX}px`,
                   top: `${overlayGeom.upperBottom + floatingBottomOffsetPx}px`,
                   transform: "translateX(-50%)",
-                  zIndex: 60,
+                  zIndex: 40,
                 }}
               >
                 {floatingBottomOverlay}
@@ -263,6 +268,7 @@ export function NodeFrame({
         )}
         <span className="nodeBadge">{toneLabel[tone]}</span>
         <NodeRunBadge nodeId={nodeId} />
+        <NodeStatusBadge status={nodeStatus} size="sm" />
       </div>
       {actions ? <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>{actions}</div> : null}
     </div>

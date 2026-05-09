@@ -15,6 +15,7 @@ import { getIncomingImageRefForNode } from "@/lib/incomingImageReference";
 export function NodeMaximizedOverlay() {
   const maximizedNodeId = useCanvasUiStore((s) => s.maximizedNodeId);
   const setMaximizedNodeId = useCanvasUiStore((s) => s.setMaximizedNodeId);
+  const subjectListVersion = useCanvasUiStore((s) => s.subjectListVersion);
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
@@ -77,6 +78,7 @@ export function NodeMaximizedOverlay() {
               nodeId={node.id}
               referenceImagePath={incomingImageRef?.path}
               referenceImageAssetId={incomingImageRef?.assetId}
+              subjectListVersion={subjectListVersion}
             />
           ) : node.type === "audioNode" ? (
             <AudioTtsPanel nodeId={node.id} />

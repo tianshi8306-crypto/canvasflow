@@ -1,4 +1,4 @@
-import { useCallback, useState, type ReactNode } from "react";
+import { useCallback, type ReactNode } from "react";
 import type { Node } from "@xyflow/react";
 import { useReactFlow } from "@xyflow/react";
 import { useProjectStore } from "@/store/projectStore";
@@ -15,6 +15,9 @@ function makeNode(type: string, data: FlowNodeData): Node<FlowNodeData> {
 }
 
 type Props = {
+  open: boolean;
+  onOpen: () => void;
+  onClose: () => void;
   projectPath: string | null;
   onRequestUploadFiles: () => void | Promise<void>;
   onOpenGallery: () => void;
@@ -114,8 +117,7 @@ function DockRow({
 }
 
 /** 画布左侧：折叠栏 + 展开「添加」面板（文案不含「节点」） */
-export function LeftAddDock({ projectPath, onRequestUploadFiles, onOpenGallery }: Props) {
-  const [open, setOpen] = useState(false);
+export function LeftAddDock({ open, onOpen, onClose, projectPath, onRequestUploadFiles, onOpenGallery }: Props) {
   const addNode = useProjectStore((s) => s.addNode);
   const { screenToFlowPosition } = useReactFlow();
 
@@ -130,9 +132,9 @@ export function LeftAddDock({ projectPath, onRequestUploadFiles, onOpenGallery }
       const n = factory();
       n.position = addAtCenter();
       addNode(n);
-      setOpen(false);
+      onClose();
     },
-    [addAtCenter, addNode],
+    [addAtCenter, addNode, onClose],
   );
 
   return (
@@ -141,7 +143,7 @@ export function LeftAddDock({ projectPath, onRequestUploadFiles, onOpenGallery }
         <button
           type="button"
           className={open ? "leftAddDockFab leftAddDockFab--close" : "leftAddDockFab"}
-          onClick={() => setOpen((o) => !o)}
+          onClick={open ? onClose : onOpen}
           title={open ? "收起" : "添加"}
           aria-expanded={open}
         >
@@ -160,51 +162,6 @@ export function LeftAddDock({ projectPath, onRequestUploadFiles, onOpenGallery }
             </svg>
           )}
         </button>
-        <div className="leftAddDockRailIcons" aria-hidden>
-          <span className="leftAddDockRailGhost" title="连线">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="6" cy="6" r="2" stroke="currentColor" strokeWidth="1.3" />
-              <circle cx="18" cy="18" r="2" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M7.5 7.5l9 9" stroke="currentColor" strokeWidth="1.3" />
-            </svg>
-          </span>
-          <span className="leftAddDockRailGhost" title="形状">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <rect x="4" y="5" width="8" height="8" rx="1" stroke="currentColor" strokeWidth="1.2" />
-              <circle cx="17" cy="8" r="3" stroke="currentColor" strokeWidth="1.2" />
-            </svg>
-          </span>
-          <span className="leftAddDockRailGhost" title="历史">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M12 8v5l3 2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
-          </span>
-        </div>
-        <div className="leftAddDockRailDivider" />
-        <div className="leftAddDockRailIcons" aria-hidden>
-          <span className="leftAddDockRailGhost" title="帮助">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.3" />
-              <path
-                d="M12 16v.01M10.5 10a1.5 1.5 0 1 1 3 0c0 1.5-1.5 1.2-1.5 2.5"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-              />
-            </svg>
-          </span>
-          <span className="leftAddDockRailGhost" title="客服">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path
-                d="M6 10a6 6 0 0 1 12 0v2a2 2 0 0 1-2 2h-1v2H9v-2H8a2 2 0 0 1-2-2v-2z"
-                stroke="currentColor"
-                strokeWidth="1.3"
-              />
-              <path d="M9 18v2M15 18v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-            </svg>
-          </span>
-        </div>
       </div>
 
       {open ? (
@@ -255,7 +212,7 @@ export function LeftAddDock({ projectPath, onRequestUploadFiles, onOpenGallery }
               label="上传"
               onClick={() => {
                 void onRequestUploadFiles();
-                setOpen(false);
+                onClose();
               }}
             />
             <DockRow
@@ -264,7 +221,7 @@ export function LeftAddDock({ projectPath, onRequestUploadFiles, onOpenGallery }
               disabled={!projectPath}
               onClick={() => {
                 onOpenGallery();
-                setOpen(false);
+                onClose();
               }}
             />
           </div>
