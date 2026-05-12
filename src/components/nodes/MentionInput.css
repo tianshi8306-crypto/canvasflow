@@ -1,0 +1,88 @@
+.mention-input-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.mention-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  padding: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow: hidden;
+  z-index: 1;
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  color: transparent;
+}
+
+.mention-textarea {
+  position: relative;
+  z-index: 2;
+  background: transparent;
+  color: inherit;
+  resize: none;
+  width: 100%;
+  box-sizing: border-box;
+  caret-color: var(--text, #e8ecf4);
+}
+
+.mention-pill {
+  display: inline-block;
+  background: var(--accent, #3b82f6);
+  color: white;
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.9em;
+  pointer-events: none;
+  vertical-align: baseline;
+}
+
+.mention-dropdown {
+  position: absolute;
+  z-index: 100;
+  background: var(--panel, #161a22);
+  border: 1px solid var(--border, #2a3140);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  min-width: 180px;
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 4px;
+}
+
+.mention-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  color: var(--text, #e8ecf4);
+}
+
+.mention-dropdown-item.selected,
+.mention-dropdown-item:hover {
+  background: var(--accent, #3b82f6);
+  color: white;
+}
+
+.mention-dropdown-type {
+  font-size: 0.75em;
+  color: var(--muted, #8b95a8);
+  text-transform: uppercase;
+}
+
+.mention-dropdown-item.selected .mention-dropdown-type,
+.mention-dropdown-item:hover .mention-dropdown-type {
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.mention-dropdown-label {
+  flex: 1;
+}
