@@ -12,6 +12,15 @@ export type Category =
   | "多宫格"
   | "通用";
 
+export const CATEGORIES: Category[] = [
+  "人物参考",
+  "场景构图",
+  "脚本结构",
+  "信息提取",
+  "多宫格",
+  "通用",
+];
+
 export interface SlashPreset {
   id: string;
   title: string;
