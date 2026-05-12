@@ -45,7 +45,6 @@ export function SlashPresetPanel({ cursorRect, onSelect, onClose }: SlashPresetP
     );
   }, [presets, search]);
 
-  useEffect(() => { setSelectedIndex(0); }, [search]);
   useEffect(() => { searchRef.current?.focus(); }, []);
 
   useEffect(() => {
