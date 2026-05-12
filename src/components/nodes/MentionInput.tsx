@@ -1,6 +1,7 @@
-import React, { useRef, useState, useCallback, useMemo } from "react";
+import React, { useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import "./MentionInput.css";
 import { useUpstreamNodeCandidates } from "../../hooks/useUpstreamNodeCandidates";
+import { USER_INPUT_PLACEHOLDER } from "@/lib/slashPresets";
 
 export interface MentionInputProps {
   nodeId: string;
@@ -10,26 +11,55 @@ export interface MentionInputProps {
   className?: string;
   style?: React.CSSProperties;
   nodeLabels?: Record<string, string>;
+  onSlashTrigger?: (cursorRect: DOMRect) => void;
 }
 
-export function MentionInput({
-  nodeId,
-  value,
-  onChange,
-  placeholder,
-  className = "",
-  style,
-  nodeLabels = {},
-}: MentionInputProps) {
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const overlayRef = useRef<HTMLDivElement>(null);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const [dropdownQuery, setDropdownQuery] = useState("");
-  const [dropdownIndex, setDropdownIndex] = useState(0);
-  // Use refs for immediate value/cursor tracking (not batched like state)
-  const pendingValueRef = useRef(value);
-  const pendingCursorRef = useRef(0);
-  const upstreamNodes = useUpstreamNodeCandidates(nodeId);
+export interface MentionInputRef {
+  insertPresetTemplate: (template: string) => void;
+}
+
+export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
+  ({ nodeId, value, onChange, placeholder, className = "", style, nodeLabels = {}, onSlashTrigger }, ref) => {
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const overlayRef = useRef<HTMLDivElement>(null);
+    const [showDropdown, setShowDropdown] = useState(false);
+    const [dropdownQuery, setDropdownQuery] = useState("");
+    const [dropdownIndex, setDropdownIndex] = useState(0);
+    // Use refs for immediate value/cursor tracking (not batched like state)
+    const pendingValueRef = useRef(value);
+    const pendingCursorRef = useRef(0);
+    const upstreamNodes = useUpstreamNodeCandidates(nodeId);
+
+    useImperativeHandle(ref, () => ({
+      insertPresetTemplate: (template: string) => {
+        const textarea = textareaRef.current;
+        if (!textarea) return;
+        const cursor = textarea.selectionStart ?? 0;
+        const textBefore = pendingValueRef.current.slice(0, cursor);
+        const textAfter = pendingValueRef.current.slice(cursor);
+        const slashMatch = textBefore.match(/\/([^/\n]*)$/);
+        if (!slashMatch) return;
+        const newValue =
+          textBefore.slice(0, textBefore.length - slashMatch[0].length) +
+          template +
+          textAfter;
+        pendingValueRef.current = newValue;
+        onChange(newValue);
+        requestAnimationFrame(() => {
+          textarea.focus();
+          const anchorPos = textBefore.length - slashMatch[0].length;
+          const placeholderPos = template.indexOf(USER_INPUT_PLACEHOLDER);
+          if (placeholderPos !== -1) {
+            textarea.setSelectionRange(
+              anchorPos + placeholderPos,
+              anchorPos + placeholderPos
+            );
+          } else {
+            textarea.setSelectionRange(anchorPos + template.length, anchorPos + template.length);
+          }
+        });
+      },
+    }));
 
   const filteredNodes = useMemo(() => {
     if (!dropdownQuery) return upstreamNodes;
@@ -60,8 +90,15 @@ export function MentionInput({
       } else {
         setShowDropdown(false);
       }
+
+      // Detect / trigger
+      const slashMatch = textBefore.match(/\/([^/\n]*)$/);
+      if (slashMatch) {
+        onSlashTrigger?.(textareaRef.current!.getBoundingClientRect());
+        return;
+      }
     },
-    [onChange]
+    [onChange, onSlashTrigger]
   );
 
   const insertMention = useCallback(
@@ -185,4 +222,6 @@ export function MentionInput({
       )}
     </div>
   );
-}
+});
+
+MentionInput.displayName = "MentionInput";
