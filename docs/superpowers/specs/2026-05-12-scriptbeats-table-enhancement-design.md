@@ -1,0 +1,155 @@
+# ScriptBeatsEditorTable Enhancement Design
+
+**Date:** 2026-05-12
+**Feature:** ScriptBeatsEditorTable 增强 — 批量删除、行列移动、列宽拖拽、快捷编辑
+
+---
+
+## 1. Concept & Vision
+
+对现有的 `ScriptBeatsEditorTable` 进行四项 UX 增强，使其从一个功能性表格升级为一个真正高效的脚本编辑工具。增强聚焦于"快速操作"和"编辑手感"，不改变数据结构，不破坏现有功能。
+
+---
+
+## 2. Feature 1: 批量删除
+
+### 交互
+
+- 每行左侧 Checkbox 已存在，多选后工具栏出现红色"删除"按钮，显示 `🗑️ 删除(N)`
+- 点击直接删除，不弹确认框
+- 删除后焦点自动移到上一行（保持编辑焦点不丢失）
+- `Delete` / `Backspace` 快捷键直接删除选中行
+
+### 工具栏变化
+
+```
+[字段 ▼] [筛选 ▼]              →  选中 N 行时  →  🗑️ 删除(N)  [全选]
+```
+
+### 数据更新
+
+```typescript
+const newBeats = scriptBeats.filter((_, i) => !selectedIndices.includes(i));
+updateNodeData(nodeId, { scriptBeats: newBeats });
+```
+
+---
+
+## 3. Feature 2: 行列移动（选中后移动）
+
+### 交互
+
+- 多选行后，工具栏出现"移动到"下拉菜单
+- 菜单项：`↑ 上移一层` / `↓ 下移一层` / `⤒ 置顶` / `⤓ 置底`
+- 单行也可操作（不需要先多选）
+- 快捷键：`Shift+↑` 上移 / `Shift+↓` 下移
+
+### 数据更新
+
+```typescript
+// 移动逻辑：移除选中行 → 插入到目标位置
+const selected = beats.filter((_, i) => selectedIndices.includes(i));
+const remaining = beats.filter((_, i) => !selectedIndices.includes(i));
+// 按 moveDirection 插入
+updateNodeData(nodeId, { scriptBeats: reordered });
+```
+
+### 选中状态维护
+
+- 移动后保持选中状态，自动滚动到可见区域
+
+---
+
+## 4. Feature 3: 列宽拖拽调整
+
+### 交互
+
+- 鼠标悬停表头列分隔线区域 → 光标变成 `col-resize`
+- 按住拖动 → 实时调整该列宽度（min-width 限制 60px）
+- 双击 → 恢复该列默认宽度
+- 列宽保存在组件 state，不持久化（刷新恢复）
+
+### 实现
+
+在每个 `<th>` 后插入 resize handle div：
+
+```tsx
+<th data-col-width={180} style={{ width: colWidths[colId] }}>
+  {label}
+  <div className="col-resize-handle" onMouseDown={(e) => startResize(e, colId)} />
+</th>
+```
+
+Resize handler 通过 `onMouseMove` / `onMouseUp` 全局事件实现拖拽。
+
+---
+
+## 5. Feature 4: 快捷编辑体验
+
+### Tab / Shift+Tab 单元格导航
+
+- 当前单元格按 `Tab` → 跳到同一行下一个可编辑单元格
+- `Shift+Tab` → 反向跳
+- 到达行尾再按 `Tab` → 自动新增一行并进入编辑
+
+### 双击编辑模式
+
+- **单击** → 选中该单元格（蓝色边框高亮）
+- **双击** → 进入编辑模式（单元格变成 input/textarea）
+- **Enter** → 确认输入并跳到**下一行同一列**
+- **Escape** → 取消编辑，恢复原值
+
+### Ctrl+A 全选
+
+- `Ctrl+A` → 全选所有行（所有行高亮）
+- 点击行外空白区域或 `Escape` → 取消全选
+
+### Delete 删除快捷键
+
+- 有选中行时按 `Delete` / `Backspace` → 直接删除选中行（无需点击工具栏）
+
+---
+
+## 6. Component Architecture
+
+```
+ScriptBeatsEditorTable.tsx        # 主组件，state 管理列宽、移动、选中
+├── state: colWidths[colId: string] = number
+├── state: selectedIndices Set<number>
+├── state: editingCell { row: number, col: string } | null
+├── Toolbar: 批量操作按钮 + 删除按钮
+├── TableHead: 列头 + resize handle
+├── TableBody: 行渲染 + 单元格双击/单击处理
+└── onKeyDown 处理: Tab/Shift+Tab/Enter/Escape/Delete/Ctrl+A
+```
+
+---
+
+## 7. Files to Modify
+
+| File | Change |
+|------|--------|
+| `src/components/ScriptBeatsEditorTable.tsx` | 主逻辑：列宽 state、选中 state、编辑 state、键盘处理、工具栏按钮 |
+| `src/components/ScriptBeatsEditorTable.css` | 列宽拖拽样式、选中高亮、resize handle |
+
+---
+
+## 8. Out of Scope
+
+- 批量复制行（未来扩展）
+- 列宽持久化（刷新恢复）
+- 拖拽式行排序（通过按钮+快捷键实现）
+- 批量移动到指定位置（仅支持上下一层）
+
+---
+
+## 9. Manual Acceptance Steps
+
+1. 选中 3 行，点击工具栏 🗑️ 删除按钮，确认 3 行都被删除
+2. 选中行后按 Delete 键，确认删除快捷键工作
+3. 选中行后按 Shift+↑ / Shift+↓，确认行顺序上移/下移
+4. 鼠标悬停列分隔线，确认光标变为 col-resize，拖动调整宽度
+5. 双击单元格，确认进入编辑模式，输入内容后按 Enter 跳到下一行
+6. 按 Tab 在单元格间跳转，确认焦点正确移动
+7. 按 Ctrl+A 全选，确认所有行高亮
+8. 刷新页面，确认列宽恢复默认（不持久化）
