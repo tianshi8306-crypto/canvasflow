@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type SyntheticEvent,
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { MagneticNodeAnchors } from "@/components/nodes/MagneticNodeAnchors";
+import { MentionInput } from "@/components/nodes/MentionInput";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { scriptNodeDispatchAgentRuntime } from "@/lib/nodeAgentRuntime/dagnodeDispatchAgents";
 import { scriptStoryboardGenerateAgentRuntime } from "@/lib/nodeAgentRuntime/scriptStoryboardAgent";
@@ -74,6 +75,10 @@ export function ScriptNode({ id, data, selected, type }: NodeProps<Node<FlowNode
     [edges, id, nodes],
   );
   const allReferenceVideos = useMemo(() => Array.from(new Set(upstreamReferenceVideos)), [upstreamReferenceVideos]);
+  const nodeLabels = useMemo(
+    () => Object.fromEntries(nodes.map((n) => [n.id, n.data.label ?? n.id])),
+    [nodes],
+  );
   const parseBusy = isParsing || nodeRunning;
   const providerUnavailable = isTauri() && !providerLoading && providerOptions.length === 0;
   const parseBlockedReason = parseBusy
@@ -227,6 +232,7 @@ export function ScriptNode({ id, data, selected, type }: NodeProps<Node<FlowNode
 
   useEffect(() => {
     if (!uiSelected) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void loadProviders();
   }, [uiSelected, loadProviders]);
 
@@ -242,28 +248,22 @@ export function ScriptNode({ id, data, selected, type }: NodeProps<Node<FlowNode
 
   useEffect(() => {
     if (!isGraphRunning && isParsing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setIsParsing(false);
     }
   }, [isGraphRunning, isParsing]);
 
   const composer = selected ? (
     <div className={`scriptGenComposer ${RF_NODE_INPUT_CLASS}`} onPointerDown={stop} onWheel={stopWheel}>
-      <textarea
-        className={`scriptGenComposerInput ${RF_NODE_INPUT_CLASS}`}
-        placeholder="描述剧情或添加角色参考、视频参考等，为你生成分镜脚本"
+      <MentionInput
+        nodeId={id}
         value={prompt}
-        rows={2}
-        onChange={(e) => {
-          const nextPrompt = e.currentTarget.value;
-          const base = (data.params && typeof data.params === "object" ? { ...data.params } : {}) as Record<
-            string,
-            unknown
-          >;
-          base.styleProfile = "auto";
-          updateNodeData(id, { prompt: nextPrompt, params: base });
+        onChange={(newPrompt) => {
+          updateNodeData(id, { prompt: newPrompt, params: { ...params, styleProfile: "auto" } });
         }}
-        onPointerDown={stop}
-        onWheel={stopWheel}
+        placeholder="输入脚本内容..."
+        className={`scriptGenComposerInput ${RF_NODE_INPUT_CLASS}`}
+        nodeLabels={nodeLabels}
       />
       <div className="scriptGenComposerBar">
         <div className="scriptGenModel">
