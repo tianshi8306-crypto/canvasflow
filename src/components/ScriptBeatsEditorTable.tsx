@@ -63,6 +63,7 @@ export function ScriptBeatsEditorTable({
   const fieldsInputRef = useRef<HTMLInputElement>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const fieldRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const focusedRowIndexRef = useRef<number | null>(null);
   const [inlineContainerWidth, setInlineContainerWidth] = useState(0);
 
   const maxRoleCount = useMemo(() => {
@@ -212,6 +213,30 @@ export function ScriptBeatsEditorTable({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [variant, fieldsOpen, filterOpen, roleEditorRowId]);
 
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      // Don't fire if user is typing in an input/textarea (outside table)
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      // Don't fire if user is editing a cell
+      const isInCellEditor = (e.target as HTMLElement).closest(".cell-editor");
+      if (isInCellEditor) return;
+
+      if (focusedRowIndexRef.current !== null) {
+        e.preventDefault();
+        const idx = focusedRowIndexRef.current;
+        const newRows = normRows.filter((_, i) => i !== idx);
+        onPersistRows(newRows);
+        // Move focus to next row (or previous if deleted last row)
+        const nextIdx = Math.min(idx, newRows.length - 1);
+        focusedRowIndexRef.current = nextIdx >= 0 ? nextIdx : null;
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [normRows, onPersistRows]);
+
   const cols = visibleCols;
   const colCount = cols.length + 2;
   const inlineColStyle = (c: TableCol): CSSProperties | undefined => {
@@ -328,7 +353,10 @@ export function ScriptBeatsEditorTable({
             const idx = origIdx >= 0 ? origIdx : 0;
             return (
               <tr key={b.id}>
-                <td>
+                <td
+                  tabIndex={0}
+                  onFocus={() => { focusedRowIndexRef.current = idx; }}
+                >
                   <input
                     type="checkbox"
                     checked={selectedIds.includes(b.id)}
@@ -337,7 +365,11 @@ export function ScriptBeatsEditorTable({
                   />
                 </td>
                 {cols.map((c) => (
-                  <td key={c.key}>
+                  <td
+                    key={c.key}
+                    tabIndex={0}
+                    onFocus={() => { focusedRowIndexRef.current = idx; }}
+                  >
                     <ScriptBeatsTableCellRenderer
                       beat={b}
                       rowIndex={idx}
@@ -353,7 +385,10 @@ export function ScriptBeatsEditorTable({
                     />
                   </td>
                 ))}
-                <td>
+                <td
+                  tabIndex={0}
+                  onFocus={() => { focusedRowIndexRef.current = idx; }}
+                >
                   <button
                     type="button"
                     className="btn btnDanger"
