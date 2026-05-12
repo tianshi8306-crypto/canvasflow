@@ -5,6 +5,7 @@ import {
   loadEnabledProviderOptions,
   type TextNodeProviderOption,
 } from "@/lib/textNodeProviders";
+import { resolveMentionTokens } from "@/lib/resolveMentionTokens";
 import { useProjectStore } from "@/store/projectStore";
 import { MentionInput } from "./MentionInput";
 
@@ -70,9 +71,11 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
       }
       setRunning(true);
       try {
-        // 将输入写入节点 params，触发 DAG 执行
+        const rawPrompt = response ? `${response}\n\n${inputText}` : inputText;
+        const resolvedPrompt = resolveMentionTokens(rawPrompt, nodes);
+        // 将解析后的 prompt 写入节点 params，触发 DAG 执行
         const params = {
-          prompt: response ? `${response}\n\n${inputText}` : inputText,
+          prompt: resolvedPrompt,
           modelInput: inputText,
           providerId: selectedProviderId || undefined,
         };
@@ -83,7 +86,7 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
         setRunning(false);
       }
     },
-    [inputText, selectedProviderId, nodeId, projectPath, response, setStatusText, updateNodeData],
+    [inputText, selectedProviderId, nodeId, projectPath, response, setStatusText, updateNodeData, nodes],
   );
 
   
