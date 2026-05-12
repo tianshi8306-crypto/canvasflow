@@ -29,6 +29,9 @@ type Props = {
   setFilterQuery: Dispatch<SetStateAction<string>>;
   displayRowsLength: number;
   normRowsLength: number;
+  selectedCount: number;
+  onDelete: () => void;
+  onSelectAll: () => void;
 };
 
 export function ScriptBeatsEditorTableToolbar({
@@ -58,6 +61,9 @@ export function ScriptBeatsEditorTableToolbar({
   setFilterQuery,
   displayRowsLength,
   normRowsLength,
+  selectedCount,
+  onDelete,
+  onSelectAll,
 }: Props) {
   return (
     <div className="scriptTableFullscreenToolbar" ref={toolsRef}>
@@ -90,6 +96,26 @@ export function ScriptBeatsEditorTableToolbar({
           <FilterIcon />
           筛选
         </button>
+        {selectedCount > 0 ? (
+          <>
+            <button
+              type="button"
+              className="toolbar-delete-btn"
+              onClick={onDelete}
+              title="删除选中行"
+            >
+              🗑️ 删除({selectedCount})
+            </button>
+            <button
+              type="button"
+              className="scriptTableToolBtn"
+              onClick={onSelectAll}
+              title="全选 / 取消全选"
+            >
+              全选
+            </button>
+          </>
+        ) : null}
       </div>
 
       {fieldsOpen ? (

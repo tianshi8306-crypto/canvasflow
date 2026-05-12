@@ -2143,65 +2143,9 @@ select {
   text-overflow: ellipsis;
 }
 
-/* 视频节点样式 - 864×682 标准尺寸 */
-.videoAssetCard.nodeCard {
-  width: 864px;
-  height: 682px;
-  min-width: 864px;
-  max-width: 864px;
-  overflow: hidden;
-}
-
-.videoAssetCard .nodeToolbar {
-  width: 864px;
-  height: 32px;
-  flex-shrink: 0;
-}
-
-.videoAssetCard .nodeCoreContent {
-  width: 864px;
-  height: 496px;
-  flex-shrink: 0;
-  overflow: hidden;
-}
-
-.videoAssetCard .nodeReferenceArea {
-  width: 864px;
-  height: 114px;
-  flex-shrink: 0;
-}
-
-.videoAssetCard .nodeBottomBar {
-  width: 864px;
-  height: 40px;
-  flex-shrink: 0;
-}
-
-.videoFullscreenBtn {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-  width: 24px;
-  height: 24px;
-  border-radius: 6px;
-  border: 1px solid var(--canvas-float-border);
-  background: var(--canvas-float-bg);
-  color: var(--muted);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  opacity: 0;
-  transition: opacity 140ms ease;
-}
-
-.videoAssetCard:hover .videoFullscreenBtn {
-  opacity: 1;
-}
-
-.videoFullscreenBtn:hover {
-  background: var(--canvas-float-hover);
-  color: var(--text);
-}
+/* ═══════════════════════════════════════════════════════════════════
+   视频节点样式 - AI-CanvasPro 极简风格（固定尺寸）
+   ═══════════════════════════════════════════════════════════════════ */
 
 .videoAssetPreviewShell {
   border-radius: 8px;
@@ -2749,70 +2693,83 @@ select {
   padding: 10px 10px 0;
 }
 
-/* 多模态视频输入面板 */
+/* ═══════════════════════════════════════════════════════════════════
+   多模态视频输入面板 - AI-CanvasPro 风格
+   圆角: 16px (节点) / 18px (预览区)
+   动效: cubic-bezier(.34, 1.56, .64, 1) + 0.22s
+   ═══════════════════════════════════════════════════════════════════ */
+
 .mmPanel {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  background: #0f172a;
-  border-radius: 10px;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
 }
 
-/* 模块1：顶部标签栏 */
+/* 模块1：顶部标签栏 - AI-CanvasPro 风格 */
 .mmTabs {
   display: flex;
   align-items: center;
-  gap: 2px;
-  background: #1e293b;
-  border-radius: 8px;
-  padding: 3px;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0;
 }
 
 .mmTab {
-  flex: 1;
-  padding: 6px 4px;
+  padding: 6px 12px;
   border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #94a3b8;
-  font-size: 11px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   white-space: nowrap;
 }
 
 .mmTab:hover {
-  background: rgba(255, 255, 255, 0.06);
-  color: #e2e8f0;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.8);
+  transform: scale(1.02);
 }
 
 .mmTab--active {
-  background: #334155;
-  color: #f8fafc;
+  background: rgba(59, 130, 246, 0.2);
+  color: #fff;
   font-weight: 600;
+  border: 1px solid rgba(59, 130, 246, 0.3);
 }
 
 .mmTab--inactive {
-  opacity: 0.35;
+  opacity: 0.45;
 }
 
 .mmExpandBtn {
-  padding: 5px 8px;
+  padding: 8px 10px;
   border: none;
-  border-radius: 6px;
-  background: transparent;
-  color: #94a3b8;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
   cursor: pointer;
   display: flex;
   align-items: center;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mmExpandBtn:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: #e2e8f0;
+  background: rgba(59, 130, 246, 0.15);
+  color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.05);
 }
 
 .mmExpandBtn:disabled {
@@ -2837,46 +2794,56 @@ select {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  padding: 8px 10px;
-  border: 1px solid #334155;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.6);
-  color: #e2e8f0;
-  font-size: 10px;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mmQuickTool:hover {
-  background: rgba(51, 65, 85, 0.5);
-  border-color: #475569;
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.35);
+  color: rgba(255, 255, 255, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .mmQuickTool--active {
-  background: rgba(59, 130, 246, 0.15);
+  background: rgba(59, 130, 246, 0.18);
   border-color: rgba(59, 130, 246, 0.5);
   color: #93c5fd;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
 }
 
+/* 参考图缩略图区域 - AI-CanvasPro 风格 */
 .mmThumbsWrapper {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   margin-left: auto;
   min-width: 0;
-  max-width: 160px;
+  max-width: 180px;
 }
 
 .mmThumbsCount {
   flex-shrink: 0;
-  font-size: 10px;
-  color: #64748b;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
   font-variant-numeric: tabular-nums;
 }
 
 .mmThumbs {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   overflow-x: auto;
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -2888,30 +2855,35 @@ select {
 }
 
 .mmThumbsEmpty {
-  font-size: 11px;
-  color: #64748b;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.35);
   white-space: nowrap;
 }
 
+/* 缩略图 - AI-CanvasPro 风格 */
 .mmThumb {
   position: relative;
   flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 8px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid #334155;
-  background: #0f172a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0a0a0b;
 }
 
 .mmThumb--clickable {
   cursor: pointer;
-  transition: border-color 0.15s, transform 0.12s;
+  transition:
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mmThumb--clickable:hover {
-  border-color: #60a5fa;
-  transform: scale(1.06);
+  border-color: rgba(59, 130, 246, 0.5);
+  transform: scale(1.15);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
 }
 
 .mmThumb--clickable:hover .mmThumbHoverOverlay {
@@ -2925,16 +2897,16 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(0, 0, 0, 0.35);
   opacity: 0;
-  transition: opacity 0.15s;
+  transition: opacity 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   pointer-events: none;
 }
 
 .mmThumbBadge {
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: 3px;
+  right: 3px;
   z-index: 2;
   min-width: 16px;
   height: 16px;
@@ -2948,25 +2920,31 @@ select {
   pointer-events: none;
 }
 
-/* 悬停显示删除按钮 */
+/* AI-CanvasPro 风格：悬停显示删除按钮 */
 .mmThumbDelete {
   display: none;
   position: absolute;
-  top: 2px;
-  right: 2px;
+  top: -6px;
+  right: -6px;
   z-index: 3;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 3px;
-  border-radius: 4px;
-  background: rgba(239, 68, 68, 0.9);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.85);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   color: #fff;
-  font-size: 13px;
-  line-height: 14px;
-  text-align: center;
-  border: none;
-  cursor: pointer;
+  font-size: 14px;
   font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mmThumb--clickable:hover .mmThumbBadge {
@@ -2975,12 +2953,19 @@ select {
 
 .mmThumb--clickable:hover .mmThumbDelete {
   display: block;
+  opacity: 1;
+  transform: scale(1);
 }
 
 .mmThumb :global(.nodeThumb) {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mmThumb--clickable:hover :global(.nodeThumb) {
+  transform: scale(1.1);
 }
 
 .mmThumbAudio {
@@ -3184,50 +3169,52 @@ select {
   right: 12px;
 }
 
-/* 模块3：提示词文本区 */
+/* 模块3：提示词文本区 - AI-CanvasPro 风格 */
 .mmPromptArea {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
 .mmPromptInput {
   width: 100%;
-  min-height: 80px;
-  padding: 10px;
-  border: 1px solid #2a3344;
-  border-radius: 8px;
-  background: #0c1322;
-  color: #e2e8f0;
-  font-size: 12px;
+  min-height: 50px;
+  max-height: 100px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 13px;
   font-family: inherit;
-  line-height: 1.5;
-  resize: vertical;
+  line-height: 1.6;
+  resize: none;
   box-sizing: border-box;
 }
 
 .mmPromptInput::placeholder {
-  color: #475569;
+  color: rgba(255, 255, 255, 0.28);
 }
 
 .mmPromptInput:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(255, 255, 255, 0.06);
 }
 
 .mmPromptFooter {
   display: flex;
   justify-content: flex-end;
-  padding: 0 4px;
+  padding: 4px 4px 0;
 }
 
 .mmPromptLen {
-  font-size: 10px;
-  color: #64748b;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
 }
 
-/* 模块4：底部参数栏 */
+/* 模块4：底部参数栏 - AI-CanvasPro pill 风格 */
 .mmFoot {
   display: flex;
   align-items: center;
@@ -3237,59 +3224,75 @@ select {
 }
 
 .mmModelSelect {
-  padding: 5px 8px;
-  border-radius: 6px;
-  border: 1px solid var(--border);
-  background: rgba(30, 41, 59, 0.8);
-  color: #e2e8f0;
-  font-size: 11px;
+  padding: 8px 28px 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
   cursor: pointer;
   appearance: none;
   -webkit-appearance: none;
-  padding-right: 20px;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.6)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
-  background-position: right 6px center;
+  background-position: right 12px center;
+  font-weight: 500;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.mmModelSelect:hover {
+  background-color: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
 }
 
 .mmModelSelect:focus {
   outline: none;
-  border-color: var(--focus-ring, #3b82f6);
+  border-color: rgba(59, 130, 246, 0.5);
+  background-color: rgba(59, 130, 246, 0.1);
 }
 
 .mmModelLabel {
   font-weight: 500;
-  color: #e2e8f0;
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .mmParam {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 8px;
-  border-radius: 6px;
-  background: rgba(30, 41, 59, 0.8);
-  color: #f8fafc;
-  font-size: 11px;
-  border: none;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   cursor: default;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mmParam--clickable {
   cursor: pointer;
-  transition: background 0.15s;
 }
 
 .mmParam--clickable:hover {
-  background: rgba(51, 65, 85, 0.8);
+  background: rgba(59, 130, 246, 0.12);
+  border-color: rgba(59, 130, 246, 0.3);
+  transform: scale(1.02);
 }
 
 .mmParam--open {
-  background: rgba(51, 65, 85, 0.9);
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .mmParamIcon {
-  font-size: 10px;
+  font-size: 11px;
   opacity: 0.8;
 }
 
@@ -3298,65 +3301,77 @@ select {
 }
 
 .mmParam--audio.mmParam--audioOn {
-  color: #93c5fd;
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .mmParam--audio:not(.mmParam--audioOn) {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.5);
 }
 
-/* 生成按钮 */
+/* AI-CanvasPro 风格：生成按钮 - 圆形渐变 */
 .mmGenerateBtn {
   margin-left: auto;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: none;
-  background: #f8fafc;
-  color: #0f172a;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: linear-gradient(135deg, rgba(59, 100, 200, 0.9), rgba(59, 130, 246, 0.7));
+  color: #fff;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.15s, opacity 0.15s;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  flex-shrink: 0;
 }
 
 .mmGenerateBtn:hover:not(:disabled) {
-  background: #e2e8f0;
+  background: linear-gradient(135deg, rgba(79, 120, 220, 0.95), rgba(79, 150, 255, 0.85));
+  transform: scale(1.1);
+  box-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
 }
 
 .mmGenerateBtn:disabled,
 .mmGenerateBtn--busy {
   opacity: 0.5;
   cursor: not-allowed;
+  transform: none;
 }
 
-/* 生成设置下拉面板 */
+/* AI-CanvasPro 风格：生成设置下拉面板 */
 .mmGenSettings {
   position: absolute;
   bottom: calc(100% + 8px);
   right: 0;
   width: 280px;
-  background: #1e293b;
-  border: 1px solid #334155;
-  border-radius: 10px;
+  background: #16161a;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   z-index: 100;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    0 12px 32px rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
 }
 
 .mmGenSettingsSection {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .mmGenSettingsLabel {
-  font-size: 11px;
-  color: #94a3b8;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
   font-weight: 500;
 }
 
@@ -3367,68 +3382,77 @@ select {
 }
 
 .mmGenSettingsDurationVal {
-  font-size: 11px;
-  color: #e2e8f0;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.9);
   font-weight: 600;
 }
 
 .mmGenSettingsRatioGrid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
+  gap: 8px;
 }
 
 .mmGenSettingsRatioBtn {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  padding: 8px 4px;
-  border: 1px solid #334155;
-  border-radius: 6px;
-  background: rgba(15, 23, 42, 0.6);
-  color: #94a3b8;
-  font-size: 10px;
+  gap: 6px;
+  padding: 10px 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .mmGenSettingsRatioBtn:hover {
-  background: rgba(51, 65, 85, 0.4);
-  color: #e2e8f0;
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.02);
 }
 
 .mmGenSettingsRatioBtn--active {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(59, 130, 246, 0.5);
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(59, 130, 246, 0.45);
   color: #93c5fd;
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.2);
 }
 
 .mmGenSettingsRatioWire {
-  width: 20px;
-  height: 14px;
+  width: 24px;
+  height: 16px;
   border: 1.5px solid currentColor;
-  border-radius: 2px;
+  border-radius: 3px;
 }
 
 .mmGenSettingsSeg {
   display: flex;
-  border-radius: 6px;
-  border: 1px solid #2a3344;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
 }
 
 .mmGenSettingsSegBtn {
   flex: 1;
-  padding: 6px 0;
+  padding: 8px 0;
   border: none;
   background: transparent;
-  color: #94a3b8;
-  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  border-right: 1px solid #2a3344;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .mmGenSettingsSegBtn:last-child {
@@ -3436,44 +3460,51 @@ select {
 }
 
 .mmGenSettingsSegBtn:hover {
-  background: rgba(255, 255, 255, 0.05);
-  color: #e2e8f0;
+  background: rgba(59, 130, 246, 0.1);
+  color: rgba(255, 255, 255, 0.9);
 }
 
 .mmGenSettingsSegBtn--active {
-  background: #334155;
-  color: #f8fafc;
+  background: rgba(59, 130, 246, 0.2);
+  color: #93c5fd;
 }
 
+/* AI-CanvasPro 风格：滑块 */
 .mmGenSettingsSlider {
   width: 100%;
   height: 6px;
+  border-radius: 3px;
   accent-color: #3b82f6;
   cursor: pointer;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .mmGenSettingsRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 0 2px;
+  padding: 8px 0 4px;
 }
 
 .mmGenSettingsLabel {
   font-size: 12px;
-  color: #94a3b8;
+  color: rgba(255, 255, 255, 0.5);
   font-weight: 500;
 }
 
+/* AI-CanvasPro 风格：开关 */
 .mmGenSettingsToggle {
   position: relative;
-  width: 36px;
-  height: 20px;
-  border-radius: 10px;
-  border: none;
-  background: #334155;
+  width: 40px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
   cursor: pointer;
-  transition: background 0.2s;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   padding: 0;
   flex-shrink: 0;
 }
@@ -3484,7 +3515,9 @@ select {
 }
 
 .mmGenSettingsToggle--on {
-  background: #3b82f6;
+  background: rgba(59, 130, 246, 0.8);
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
 }
 
 .mmGenSettingsToggleThumb {
@@ -3494,13 +3527,14 @@ select {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #f8fafc;
-  transition: transform 0.2s;
+  background: rgba(255, 255, 255, 0.9);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
   display: block;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .mmGenSettingsToggle--on .mmGenSettingsToggleThumb {
-  transform: translateX(16px);
+  transform: translateX(18px);
 }
 
 /* 验证错误提示 */
@@ -3664,95 +3698,278 @@ select {
   color: #94a3b8;
 }
 
-/* 视频节点工具栏（展开态嵌入上卡顶部） */
-.videoNodeToolbar {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 8px;
-  margin: 0 4px;
-  border-radius: 8px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid rgba(51, 65, 85, 0.5);
+/* ═══════════════════════════════════════════════════════════════════
+   视频节点 - AI-CanvasPro 极度节俭风格
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   视频节点 (VideoAssetNode) - AI-CanvasPro 设计风格
+   圆角: 16px (节点) / 18px (预览区)
+   色彩: bg-node #16161a / stroke rgba(255,255,255,0.08)→0.12
+   动效: cubic-bezier(.34, 1.56, .64, 1) + 0.22s
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 节点容器 - AI-CanvasPro 风格 */
+.videoMinimalNode {
+  position: relative;
+  display: inline-block;
+  background: #16161a;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: visible;
+  width: 480px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+  transition:
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.videoNodeToolbarBtn {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 1px;
-  padding: 4px 6px;
-  border: none;
-  border-radius: 5px;
-  background: transparent;
-  color: #94a3b8;
+/* 节点选中态 - AI-CanvasPro 蓝色边框风格 */
+.videoMinimalNode:has(.videoMinimalPreview:hover),
+.videoMinimalNode.videoMinimalNode--selected {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow:
+    0 0 0 1px rgba(59, 130, 246, 0.2),
+    0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+/* 视频内容区 */
+.videoMinimalContent {
+  position: relative;
+  z-index: 1;
+}
+
+/* 视频预览区 - AI-CanvasPro 18px 圆角风格 */
+.videoMinimalPreview {
+  width: 100%;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s;
-  min-width: 32px;
+  border-radius: 18px 18px 0 0;
+  overflow: hidden;
+  background: #0a0a0b;
+  min-height: 160px;
+  position: relative;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.videoNodeToolbarBtn:hover:not(.videoNodeToolbarBtn--disabled) {
-  background: rgba(51, 65, 85, 0.7);
-  color: #e2e8f0;
+/* 预览区悬停效果 - AI-CanvasPro 风格 */
+.videoMinimalPreview:hover {
+  background: #0d0d0f;
 }
 
-.videoNodeToolbarBtn--disabled {
-  opacity: 0.35;
-  cursor: not-allowed;
+/* 预览区内视频样式 */
+.videoMinimalPreview :global(video) {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 0;
+  opacity: 1;
+  transition: opacity 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
-.videoNodeToolbarLabel {
-  font-size: 9px;
-  font-weight: 500;
-  white-space: nowrap;
-  line-height: 1;
+/* 播放按钮悬浮层 - AI-CanvasPro 风格 */
+.videoMinimalPreview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0);
+  transition: background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: 2;
 }
 
-/* 视频节点预览区 */
-.videoAssetPreviewShell {
+.videoMinimalPreview:hover::before {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* 视频中心播放图标 - 悬停显示 */
+.videoMinimalPreview::after {
+  content: "▶";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) scale(0.8);
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.9);
+  opacity: 0;
+  transition:
+    opacity 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.videoMinimalPreview:hover::after {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* 空态提示 - AI-CanvasPro 风格 */
+.videoNodeEmptyState {
   display: flex;
   flex-direction: column;
-  gap: 6px;
   align-items: center;
-  padding: 6px 8px;
+  justify-content: center;
+  gap: 12px;
+  padding: 40px 24px;
+  min-height: 180px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+  cursor: pointer;
+  background: #0a0a0b;
+  border-radius: 18px 18px 0 0;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  position: relative;
+  overflow: hidden;
 }
 
-.videoAssetPreviewShell--expanded {
-  padding: 8px 4px;
+/* 空态悬停 - AI-CanvasPro 风格 */
+.videoNodeEmptyState:hover {
+  background: #111113;
+  color: rgba(255, 255, 255, 0.6);
+  transform: scale(1.01);
 }
 
+/* 空态图标样式 */
+.videoNodeEmptyState svg {
+  width: 40px;
+  height: 40px;
+  opacity: 0.6;
+  transition: opacity 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.videoNodeEmptyState:hover svg {
+  opacity: 0.85;
+  transform: scale(1.1);
+}
+
+/* 底部浮动参数面板 - AI-CanvasPro 风格 */
+.videoNodeFloatingBottom {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 480px;
+  background: #16161a;
+  border-radius: 0 0 16px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-top: none;
+  z-index: 100;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* 视频节点顶部工具栏浮动层 - 绝对定位在预览区右上角 */
+.videoNodeToolbarOverlay {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 视频素材缩略图条 - AI-CanvasPro 风格 */
 .videoAssetEmptyPreview {
   cursor: pointer;
-  border-radius: 10px;
-  transition: background 0.12s;
+  border-radius: 12px;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 200px;
 }
 
 .videoAssetEmptyPreview:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
+  transform: scale(1.01);
 }
 
 .videoAssetThumbStrip {
   display: flex;
-  gap: 6px;
+  gap: 8px;
   align-items: center;
   width: 100%;
-  padding: 4px 2px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 .videoAssetThumbStripItem {
   position: relative;
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
   overflow: hidden;
-  border: 1px solid #334155;
+  border: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
+  transition:
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.videoAssetThumbStripItem:hover {
+  transform: scale(1.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
 }
 
 .videoAssetThumbStripItem :global(.nodeThumb) {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* AI-CanvasPro 风格：缩略图删除按钮 */
+.videoAssetThumbStripItem::before {
+  content: "×";
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(239, 68, 68, 0.8);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  opacity: 0;
+  transform: scale(0.6);
+  transition:
+    opacity 0.15s ease,
+    transform 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+  z-index: 10;
+  cursor: pointer;
+}
+
+.videoAssetThumbStripItem:hover::before {
+  opacity: 1;
+  transform: scale(1);
 }
 
 .videoAssetThumbStripNum {
@@ -3770,17 +3987,32 @@ select {
   text-align: center;
 }
 
+/* AI-CanvasPro 风格：更多按钮 */
 .videoAssetThumbStripMore {
   width: 40px;
   height: 40px;
-  border-radius: 6px;
-  border: 1px dashed #334155;
+  border-radius: 8px;
+  border: 1px dashed rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.02);
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 10px;
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.4);
   flex-shrink: 0;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+  cursor: pointer;
+}
+
+.videoAssetThumbStripMore:hover {
+  background: rgba(59, 130, 246, 0.1);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: rgba(255, 255, 255, 0.7);
+  transform: scale(1.05);
 }
 
 .videoAssetPathRow {
@@ -3800,19 +4032,25 @@ select {
 
 .videoAssetUploadBtnSm {
   flex-shrink: 0;
-  padding: 2px 8px;
-  border-radius: 5px;
-  border: 1px solid #334155;
-  background: transparent;
-  color: #94a3b8;
-  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 11px;
   cursor: pointer;
-  transition: all 0.12s;
+  transition:
+    background 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    border-color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color 0.22s cubic-bezier(0.34, 1.56, 0.64, 1),
+    transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
 
 .videoAssetUploadBtnSm:hover {
-  border-color: #3b82f6;
-  color: #93c5fd;
+  background: rgba(59, 130, 246, 0.15);
+  border-color: rgba(59, 130, 246, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+  transform: scale(1.02);
 }
 
 .videoAssetUploadHint {
@@ -5376,17 +5614,21 @@ select {
 }
 
 .nodeTone-video {
-  box-shadow: inset 0 0 0 1px rgba(239, 68, 68, 0.2), 0 10px 30px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
-/* 视频素材节点：偏宽屏 16:9 预览区（与参考图一致） */
+/* 视频素材节点：AI-CanvasPro 极简风格（固定尺寸） */
 .videoAssetCard.nodeCard {
-  min-width: 320px;
-  max-width: 400px;
+  width: 864px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  overflow: visible;
 }
 
 .videoAssetCard--expanded.nodeCard {
-  max-width: 440px;
+  width: 864px;
 }
 
 .videoAssetUploadBar {
@@ -8658,3 +8900,443 @@ select {
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-variant-numeric: tabular-nums;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   视频节点 - React Flow 主流设计风格
+   配合 colorMode="dark" 使用
+   ═══════════════════════════════════════════════════════════════════ */
+
+.video-node-container {
+  background: #1e1e24;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0;
+  min-width: 280px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.video-node-container.selected {
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+.video-node-preview {
+  width: 100%;
+  background: #18181c;
+}
+
+.video-node-media { cursor: pointer; }
+.video-node-video { display: block; width: 100%; height: auto; }
+
+.video-node-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 32px 16px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  cursor: pointer;
+  background: #18181c;
+}
+
+.video-node-empty:hover {
+  background: #1c1c20;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.video-node-panel { padding: 8px 10px 10px; background: #1e1e24; }
+.video-node-tabs { display: flex; gap: 2px; margin-bottom: 6px; }
+
+.video-node-tab {
+  padding: 3px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.video-node-tab:hover { background: rgba(255, 255, 255, 0.06); color: rgba(255, 255, 255, 0.7); }
+.video-node-tab.active { background: rgba(99, 102, 241, 0.2); color: #fff; font-weight: 600; }
+
+.video-node-prompt {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-family: inherit;
+  line-height: 1.4;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.video-node-prompt::placeholder { color: rgba(255, 255, 255, 0.25); }
+.video-node-prompt:focus { outline: none; border-color: rgba(99, 102, 241, 0.4); background: rgba(255, 255, 255, 0.06); }
+
+.video-node-controls { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
+
+.video-node-select {
+  padding: 3px 16px 3px 6px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6' viewBox='0 0 24 24' fill='none' stroke='rgba(255,255,255,0.4)' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 4px center;
+}
+
+.video-node-select:focus { outline: none; border-color: rgba(99, 102, 241, 0.4); }
+
+.video-node-generate {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: none;
+  border-radius: 12px;
+  background: #6366f1;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.video-node-generate:hover { background: #4f46e5; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   脚本节点 - React Flow 主流设计风格
+   配合 colorMode="dark" 使用
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 节点容器 */
+.script-node-container {
+  background: #1e1e24;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 0;
+  min-width: 240px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+/* 选中状态 */
+.script-node-container.selected {
+  border-color: rgba(99, 102, 241, 0.5);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.2);
+}
+
+/* 内容区 */
+.script-node-content {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 头部 */
+.script-node-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: #18181c;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.script-node-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.script-node-badge {
+  padding: 2px 6px;
+  border-radius: 8px;
+  background: rgba(99, 102, 241, 0.2);
+  color: #fff;
+  font-size: 9px;
+  font-weight: 500;
+}
+
+/* 脚本体 */
+.script-node-body {
+  padding: 8px 10px;
+  min-height: 60px;
+}
+
+.script-node-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.script-node-preview-text {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.script-node-beats-count {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.script-node-input {
+  width: 100%;
+  min-height: 50px;
+  padding: 6px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 11px;
+  font-family: inherit;
+  line-height: 1.4;
+  resize: none;
+  box-sizing: border-box;
+}
+
+.script-node-input::placeholder { color: rgba(255, 255, 255, 0.25); }
+.script-node-input:focus { outline: none; border-color: rgba(99, 102, 241, 0.4); background: rgba(255, 255, 255, 0.06); }
+
+/* 工具栏 */
+.script-node-toolbar {
+  display: flex;
+  gap: 4px;
+  padding: 6px 10px;
+  background: #1e1e24;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.script-node-btn {
+  padding: 4px 10px;
+  border: none;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 10px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.script-node-btn:hover { background: rgba(255, 255, 255, 0.1); color: #fff; }
+.script-node-btn:active { background: rgba(99, 102, 241, 0.3); color: #fff; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   React Flow Handle 全局样式
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════════════
+   简单锚点样式（SimpleAnchors）
+   圆形边框 + 符号，hover 显示
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* 锚点基础样式 */
+.simple-anchor {
+  width: 14px !important;
+  height: 14px !important;
+  background: transparent !important;
+  border: 2px solid rgba(255, 255, 255, 0.35) !important;
+  border-radius: 50% !important;
+  opacity: 0 !important;
+  transition: transform 0.15s ease, border-color 0.15s ease, opacity 0.15s ease !important;
+}
+
+/* + 符号 */
+.simple-anchor::before {
+  content: "+";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 12px;
+  font-weight: 300;
+  line-height: 1;
+  pointer-events: none;
+}
+
+/* hover 显示 - 锚点组在节点 hover 时显示 */
+.react-flow__node:hover .simple-anchor {
+  opacity: 1 !important;
+}
+
+/* hover 放大 */
+.react-flow__node:hover .simple-anchor:hover {
+  transform: scale(1.12) !important;
+  border-color: rgba(255, 255, 255, 0.7) !important;
+}
+
+/* hover 时符号更亮 */
+.react-flow__node:hover .simple-anchor:hover::before {
+  color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* 连接中全局显示 */
+.react-flow--connecting .simple-anchor,
+.react-flow--drag-connecting .simple-anchor {
+  opacity: 1;
+}
+
+/* 锚点位置 - 向外偏移，不压入节点 */
+.simple-anchor--left {
+  left: -10px !important;
+}
+
+.simple-anchor--right {
+  right: -10px !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   极简图片节点 - 实验性
+   参考 AI-CanvasPro 风格
+   ═══════════════════════════════════════════════════════════════════ */
+
+.minimal-image-node {
+  position: relative;
+  width: 280px;
+  background: #1a1a1e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.minimal-image-node:hover {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.minimal-image-node.selected {
+  border-color: rgba(99, 102, 241, 0.4);
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15);
+}
+
+/* 图片预览区 */
+.minimal-image-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #141414;
+  overflow: hidden;
+}
+
+.minimal-image-content {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 空状态占位 - 图标居中 */
+.minimal-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.02);
+  color: rgba(255, 255, 255, 0.15);
+  transition: background 0.15s;
+}
+
+.minimal-image-preview:hover .minimal-image-placeholder {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.25);
+}
+
+/* 预览区外左上角标签 */
+.minimal-image-label {
+  position: absolute;
+  top: -16px;
+  left: 4px;
+  z-index: 2;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+.minimal-image-label-text {
+  font-size: 9px;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.3);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.minimal-image-label-text:hover {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.minimal-image-label-input {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid rgba(99, 102, 241, 0.5);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 9px;
+  font-family: inherit;
+  outline: none;
+  width: 72px;
+  padding: 0;
+  line-height: 1;
+}
+
+/* 预览区外右上角分辨率 - 与标签同一水平线 */
+.minimal-image-res {
+  position: absolute;
+  top: -16px;
+  right: 4px;
+  z-index: 2;
+  font-size: 9px;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.25);
+  white-space: nowrap;
+  pointer-events: none;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+}
+
+/* 节点本身需relative以便绝对定位子元素 */
+.minimal-image-node {
+  position: relative;
+  width: 280px;
+  background: #1a1a1e;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  overflow: visible;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+/* Toolbar delete button — appears when rows are selected in ScriptBeatsEditorTable */
+.toolbar-delete-btn {
+  background: #dc2626;
+  color: white;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.toolbar-delete-btn:hover {
+  background: #b91c1c;
+}
+

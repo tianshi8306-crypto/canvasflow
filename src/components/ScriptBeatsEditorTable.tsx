@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ScriptBeat } from "@/lib/types";
 import { normalizeScriptBeat } from "@/lib/scriptBeatHelpers";
 import {
@@ -64,6 +64,7 @@ export function ScriptBeatsEditorTable({
   const filterInputRef = useRef<HTMLInputElement>(null);
   const fieldRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [inlineContainerWidth, setInlineContainerWidth] = useState(0);
+  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
   const maxRoleCount = useMemo(() => {
     let n = 0;
@@ -261,6 +262,15 @@ export function ScriptBeatsEditorTable({
     onStatusText?.("已隐藏大部分字段，保留「镜号」列");
   };
 
+  const allSelected = displayRows.length > 0 && selectedIndices.size === displayRows.length;
+  const handleSelectAll = useCallback(() => {
+    if (allSelected) {
+      setSelectedIndices(new Set());
+    } else {
+      setSelectedIndices(new Set(displayRows.map((_, i) => i)));
+    }
+  }, [displayRows, allSelected]);
+
   const tableEl = (
     <table
       className={tableClass}
@@ -401,6 +411,13 @@ export function ScriptBeatsEditorTable({
         setFilterQuery={setFilterQuery}
         displayRowsLength={displayRows.length}
         normRowsLength={normRows.length}
+        selectedCount={selectedIndices.size}
+        onDelete={() => {
+          const kept = normRows.filter((_, i) => !selectedIndices.has(i));
+          onPersistRows(kept);
+          setSelectedIndices(new Set());
+        }}
+        onSelectAll={handleSelectAll}
       />
 
       <div className="scriptTableFullscreenScroll">{tableEl}</div>
