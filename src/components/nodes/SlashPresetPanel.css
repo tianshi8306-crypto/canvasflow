@@ -12,11 +12,6 @@
   overflow: hidden;
 }
 
-.slash-preset-panel--top {
-  top: auto;
-  bottom: 0;
-}
-
 .slash-preset-search {
   padding: 8px;
   border-bottom: 1px solid var(--border, #2a3140);

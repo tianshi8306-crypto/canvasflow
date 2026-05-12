@@ -26,7 +26,12 @@ export function SlashPresetPanel({ cursorRect, onSelect, onClose }: SlashPresetP
     const left = Math.min(cursorRect.left, vw - PANEL_WIDTH - 8);
     const vertical: "bottom" | "top" =
       spaceBelow >= PANEL_MAX_HEIGHT + 8 ? "bottom" : "top";
-    return { left, vertical };
+    return {
+      left,
+      vertical,
+      top: vertical === "bottom" ? cursorRect.bottom : undefined,
+      bottom: vertical === "top" ? vh - cursorRect.top : undefined,
+    };
   }, [cursorRect]);
 
   const filtered = useMemo(() => {
@@ -76,7 +81,7 @@ export function SlashPresetPanel({ cursorRect, onSelect, onClose }: SlashPresetP
         if (filtered[selectedIndex]) {
           handleSelect(filtered[selectedIndex].id);
         }
-      } else if (e.key === "Escape" || e.key === "/") {
+      } else if (e.key === "Escape") {
         e.preventDefault();
         onClose();
       }
@@ -97,8 +102,8 @@ export function SlashPresetPanel({ cursorRect, onSelect, onClose }: SlashPresetP
   return (
     <div
       ref={panelRef}
-      className={`slash-preset-panel ${position.vertical === "top" ? "slash-preset-panel--top" : ""}`}
-      style={{ left: position.left }}
+      className="slash-preset-panel"
+      style={{ left: position.left, top: position.top, bottom: position.bottom }}
       onKeyDown={handleKeyDown}
     >
       <div className="slash-preset-search">
@@ -108,6 +113,12 @@ export function SlashPresetPanel({ cursorRect, onSelect, onClose }: SlashPresetP
           placeholder="搜索预设..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "/" || e.key === "Escape") {
+              e.preventDefault();
+              onClose();
+            }
+          }}
         />
       </div>
       <div className="slash-preset-list">
