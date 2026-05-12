@@ -39,6 +39,7 @@ function LLMDocGlyph() {
 }
 
 export function LLMNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const params = useMemo(() => getLLMParams(data), [data.params]);
 
   const hasPrompt = Boolean(params.prompt?.trim());
