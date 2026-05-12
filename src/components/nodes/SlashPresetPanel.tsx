@@ -111,7 +111,7 @@ export function SlashPresetPanel({ cursorRect, onSelect, onClose }: SlashPresetP
           className="slash-preset-search-input"
           placeholder="搜索预设..."
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setSelectedIndex(0); }}
           onKeyDown={(e) => {
             if (e.key === "/" || e.key === "Escape") {
               e.preventDefault();
