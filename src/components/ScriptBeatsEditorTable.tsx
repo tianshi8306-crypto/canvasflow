@@ -64,7 +64,6 @@ export function ScriptBeatsEditorTable({
   const filterInputRef = useRef<HTMLInputElement>(null);
   const fieldRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const [inlineContainerWidth, setInlineContainerWidth] = useState(0);
-  const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
 
   const maxRoleCount = useMemo(() => {
     let n = 0;
@@ -262,14 +261,17 @@ export function ScriptBeatsEditorTable({
     onStatusText?.("已隐藏大部分字段，保留「镜号」列");
   };
 
-  const allSelected = displayRows.length > 0 && selectedIndices.size === displayRows.length;
+  const allSelected = displayRows.length > 0 && displayRows.every((b) => selectedIds.includes(b.id));
   const handleSelectAll = useCallback(() => {
+    const selectedIdsSet = new Set(selectedIds);
     if (allSelected) {
-      setSelectedIndices(new Set());
+      selectedIds.forEach((id) => onToggleSelect(id));
     } else {
-      setSelectedIndices(new Set(displayRows.map((_, i) => i)));
+      displayRows.forEach((b) => {
+        if (!selectedIdsSet.has(b.id)) onToggleSelect(b.id);
+      });
     }
-  }, [displayRows, allSelected]);
+  }, [displayRows, selectedIds, onToggleSelect, allSelected]);
 
   const tableEl = (
     <table
@@ -411,11 +413,11 @@ export function ScriptBeatsEditorTable({
         setFilterQuery={setFilterQuery}
         displayRowsLength={displayRows.length}
         normRowsLength={normRows.length}
-        selectedCount={selectedIndices.size}
+        selectedCount={selectedIds.length}
         onDelete={() => {
-          const kept = normRows.filter((_, i) => !selectedIndices.has(i));
+          const selectedIdsSet = new Set(selectedIds);
+          const kept = normRows.filter((r) => !selectedIdsSet.has(r.id));
           onPersistRows(kept);
-          setSelectedIndices(new Set());
         }}
         onSelectAll={handleSelectAll}
       />
