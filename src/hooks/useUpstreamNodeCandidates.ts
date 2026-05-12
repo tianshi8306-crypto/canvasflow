@@ -11,17 +11,18 @@ export type UpstreamNodeCandidate = {
 
 /**
  * Returns upstream nodes connected to the given node via incoming edges.
- * Stub implementation - will be enhanced in Task 2.
  */
 export function useUpstreamNodeCandidates(nodeId: string): UpstreamNodeCandidate[] {
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
 
   return useMemo(() => {
-    const upstreamEdgeSources = edges
-      .filter((edge) => edge.target === nodeId)
-      .map((edge) => edge.source)
-      .filter((sourceId) => sourceId !== nodeId);
+    const upstreamEdgeSources = [...new Set(
+      edges
+        .filter((edge) => edge.target === nodeId)
+        .map((edge) => edge.source)
+        .filter((sourceId) => sourceId !== nodeId)
+    )];
 
     return upstreamEdgeSources
       .map((sourceId) => {
