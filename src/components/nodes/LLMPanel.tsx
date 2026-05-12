@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import {
   getProviderSelectionPatch,
@@ -23,7 +23,10 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const setStatusText = useProjectStore((s) => s.setStatusText);
 
-  const nodeLabels = Object.fromEntries(nodes.map((n) => [n.id, n.data.label ?? n.id]));
+  const nodeLabels = useMemo(
+    () => Object.fromEntries(nodes.map((n) => [n.id, n.data.label ?? n.id])),
+    [nodes],
+  );
 
   const [providerOptions, setProviderOptions] = useState<TextNodeProviderOption[]>([]);
   const [selectedProviderId, setSelectedProviderId] = useState(providerId ?? "");
