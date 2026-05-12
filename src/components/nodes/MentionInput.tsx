@@ -115,14 +115,6 @@ export function MentionInput({
     [showDropdown, filteredNodes, dropdownIndex, insertMention]
   );
 
-  const syncOverlay = useCallback(() => {
-    const textarea = textareaRef.current;
-    const overlay = overlayRef.current;
-    if (!textarea || !overlay) return;
-    overlay.scrollLeft = textarea.scrollLeft;
-    overlay.scrollTop = textarea.scrollTop;
-  }, []);
-
   const pills = useMemo(() => {
     const result: { nodeId: string; label: string; start: number; end: number }[] = [];
     const regex = /@\[([^\]]+)\]/g;
@@ -142,11 +134,25 @@ export function MentionInput({
   return (
     <div className={`mention-input-wrapper ${className}`} style={style}>
       <div className="mention-overlay" ref={overlayRef}>
-        {pills.map((pill) => (
-          <span key={pill.nodeId} className="mention-pill">
-            @{pill.label}
-          </span>
-        ))}
+        {(() => {
+          const parts: React.ReactNode[] = [];
+          let lastIndex = 0;
+          for (const pill of pills) {
+            if (pill.start > lastIndex) {
+              parts.push(value.slice(lastIndex, pill.start));
+            }
+            parts.push(
+              <span key={`${pill.start}-${pill.nodeId}`} className="mention-pill">
+                @{pill.label}
+              </span>
+            );
+            lastIndex = pill.end;
+          }
+          if (lastIndex < value.length) {
+            parts.push(value.slice(lastIndex));
+          }
+          return parts;
+        })()}
       </div>
       <textarea
         ref={textareaRef}
@@ -154,7 +160,6 @@ export function MentionInput({
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
-        onScroll={syncOverlay}
         placeholder={placeholder}
         rows={4}
       />

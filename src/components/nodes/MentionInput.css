@@ -46,6 +46,7 @@
 
 .mention-dropdown {
   position: absolute;
+  top: 100%;
   z-index: 100;
   background: var(--panel, #161a22);
   border: 1px solid var(--border, #2a3140);
