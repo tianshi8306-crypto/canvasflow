@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import {
   getProviderSelectionPatch,
@@ -8,6 +8,8 @@ import {
 import { resolveMentionTokens } from "@/lib/resolveMentionTokens";
 import { useProjectStore } from "@/store/projectStore";
 import { MentionInput } from "./MentionInput";
+import { SlashPresetPanel } from "./SlashPresetPanel";
+import type { MentionInputRef } from "./MentionInput";
 
 const MAX_CHARS = 4000;
 
@@ -34,6 +36,8 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
   const [inputText, setInputText] = useState(modelInput ?? "");
   const [response, setResponse] = useState(prompt ?? "");
   const [running, setRunning] = useState(false);
+  const [slashCursorRect, setSlashCursorRect] = useState<DOMRect | null>(null);
+  const mentionRef = useRef<MentionInputRef>(null);
 
   useEffect(() => {
     void loadEnabledProviderOptions().then(setProviderOptions);
@@ -89,6 +93,15 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
     [inputText, selectedProviderId, nodeId, projectPath, response, setStatusText, updateNodeData, nodes],
   );
 
+  const handleSlashTrigger = useCallback((rect: DOMRect) => {
+    setSlashCursorRect(rect);
+  }, []);
+
+  const handlePresetSelect = useCallback((template: string) => {
+    mentionRef.current?.insertPresetTemplate(template);
+    setSlashCursorRect(null);
+  }, []);
+
   
   return (
     <div className="llmPanel">
@@ -130,13 +143,22 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
           </div>
         </div>
         <MentionInput
+          ref={mentionRef}
           nodeId={nodeId}
           value={inputText}
           onChange={setInputText}
+          onSlashTrigger={handleSlashTrigger}
           placeholder="输入提示词，让 LLM 生成内容…"
           className="scriptGenComposerInput"
           nodeLabels={nodeLabels}
         />
+        {slashCursorRect && (
+          <SlashPresetPanel
+            cursorRect={slashCursorRect}
+            onSelect={handlePresetSelect}
+            onClose={() => setSlashCursorRect(null)}
+          />
+        )}
       </form>
     </div>
   );
