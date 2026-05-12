@@ -5,6 +5,7 @@ import { MagneticNodeAnchors } from "@/components/nodes/MagneticNodeAnchors";
 import { MentionInput } from "@/components/nodes/MentionInput";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { scriptNodeDispatchAgentRuntime } from "@/lib/nodeAgentRuntime/dagnodeDispatchAgents";
+import { resolveMentionTokens } from "@/lib/resolveMentionTokens";
 import { scriptStoryboardGenerateAgentRuntime } from "@/lib/nodeAgentRuntime/scriptStoryboardAgent";
 import type { FlowNodeData, ScriptBeat } from "@/lib/types";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
@@ -531,7 +532,10 @@ export function ScriptNode({ id, data, selected, type }: NodeProps<Node<FlowNode
                   scriptStoryboardGenerateAgentRuntime,
                   {
                     targetBeats: picked,
-                    themePrompt: (useProjectStore.getState().nodes.find((n) => n.id === id)?.data.prompt ?? "").trim(),
+                    themePrompt: resolveMentionTokens(
+                      useProjectStore.getState().nodes.find((n) => n.id === id)?.data.prompt ?? "",
+                      useProjectStore.getState().nodes,
+                    ).trim(),
                     prevShots: useProjectStore.getState().nodes.find((n) => n.id === id)?.data.storyboardShots,
                   },
                   { nodeId: id, projectPath: path, updateNodeData, setStatusText },

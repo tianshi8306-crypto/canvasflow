@@ -3,8 +3,11 @@ import {
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
+  useMemo,
   useRef,
 } from "react";
+import { MentionInput } from "@/components/nodes/MentionInput";
+import { useProjectStore } from "@/store/projectStore";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import { indexFromPoint } from "@/lib/textareaCaretCoords";
 import {
@@ -20,6 +23,7 @@ export type TtvInlineCameraPromptHandle = {
 };
 
 type Props = {
+  nodeId: string;
   draft: VideoGenerationDraft;
   patchDraft: (patch: VideoGenerationDraftPatch) => void;
   cameraLabel: string | null;
@@ -30,7 +34,7 @@ const PLAIN_PLACEHOLDER = "描述画面、镜头与风格；生成结果将出�
 const FLOW_PLACEHOLDER = "描述画面、镜头与风格；运镜标签与正文同一行，可拖动或 Alt+点击调整位置。";
 
 export const TtvInlineCameraPrompt = forwardRef<TtvInlineCameraPromptHandle, Props>(
-  function TtvInlineCameraPrompt({ draft, patchDraft, cameraLabel, hasCamera }, ref) {
+  function TtvInlineCameraPrompt({ nodeId, draft, patchDraft, cameraLabel, hasCamera }, ref) {
     const taRef = useRef<HTMLTextAreaElement>(null);
     const editorRef = useRef<HTMLDivElement>(null);
     const leftSegRef = useRef<HTMLSpanElement>(null);
@@ -42,6 +46,11 @@ export const TtvInlineCameraPrompt = forwardRef<TtvInlineCameraPromptHandle, Pro
 
     const prompt = draft.prompt ?? "";
     const insertIndex = getCameraInsertIndex(draft.cameraMovement, prompt.length);
+    const nodes = useProjectStore((s) => s.nodes);
+    const nodeLabels = useMemo(
+      () => Object.fromEntries(nodes.map((n) => [n.id, n.data.label ?? n.id])),
+      [nodes]
+    );
 
     useLayoutEffect(() => {
       if (!hasCamera) return;
@@ -124,7 +133,7 @@ export const TtvInlineCameraPrompt = forwardRef<TtvInlineCameraPromptHandle, Pro
     const onChipPointerMove = (e: React.PointerEvent) => {
       if (!draggingChipRef.current || !editorRef.current || !leftSegRef.current || !rightSegRef.current || !chipRef.current)
         return;
-      let r = getCaretRangeFromPoint(e.clientX, e.clientY);
+      const r = getCaretRangeFromPoint(e.clientX, e.clientY);
       let idx: number | null = null;
       if (r && editorRef.current.contains(r.startContainer)) {
         idx = getPromptIndexFromCaretRange(r, leftSegRef.current, chipRef.current, rightSegRef.current);
@@ -146,7 +155,7 @@ export const TtvInlineCameraPrompt = forwardRef<TtvInlineCameraPromptHandle, Pro
         /* ignore */
       }
       if (editorRef.current && leftSegRef.current && rightSegRef.current && chipRef.current) {
-        let r = getCaretRangeFromPoint(e.clientX, e.clientY);
+        const r = getCaretRangeFromPoint(e.clientX, e.clientY);
         let idx: number | null = null;
         if (r && editorRef.current.contains(r.startContainer)) {
           idx = getPromptIndexFromCaretRange(r, leftSegRef.current, chipRef.current, rightSegRef.current);
@@ -182,15 +191,13 @@ export const TtvInlineCameraPrompt = forwardRef<TtvInlineCameraPromptHandle, Pro
       <div className="textNodeTtvPromptComposer textNodeTtvPromptComposer--inline">
         <div className="textNodeTtvInlineWrap textNodeTtvInlineWrap--flow">
           {!hasCamera ? (
-            <textarea
-              ref={taRef}
-              className={`textNodeTtvPrompt textNodeTtvPromptInput textNodeTtvPromptInput--composer mono ${RF_NODE_INPUT_CLASS}`}
-              rows={4}
-              placeholder={PLAIN_PLACEHOLDER}
+            <MentionInput
+              nodeId={nodeId}
               value={prompt}
-              onChange={(e) => patchDraft({ prompt: e.target.value })}
-              onPointerDown={(e) => e.stopPropagation()}
-              spellCheck={false}
+              onChange={(value) => patchDraft({ prompt: value })}
+              placeholder={PLAIN_PLACEHOLDER}
+              className={`textNodeTtvPrompt textNodeTtvPromptInput textNodeTtvPromptInput--composer mono ${RF_NODE_INPUT_CLASS}`}
+              nodeLabels={nodeLabels}
             />
           ) : (
             <>
