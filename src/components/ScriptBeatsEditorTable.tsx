@@ -343,42 +343,6 @@ export function ScriptBeatsEditorTable({
     [normRows, selectedIds, onPersistRows]
   );
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // Shift+Arrow row move (works regardless of Delete/Backspace path)
-      if (e.shiftKey && e.key === "ArrowUp" && selectedIds.length > 0) {
-        e.preventDefault();
-        moveRows("up");
-        return;
-      }
-      if (e.shiftKey && e.key === "ArrowDown" && selectedIds.length > 0) {
-        e.preventDefault();
-        moveRows("down");
-        return;
-      }
-
-      if (e.key !== "Delete" && e.key !== "Backspace") return;
-      // Don't fire if user is typing in an input/textarea (outside table)
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
-      // Don't fire if user is editing a cell
-      const isInCellEditor = (e.target as HTMLElement).closest(".cell-editor");
-      if (isInCellEditor) return;
-
-      if (focusedRowIndexRef.current !== null) {
-        e.preventDefault();
-        const idx = focusedRowIndexRef.current;
-        const newRows = normRows.filter((_, i) => i !== idx);
-        onPersistRows(newRows);
-        // Move focus to next row (or previous if deleted last row)
-        const nextIdx = Math.min(idx, newRows.length - 1);
-        focusedRowIndexRef.current = nextIdx >= 0 ? nextIdx : null;
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [normRows, onPersistRows, selectedIds]);
-
   const tableEl = (
     <table
       className={tableClass}
