@@ -215,6 +215,18 @@ export function ScriptBeatsEditorTable({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Shift+Arrow row move (works regardless of Delete/Backspace path)
+      if (e.shiftKey && e.key === "ArrowUp" && selectedIds.length > 0) {
+        e.preventDefault();
+        moveRows("up");
+        return;
+      }
+      if (e.shiftKey && e.key === "ArrowDown" && selectedIds.length > 0) {
+        e.preventDefault();
+        moveRows("down");
+        return;
+      }
+
       if (e.key !== "Delete" && e.key !== "Backspace") return;
       // Don't fire if user is typing in an input/textarea (outside table)
       const tag = (e.target as HTMLElement).tagName;
@@ -235,7 +247,7 @@ export function ScriptBeatsEditorTable({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [normRows, onPersistRows]);
+  }, [normRows, onPersistRows, selectedIds]);
 
   const cols = visibleCols;
   const colCount = cols.length + 2;
@@ -297,6 +309,75 @@ export function ScriptBeatsEditorTable({
       });
     }
   }, [displayRows, selectedIds, onToggleSelect, allSelected]);
+
+  const moveRows = useCallback(
+    (direction: "up" | "down" | "top" | "bottom") => {
+      if (selectedIds.length === 0) return;
+      const sorted = [...selectedIds].map(id => normRows.findIndex(r => r.id === id)).filter(i => i >= 0).sort((a, b) => a - b);
+      if (sorted.length === 0) return;
+      let reordered = [...normRows];
+
+      if (direction === "up") {
+        if (sorted[0] === 0) return;
+        for (const idx of sorted) {
+          [reordered[idx - 1], reordered[idx]] = [reordered[idx], reordered[idx - 1]];
+        }
+      } else if (direction === "down") {
+        if (sorted[sorted.length - 1] === normRows.length - 1) return;
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          const idx = sorted[i];
+          [reordered[idx], reordered[idx + 1]] = [reordered[idx + 1], reordered[idx]];
+        }
+      } else if (direction === "top") {
+        const moving = sorted.map(i => reordered[i]);
+        reordered = reordered.filter((_, i) => !sorted.includes(i));
+        reordered.unshift(...moving);
+      } else {
+        const moving = sorted.map(i => reordered[i]);
+        reordered = reordered.filter((_, i) => !sorted.includes(i));
+        reordered.push(...moving);
+      }
+
+      onPersistRows(reordered);
+    },
+    [normRows, selectedIds, onPersistRows]
+  );
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      // Shift+Arrow row move (works regardless of Delete/Backspace path)
+      if (e.shiftKey && e.key === "ArrowUp" && selectedIds.length > 0) {
+        e.preventDefault();
+        moveRows("up");
+        return;
+      }
+      if (e.shiftKey && e.key === "ArrowDown" && selectedIds.length > 0) {
+        e.preventDefault();
+        moveRows("down");
+        return;
+      }
+
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      // Don't fire if user is typing in an input/textarea (outside table)
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
+      // Don't fire if user is editing a cell
+      const isInCellEditor = (e.target as HTMLElement).closest(".cell-editor");
+      if (isInCellEditor) return;
+
+      if (focusedRowIndexRef.current !== null) {
+        e.preventDefault();
+        const idx = focusedRowIndexRef.current;
+        const newRows = normRows.filter((_, i) => i !== idx);
+        onPersistRows(newRows);
+        // Move focus to next row (or previous if deleted last row)
+        const nextIdx = Math.min(idx, newRows.length - 1);
+        focusedRowIndexRef.current = nextIdx >= 0 ? nextIdx : null;
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [normRows, onPersistRows, selectedIds]);
 
   const tableEl = (
     <table
@@ -455,6 +536,7 @@ export function ScriptBeatsEditorTable({
           onPersistRows(kept);
         }}
         onSelectAll={handleSelectAll}
+        onMove={moveRows}
       />
 
       <div className="scriptTableFullscreenScroll">{tableEl}</div>

@@ -32,6 +32,7 @@ type Props = {
   selectedCount: number;
   onDelete: () => void;
   onSelectAll: () => void;
+  onMove: (direction: "up" | "down" | "top" | "bottom") => void;
 };
 
 export function ScriptBeatsEditorTableToolbar({
@@ -64,6 +65,7 @@ export function ScriptBeatsEditorTableToolbar({
   selectedCount,
   onDelete,
   onSelectAll,
+  onMove,
 }: Props) {
   return (
     <div className="scriptTableFullscreenToolbar" ref={toolsRef}>
@@ -114,6 +116,23 @@ export function ScriptBeatsEditorTableToolbar({
             >
               全选
             </button>
+            <select
+              className="move-to-select"
+              defaultValue=""
+              onChange={(e) => {
+                const val = e.target.value as "up" | "down" | "top" | "bottom";
+                if (val) {
+                  onMove(val);
+                  e.currentTarget.value = "";
+                }
+              }}
+            >
+              <option value="" disabled>移动到</option>
+              <option value="up">↑ 上移一层</option>
+              <option value="down">↓ 下移一层</option>
+              <option value="top">⤒ 置顶</option>
+              <option value="bottom">⤓ 置底</option>
+            </select>
           </>
         ) : null}
       </div>
