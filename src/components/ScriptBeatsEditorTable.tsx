@@ -544,6 +544,12 @@ export function ScriptBeatsEditorTable({
                                   const nextVal = (normRows[idx][cols[colIdx + 1].key as keyof ScriptBeat] as string) ?? "";
                                   setEditingCell({ row: idx, col: cols[colIdx + 1].key });
                                   setEditValue(nextVal);
+                                } else {
+                                  // At last column — create new row, stay in same column
+                                  const newRow = normalizeScriptBeat({ id: crypto.randomUUID() });
+                                  onPersistRows([...normRows, newRow]);
+                                  setEditingCell({ row: normRows.length, col: cols[colIdx].key });
+                                  setEditValue("");
                                 }
                               }
                             } else if (e.key === "Escape") {
