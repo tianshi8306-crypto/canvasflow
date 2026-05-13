@@ -65,6 +65,8 @@ export function ScriptBeatsEditorTable({
   const fieldRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const focusedRowIndexRef = useRef<number | null>(null);
   const [inlineContainerWidth, setInlineContainerWidth] = useState(0);
+  const [colWidths, setColWidths] = useState<Record<string, number>>({});
+  const resizingRef = useRef<{ colKey: string; startX: number; startW: number } | null>(null);
 
   const maxRoleCount = useMemo(() => {
     let n = 0;
@@ -175,6 +177,33 @@ export function ScriptBeatsEditorTable({
     const timer = window.setTimeout(() => setJumpFieldKey(null), 900);
     return () => window.clearTimeout(timer);
   }, [jumpFieldKey]);
+
+  const startResize = useCallback((e: React.MouseEvent, colKey: string) => {
+    e.preventDefault();
+    const currentW = colWidths[colKey] ?? 0;
+    resizingRef.current = { colKey, startX: e.clientX, startW: currentW };
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const diff = ev.clientX - resizingRef.current.startX;
+      const newW = Math.max(60, resizingRef.current.startW + diff);
+      setColWidths((prev) => ({ ...prev, [resizingRef.current!.colKey]: newW }));
+    };
+    const onUp = () => {
+      resizingRef.current = null;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [colWidths]);
+
+  const resetColWidth = useCallback((colKey: string) => {
+    setColWidths((prev) => {
+      const next = { ...prev };
+      delete next[colKey];
+      return next;
+    });
+  }, []);
 
   useEffect(() => {
     if (!fieldsOpen) return;
@@ -360,7 +389,7 @@ export function ScriptBeatsEditorTable({
         <colgroup>
           <col style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
           {cols.map((c) => {
-            const w = getInlineColWidth(c, inlineContainerWidth);
+            const w = colWidths[c.key] ?? getInlineColWidth(c, inlineContainerWidth);
             return <col key={`col-${c.key}`} style={{ width: w, minWidth: w, maxWidth: w }} />;
           })}
           <col style={{ width: 56, minWidth: 56, maxWidth: 56 }} />
@@ -369,9 +398,23 @@ export function ScriptBeatsEditorTable({
       <thead>
         <tr>
           <th style={{ width: 36 }} aria-label="勾选" />
-          {cols.map((c) => (
-            <th key={c.key} style={inlineColStyle(c)}>
+          {cols.map((c, colIdx) => (
+            <th
+              key={c.key}
+              style={{
+                ...inlineColStyle(c),
+                width: colWidths[c.key] ?? inlineColStyle(c)?.width,
+                minWidth: 60,
+              }}
+            >
               {c.label}
+              {colIdx < cols.length - 1 && (
+                <div
+                  className="col-resize-handle"
+                  onMouseDown={(e) => startResize(e, c.key)}
+                  onDoubleClick={() => resetColWidth(c.key)}
+                />
+              )}
             </th>
           ))}
           <th style={{ width: 56 }} />

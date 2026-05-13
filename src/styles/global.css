@@ -7606,7 +7606,7 @@ select {
 }
 
 .scriptTable thead th {
-  position: sticky;
+  position: relative;
   top: 0;
   z-index: 1;
   text-align: left;
@@ -7649,6 +7649,16 @@ select {
   outline: none;
   border-color: rgba(20, 184, 166, 0.55);
   box-shadow: 0 0 0 1px rgba(20, 184, 166, 0.2);
+}
+
+.col-resize-handle {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 100%;
+  width: 6px;
+  cursor: col-resize;
+  user-select: none;
 }
 
 .scriptTableMediaCell {
@@ -9178,6 +9188,11 @@ select {
 /* hover 显示 - 锚点组在节点 hover 时显示 */
 .react-flow__node:hover .simple-anchor {
   opacity: 1 !important;
+}
+
+/* hover 节点时显示十字光标 */
+.react-flow__node:hover {
+  cursor: crosshair;
 }
 
 /* hover 放大 */
