@@ -249,7 +249,14 @@ export function ScriptBeatsEditorTable({
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      // Ctrl+A — select all (only when not editing and not in cell editor)
+      // Escape — cancel editing/selection (table-level)
+      if (e.key === "Escape") {
+        setIsAllSelected(false);
+        if (editingCell) setEditingCell(null);
+        return;
+      }
+
+      // Ctrl+A — select all / deselect all
       if ((e.ctrlKey || e.metaKey) && e.key === "a" && !editingCell && !(e.target as HTMLElement).closest(".cell-editor")) {
         e.preventDefault();
         if (isAllSelected) {
@@ -260,14 +267,7 @@ export function ScriptBeatsEditorTable({
         return;
       }
 
-      // Escape — cancel editing/selection
-      if (e.key === "Escape") {
-        setIsAllSelected(false);
-        if (editingCell) setEditingCell(null);
-        return;
-      }
-
-      // Shift+Arrow row move (works regardless of Delete/Backspace path)
+      // Shift+Arrow row move
       if (e.shiftKey && e.key === "ArrowUp" && selectedIds.length > 0) {
         e.preventDefault();
         moveRows("up");
