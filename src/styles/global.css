@@ -9195,6 +9195,35 @@ select {
   cursor: crosshair;
 }
 
+/* 锚点十字准星 */
+.anchor-crosshair {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.anchor-crosshair-h,
+.anchor-crosshair-v {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.anchor-crosshair-h {
+  width: 20px;
+  height: 1px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.anchor-crosshair-v {
+  width: 1px;
+  height: 20px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+}
+
 /* hover 放大 */
 .react-flow__node:hover .simple-anchor:hover {
   transform: scale(1.12) !important;
@@ -9361,5 +9390,30 @@ select {
   border: 1px solid #ccc;
   font-size: 13px;
   cursor: pointer;
+}
+
+.cell-selected {
+  background: rgba(59, 130, 246, 0.1);
+}
+.cell-editing {
+  padding: 2px;
+}
+.cell-editor {
+  width: 100%;
+  min-height: 40px;
+  border: 2px solid #3b82f6;
+  border-radius: 2px;
+  padding: 4px 6px;
+  font-size: inherit;
+  font-family: inherit;
+  resize: vertical;
+  box-sizing: border-box;
+  background: white;
+}
+.cell-editor:focus {
+  outline: none;
+}
+tr.all-selected td {
+  background: rgba(59, 130, 246, 0.15);
 }
 
