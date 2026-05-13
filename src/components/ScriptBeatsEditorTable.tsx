@@ -180,7 +180,9 @@ export function ScriptBeatsEditorTable({
 
   const startResize = useCallback((e: React.MouseEvent, colKey: string) => {
     e.preventDefault();
-    const currentW = colWidths[colKey] ?? 0;
+    // Measure actual DOM width, not from colWidths state
+    const thEl = (e.currentTarget as HTMLElement).parentElement as HTMLElement;
+    const currentW = thEl.getBoundingClientRect().width;
     resizingRef.current = { colKey, startX: e.clientX, startW: currentW };
     const onMove = (ev: MouseEvent) => {
       if (!resizingRef.current) return;
@@ -195,7 +197,7 @@ export function ScriptBeatsEditorTable({
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
-  }, [colWidths]);
+  }, []);
 
   const resetColWidth = useCallback((colKey: string) => {
     setColWidths((prev) => {
