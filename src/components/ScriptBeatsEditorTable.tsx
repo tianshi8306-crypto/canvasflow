@@ -268,12 +268,12 @@ export function ScriptBeatsEditorTable({
       }
 
       // Shift+Arrow row move
-      if (e.shiftKey && e.key === "ArrowUp" && selectedIds.length > 0 && !editingCell) {
+      if (e.shiftKey && e.key === "ArrowUp" && selectedIds.length > 0 && !editingCell && !(e.target as HTMLElement).closest(".cell-editor")) {
         e.preventDefault();
         moveRows("up");
         return;
       }
-      if (e.shiftKey && e.key === "ArrowDown" && selectedIds.length > 0 && !editingCell) {
+      if (e.shiftKey && e.key === "ArrowDown" && selectedIds.length > 0 && !editingCell && !(e.target as HTMLElement).closest(".cell-editor")) {
         e.preventDefault();
         moveRows("down");
         return;
