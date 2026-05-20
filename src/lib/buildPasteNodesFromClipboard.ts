@@ -1,7 +1,12 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import { cloneFlowNodeData } from "@/lib/flowNodeDataClone";
-import { getOutputPortType, isConnectionAllowed } from "@/lib/flowConnectionPolicy";
+import {
+  getOutputPortType,
+  hasParallelEdge,
+  normalizeConnection,
+  validateConnection,
+} from "@/lib/flowConnectionPolicy";
 import {
   applyScriptBeatRemapToScriptNodeData,
   buildScriptBeatIdRemapForPaste,
@@ -32,6 +37,7 @@ export function buildPasteNodesFromClipboard(
     const map = buildScriptBeatIdRemapForPaste(n.data.scriptBeats);
     if (map.size > 0) scriptBeatRemapsByOldNodeId.set(n.id, map);
   }
+
   const nextNodes = copiedNodes.map((n) => {
     const id = idMap.get(n.id)!;
     let data = cloneFlowNodeData(n.data);
@@ -42,6 +48,10 @@ export function buildPasteNodesFromClipboard(
       const upScript = findUpstreamScriptNodeIdInSubgraph(n.id, copiedEdges, copiedNodes);
       const bm = upScript ? scriptBeatRemapsByOldNodeId.get(upScript) : undefined;
       data = remapParamsScriptBeatIdForPaste(data, bm);
+    }
+    // 图片节点复制时添加"副本"后缀
+    if (n.type === "imageNode" || n.type === "videoNode") {
+      data = { ...data, label: `${data.label ?? ""} 副本`.trim() };
     }
     return {
       ...n,
@@ -67,15 +77,24 @@ export function buildPasteEdgesFromClipboard(
     const ns = idMap.get(e.source) ?? e.source;
     const nt = idMap.get(e.target) ?? e.target;
     const st = nextNodes.find((n) => n.id === ns)?.type;
-    const tt = nextNodes.find((n) => n.id === nt)?.type;
-    if (!isConnectionAllowed(st, tt)) continue;
     const payloadType = st ? getOutputPortType(st) : null;
+    const normalized = normalizeConnection({
+      source: ns,
+      target: nt,
+      sourceHandle: e.sourceHandle ?? null,
+      targetHandle: e.targetHandle ?? null,
+    });
+    if (hasParallelEdge(nextEdges, normalized)) continue;
+    const verdict = validateConnection(normalized, nextNodes, nextEdges);
+    if (!verdict.ok) continue;
     const clone = JSON.parse(JSON.stringify(e)) as Edge;
     nextEdges.push({
       ...clone,
       id: crypto.randomUUID(),
       source: ns,
       target: nt,
+      sourceHandle: normalized.sourceHandle ?? "out",
+      targetHandle: normalized.targetHandle ?? "in",
       selected: false,
       data:
         payloadType

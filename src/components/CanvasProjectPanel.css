@@ -1,0 +1,94 @@
+/* ── CanvasProjectPanel ── */
+.canvasProjectPanel {
+  position: fixed;
+  top: 64px;
+  left: 58px;
+  width: 260px;
+  border-radius: var(--canvas-float-radius);
+  border: 1px solid var(--canvas-float-border);
+  background: var(--canvas-float-bg);
+  backdrop-filter: blur(var(--canvas-float-blur));
+  -webkit-backdrop-filter: blur(var(--canvas-float-blur));
+  box-shadow: var(--canvas-float-shadow);
+  z-index: 40;
+  padding: 12px;
+  display: none;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.canvasProjectPanel.open {
+  display: flex;
+}
+
+.cppProjectName {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--canvas-float-border);
+}
+
+.cppProjectNameLabel {
+  font-size: 10px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.cppProjectNameValue {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cppPanelRows {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.cppPanelRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.cppPanelRow:hover:not(:disabled) {
+  background: var(--canvas-float-hover);
+}
+
+.cppPanelRow:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.cppPanelRowIcon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 7px;
+  background: rgba(15, 18, 28, 0.95);
+  border: 1px solid var(--canvas-float-border);
+  color: var(--muted);
+  flex-shrink: 0;
+}
+
+.cppPanelRowLabel {
+  flex: 1;
+}

@@ -3,6 +3,7 @@ import { getVideoJobViaBridge } from "@/lib/videoGeneration";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { videoGenerationAgentRuntime } from "@/lib/nodeAgentRuntime/videoGenerationAgent";
 import { videoAsyncTaskAgentRuntime, type VideoAsyncConfig } from "@/lib/nodeAgentRuntime/videoAsyncTaskAgent";
+import { startVideoGenProgressTicker } from "@/lib/nodeAgentRuntime/videoGenProgress";
 import { defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
 import { invoke } from "@tauri-apps/api/core";
 import type { AppSettings } from "@/lib/settingsPanelTypes";
@@ -20,6 +21,7 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
   );
   const activeJob = videoBlock?.activeJob;
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressTickerStopRef = useRef<(() => void) | null>(null);
 
   // 缓存 Settings 中的有效模型 ID
   const [validModelIds, setValidModelIds] = useState<string[]>([]);
@@ -97,6 +99,34 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
   }, [projectPath, setStatusText, updateNodeData, videoNodeId]);
 
   useEffect(() => {
+    if (!videoNodeId || !projectPath) {
+      progressTickerStopRef.current?.();
+      progressTickerStopRef.current = null;
+      return;
+    }
+    const st = activeJob?.status;
+    const jobRunning = st === "queued" || st === "running";
+    if (!jobRunning) {
+      progressTickerStopRef.current?.();
+      progressTickerStopRef.current = null;
+      return;
+    }
+    if (!progressTickerStopRef.current) {
+      progressTickerStopRef.current = startVideoGenProgressTicker({
+        nodeId: videoNodeId,
+        projectPath,
+        updateNodeData,
+        setStatusText,
+        cancelToken: { cancelled: false },
+      });
+    }
+    return () => {
+      progressTickerStopRef.current?.();
+      progressTickerStopRef.current = null;
+    };
+  }, [activeJob?.status, projectPath, setStatusText, updateNodeData, videoNodeId]);
+
+  useEffect(() => {
     if (!videoNodeId || !activeJob?.id) {
       clearPoll();
       return;
@@ -115,6 +145,10 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
         if (!vb0) return;
 
         if (snap.status === "queued" || snap.status === "running") {
+          const polledProgress =
+            typeof snap.progress === "number" && Number.isFinite(snap.progress)
+              ? Math.round(Math.min(99, Math.max(0, snap.progress)))
+              : undefined;
           updateNodeData(videoNodeId, {
             video: {
               ...vb0,
@@ -127,16 +161,30 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
                 startedAt: vb0.activeJob?.startedAt,
               },
             },
+            ...(polledProgress != null
+              ? {
+                  status: {
+                    status: "running" as const,
+                    updatedAt: Date.now(),
+                    agentName: "视频",
+                    phase: "poll",
+                    progress: polledProgress,
+                  },
+                }
+              : {}),
           });
           return;
         }
 
         if (snap.status === "succeeded") {
           clearPoll();
+          progressTickerStopRef.current?.();
+          progressTickerStopRef.current = null;
           const rel = snap.resultRelPath?.trim();
           const source = snap.source ?? "bridge";
           updateNodeData(videoNodeId, {
             ...(rel ? { path: rel } : {}),
+            status: undefined,
             video: {
               ...vb0,
               source: "generation",
@@ -155,7 +203,10 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
 
         if (snap.status === "failed" || snap.status === "cancelled") {
           clearPoll();
+          progressTickerStopRef.current?.();
+          progressTickerStopRef.current = null;
           updateNodeData(videoNodeId, {
+            status: undefined,
             video: {
               ...vb0,
               activeJob: {

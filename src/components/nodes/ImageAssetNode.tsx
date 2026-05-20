@@ -1,11 +1,10 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { MagneticNodeAnchors } from "@/components/nodes/MagneticNodeAnchors";
 import type { FlowNodeData } from "@/lib/types";
 import { mediaAssetNodeSubtitle } from "@/lib/nodeUiStrings";
-import { getIncomingImageRefForNode } from "@/lib/incomingImageReference";
 import { NodeFrame } from "@/components/nodes/NodeFrame";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
@@ -14,6 +13,7 @@ import { pickImagePathsForImport } from "@/lib/tauriMediaPaths";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { ImageGenerationPanel } from "@/components/nodes/ImageGenerationPanel";
+import { ImageGenerationPanelPortal } from "@/components/nodes/ImageGenerationPanelPortal";
 
 function ImageTitleIcon() {
   return (
@@ -75,25 +75,19 @@ function ImagePreviewShell({
 export function ImageAssetNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
   const fileRef = useRef<HTMLInputElement>(null);
   const i2iFileRef = useRef<HTMLInputElement>(null);
+  const previewAnchorRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const projectPath = useProjectStore((s) => s.projectPath);
   const assignImportedMediaToNode = useProjectStore((s) => s.assignImportedMediaToNode);
   const addReferenceImageNodeLeftOf = useProjectStore((s) => s.addReferenceImageNodeLeftOf);
-  const nodes = useProjectStore((s) => s.nodes);
-  const edges = useProjectStore((s) => s.edges);
   const imageI2iTargetNodeId = useCanvasUiStore((s) => s.imageI2iTargetNodeId);
   const setImageI2iTargetNodeId = useCanvasUiStore((s) => s.setImageI2iTargetNodeId);
-  const subjectListVersion = useCanvasUiStore((s) => s.subjectListVersion);
   const hasPath = Boolean(data.path?.trim() || data.assetId?.trim());
   const path = data.path;
   const assetId = data.assetId;
-
-  const incomingRef = useMemo(
-    () => getIncomingImageRefForNode(nodes, edges, id),
-    [nodes, edges, id],
-  );
-  // 保持主预览布局稳定：有图后不因底部面板显隐而切换节点结构
-  const splitExpanded = Boolean(hasPath || selected);
+  // 有图：NodeFrame 分栏 + 底部浮层；无图且选中：与 MinimalImageNode 一致的 Portal
+  const splitExpanded = hasPath;
+  const showGenPortal = selected && !hasPath;
 
   const afterRefImport = useCallback(async () => {
     if (projectPath) {
@@ -169,6 +163,7 @@ export function ImageAssetNode({ id, data, selected, type }: NodeProps<Node<Flow
   );
 
   return (
+    <>
     <NodeFrame
       defaultTitle="图片"
       label={data.label}
@@ -183,23 +178,20 @@ export function ImageAssetNode({ id, data, selected, type }: NodeProps<Node<Flow
         splitExpanded ? (
           <>
             {fileInputs}
-            <ImagePreviewShell hasPath={hasPath} path={path} assetId={assetId} expanded />
+            <div ref={previewAnchorRef}>
+              <ImagePreviewShell hasPath={hasPath} path={path} assetId={assetId} expanded />
+            </div>
             <MagneticNodeAnchors nodeId={id} nodeType={type} />
           </>
         ) : undefined
       }
       floatingBottomOverlay={
-        selected ? (
+        selected && hasPath ? (
           <div className="nodeFloatingBottomPanel">
-            <ImageGenerationPanel
-              nodeId={id}
-              referenceImagePath={incomingRef.path}
-              referenceImageAssetId={incomingRef.assetId}
-              subjectListVersion={subjectListVersion}
-            />
+            <ImageGenerationPanel nodeId={id} />
           </div>
         ) : (
-          // 保持 NodeFrame 处于 split 布局（不显示底部面板），避免主预览在显隐间切换导致抖动/丢失
+          // 无图选中时用 Portal，与 MinimalImageNode 一致
           <div style={{ display: "none" }} aria-hidden />
         )
       }
@@ -208,10 +200,19 @@ export function ImageAssetNode({ id, data, selected, type }: NodeProps<Node<Flow
       {!splitExpanded ? (
         <>
           {fileInputs}
-          <ImagePreviewShell hasPath={hasPath} path={path} assetId={assetId} expanded={false} />
+          <div ref={previewAnchorRef}>
+            <ImagePreviewShell hasPath={hasPath} path={path} assetId={assetId} expanded={false} />
+          </div>
           <MagneticNodeAnchors nodeId={id} nodeType={type} />
         </>
       ) : null}
     </NodeFrame>
+    <ImageGenerationPanelPortal
+      nodeId={id}
+      anchorRef={previewAnchorRef}
+      active={showGenPortal}
+      layout="empty"
+    />
+    </>
   );
 }

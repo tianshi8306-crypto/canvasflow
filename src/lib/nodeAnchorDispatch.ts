@@ -1,6 +1,8 @@
 import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
 import { makeFlowEdge } from "@/lib/flowEdge";
 import type { AnchorMenuKey } from "@/lib/nodeAnchorMenus";
+import { buildTextPromptFromScriptBinding } from "@/lib/incomingScriptBinding";
+import { clearAnchorMenuSession } from "@/lib/anchorMenuSession";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import type { FlowNodeData } from "@/lib/types";
@@ -21,6 +23,18 @@ function hasOutgoingToType(
   return next.some((tid) => nodes.find((n) => n.id === tid)?.type === targetType);
 }
 
+function findOutgoingNodeId(
+  edges: { source: string; target: string; data?: unknown }[],
+  nodes: { id: string; type?: string | null }[],
+  sourceId: string,
+  targetType: "videoNode" | "audioNode",
+): string | null {
+  const next = edges
+    .filter((e) => !isEdgeDisabled(e) && e.source === sourceId)
+    .map((e) => e.target);
+  return next.find((tid) => nodes.find((n) => n.id === tid)?.type === targetType) ?? null;
+}
+
 function hasIncomingOfType(
   edges: { source: string; target: string; data?: unknown }[],
   nodes: { id: string; type?: string | null }[],
@@ -35,14 +49,43 @@ function hasIncomingOfType(
 
 function mergeTextWorkflow(
   nodeId: string,
-  workflow: "textToVideo" | "textToMusic" | "imageToPrompt",
+  workflow: "textToVideo" | "textToMusic" | "imageToPrompt" | "scriptToText",
+  partnerNodeId?: string,
 ) {
   const get = useProjectStore.getState();
   const node = get.nodes.find((n) => n.id === nodeId);
   if (!node) return;
   const data = node.data;
   const base = data.params && typeof data.params === "object" ? { ...data.params } : {};
-  get.updateNodeData(nodeId, { params: { ...base, textWorkflow: workflow } });
+  const patch: Record<string, unknown> = { ...base, textWorkflow: workflow };
+  // Store the partner node ID so TextNode can sync with it; clear old IDs when switching workflows
+  if (workflow === "textToVideo") {
+    if (partnerNodeId) {
+      patch.videoNodeId = partnerNodeId;
+    } else {
+      delete patch.videoNodeId;
+    }
+    delete patch.audioNodeId;
+  } else if (workflow === "textToMusic") {
+    if (partnerNodeId) {
+      patch.audioNodeId = partnerNodeId;
+    } else {
+      delete patch.audioNodeId;
+    }
+    delete patch.videoNodeId;
+  } else if (workflow === "scriptToText") {
+    if (partnerNodeId) {
+      patch.scriptNodeId = partnerNodeId;
+    } else {
+      delete patch.scriptNodeId;
+    }
+    // scriptToText doesn't affect videoNodeId/audioNodeId
+  } else {
+    // imageToPrompt or other - clear both
+    delete patch.videoNodeId;
+    delete patch.audioNodeId;
+  }
+  get.updateNodeData(nodeId, { params: patch });
 }
 
 /**
@@ -59,6 +102,7 @@ export function dispatchAnchorMenuPick(opts: {
   const anchor = get.nodes.find((n) => n.id === anchorNodeId);
   if (!anchor) return;
 
+  try {
   if (key === "audioTts") {
     useCanvasUiStore.getState().setAudioTtsPanelNodeId(anchorNodeId);
     get.setStatusText("已打开文字转语音面板（在节点内配置）");
@@ -105,7 +149,8 @@ export function dispatchAnchorMenuPick(opts: {
   if (anchorType === "textNode") {
     if (direction === "outgoing" && key === "videoNode") {
       if (hasOutgoingToType(edges, nodes, anchorNodeId, "videoNode")) {
-        mergeTextWorkflow(anchorNodeId, "textToVideo");
+        const existingVideoId = findOutgoingNodeId(edges, nodes, anchorNodeId, "videoNode");
+        mergeTextWorkflow(anchorNodeId, "textToVideo", existingVideoId ?? undefined);
         get.setStatusText("已连接视频节点");
         return;
       }
@@ -117,14 +162,15 @@ export function dispatchAnchorMenuPick(opts: {
         data: newNodeDataByType.videoNode(),
       };
       get.addNodesWithEdges([node], [makeFlowEdge(anchorNodeId, vid, "textNode")]);
-      mergeTextWorkflow(anchorNodeId, "textToVideo");
+      mergeTextWorkflow(anchorNodeId, "textToVideo", vid);
       get.setSelectedNodeIds([vid]);
       get.setStatusText("已添加视频节点并联线");
       return;
     }
     if (direction === "outgoing" && key === "audioNode") {
       if (hasOutgoingToType(edges, nodes, anchorNodeId, "audioNode")) {
-        mergeTextWorkflow(anchorNodeId, "textToMusic");
+        const existingAudioId = findOutgoingNodeId(edges, nodes, anchorNodeId, "audioNode");
+        mergeTextWorkflow(anchorNodeId, "textToMusic", existingAudioId ?? undefined);
         get.setStatusText("已连接音频节点");
         return;
       }
@@ -136,7 +182,7 @@ export function dispatchAnchorMenuPick(opts: {
         data: newNodeDataByType.audioNode(),
       };
       get.addNodesWithEdges([node], [makeFlowEdge(anchorNodeId, aid, "textNode")]);
-      mergeTextWorkflow(anchorNodeId, "textToMusic");
+      mergeTextWorkflow(anchorNodeId, "textToMusic", aid);
       get.setSelectedNodeIds([aid]);
       get.setStatusText("已添加音频节点并联线");
       return;
@@ -160,6 +206,24 @@ export function dispatchAnchorMenuPick(opts: {
       get.setStatusText("已添加图片节点并联线");
       return;
     }
+    if (direction === "incoming" && key === "scriptNode") {
+      const scriptIds = edges
+        .filter((e) => !isEdgeDisabled(e) && e.target === anchorNodeId)
+        .map((e) => e.source)
+        .filter((sid) => nodes.find((n) => n.id === sid)?.type === "scriptNode");
+      const existingScriptId = scriptIds[0] ?? null;
+      if (existingScriptId) {
+        mergeTextWorkflow(anchorNodeId, "scriptToText", existingScriptId);
+        const syncedContent = buildTextPromptFromScriptBinding(nodes, edges, anchorNodeId);
+        if (syncedContent) {
+          get.updateNodeData(anchorNodeId, { prompt: syncedContent });
+        }
+        get.setStatusText("已连接脚本节点并同步内容");
+      } else {
+        get.setStatusText("未找到上游脚本节点");
+      }
+      return;
+    }
   }
 
   // —— 通用：水平错位创建 ——
@@ -168,5 +232,8 @@ export function dispatchAnchorMenuPick(opts: {
     direction,
     partnerType: key as keyof typeof newNodeDataByType,
   });
+  } finally {
+    clearAnchorMenuSession();
+  }
 }
 

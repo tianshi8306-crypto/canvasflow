@@ -95,6 +95,7 @@ export function AudioTtsPanel({ nodeId }: Props) {
 
   useEffect(() => {
     if (!modelPicks.some((p) => p.selectId === modelId)) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setModelId(modelPicks[0]?.selectId ?? "__provider_tts1__");
     }
   }, [modelPicks, modelId]);

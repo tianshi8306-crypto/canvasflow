@@ -1,7 +1,7 @@
 # 当前进度与下一步规划（异地协作）
 
 > **固定入口**：本文档为「进度 + 规划 + 代码索引」的**主文档**，请在异地开发时优先阅读本文。  
-> 更新日期：**2026-05-07**  
+> 更新日期：**2026-05-18**  
 > 仓库：**vibevideo**（Tauri + React + React Flow）  
 > 历史同名快照：`REMOTE_DEV_HANDOFF_2026-04-28.md`（内容与本文同步后仅作锚点，见该文件说明）。
 
@@ -15,7 +15,14 @@
 
 更细的设计对照见：[`docs/design/architecture-spec-vs-implementation.md`](../design/architecture-spec-vs-implementation.md)  
 路线图版本见：[`docs/iterations/ROADMAP_V2.md`](ROADMAP_V2.md)  
-产品与 LibTV 对齐见：[`docs/product/LIBTV_GUIDE_ALIGNMENT.md`](../product/LIBTV_GUIDE_ALIGNMENT.md)
+产品与 LibTV 对齐见：[`docs/product/LIBTV_GUIDE_ALIGNMENT.md`](../product/LIBTV_GUIDE_ALIGNMENT.md)  
+画布快捷键见：[`docs/product/SHORTCUTS.md`](../product/SHORTCUTS.md)
+
+### UX 决策（无限画布方案，2026-05-18）
+
+- **不采用** LibTV 式底部生成器 Dock。
+- 图片 / 视频 / 音频：**节点外浮层**（Portal）+ Inspector 元数据；节点卡保持预览与生成分离（见 [`docs/图片节点设计.md`](../图片节点设计.md)）。
+- 规范参考：[`docs/无限画布.pdf`](../无限画布.pdf)、[`docs/节点UI设计规范.txt`](../节点UI设计规范.txt)（色板/状态作 token 参考，不强制节点内算力条）。
 
 ---
 
@@ -37,7 +44,7 @@
 | 阶段 | 状态 | 说明 |
 |------|------|------|
 | R1 工程与保存 | 基本具备 | 工程 JSON、撤销重做、顶栏状态等。 |
-| R2 五类节点画布体验 | 持续迭代 | 节点尺寸、加载动效、连线在运行中可编辑等已做过多轮。 |
+| R2 五类节点画布体验 | 持续迭代 | 小地图、`F`/`Z` 视口、整理画布确认、图片浮层生成；无底部 Dock。 |
 | R3 脚本工作台 | **主体可用** | 全屏表、批量操作、模板（localStorage）、角色列与缩略图上传等。 |
 | R4 分镜 | **产品化完成** | `storyboardShots`、`ScriptStoryboardSection` + Hermes 自动串联、失败重试。 |
 | R5 多模态输入 | **UI 已实现** | `VideoMultimodalInputPanel` 多模态输入面板，参数分组待完善。 |

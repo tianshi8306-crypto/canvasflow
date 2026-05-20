@@ -49,6 +49,7 @@ export function orderedIncomingScriptNodeIds(
   for (const e of edges) {
     if (isEdgeDisabled(e)) continue;
     if (e.target !== targetNodeId) continue;
+    if (e.targetHandle && e.targetHandle !== "in") continue;
     const n = nodes.find((x) => x.id === e.source);
     if (n?.type !== "scriptNode") continue;
     if (seen.has(e.source)) continue;

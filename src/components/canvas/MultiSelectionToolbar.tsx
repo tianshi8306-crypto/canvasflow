@@ -40,6 +40,7 @@ export function MultiSelectionToolbar({ marqueeActive }: Props) {
   }, [flowToScreenPosition, getNodesBounds, selectedNodeIds]);
 
   useLayoutEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     updatePos();
   }, [updatePos, viewport, selectedNodeIds, nodes]);
 

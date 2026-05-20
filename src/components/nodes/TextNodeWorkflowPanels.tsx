@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ScriptBeatBindingInline } from "@/components/nodes/ScriptBeatBindingInline";
 import { useTtvDraft } from "@/hooks/useTtvDraft";
 import {
+  detectWorkflow,
   incomingRefsForDisplayStrip,
   resolveIncomingRefItemsForDraft,
   splitIncomingRefsForDraft,
@@ -135,7 +136,6 @@ export function TextNodeTextToVideoPanel({ videoNodeId }: TextNodeTextToVideoPan
   const setMaximizedNodeId = useCanvasUiStore((s) => s.setMaximizedNodeId);
   const { draft, patchDraft } = useTtvDraft(videoNodeId);
   const { startGeneration, busy, activeJob } = useVideoNodeGeneration(videoNodeId);
-  const setupFirstLastFrameForVideoNode = useProjectStore((s) => s.setupFirstLastFrameForVideoNode);
   const addInputNodeLeftOfVideo = useProjectStore((s) => s.addInputNodeLeftOfVideo);
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodes = useProjectStore((s) => s.nodes);
@@ -185,6 +185,15 @@ export function TextNodeTextToVideoPanel({ videoNodeId }: TextNodeTextToVideoPan
       cancelled = true;
     };
   }, [videoNodeId, incomingRefItems, patchDraft, projectPath]);
+
+  // 根据连线状态自动检测并更新 workflow
+  useEffect(() => {
+    if (!videoNodeId) return;
+    const detected = detectWorkflow(incomingRefItems, draft.prompt ?? "");
+    if (detected && detected !== draft.workflow) {
+      patchDraft({ workflow: detected });
+    }
+  }, [videoNodeId, incomingRefItems, draft.prompt, draft.workflow, patchDraft]);
 
   useEffect(() => {
     autoFilledScriptPromptRef.current = false;
@@ -333,31 +342,18 @@ export function TextNodeTextToVideoPanel({ videoNodeId }: TextNodeTextToVideoPan
 
   return (
     <div className={`textNodeTtvPanel ${RF_NODE_INPUT_CLASS}`} onPointerDown={(e) => e.stopPropagation()}>
+      {/* 顶部创作模式状态栏（自动联动连线状态） */}
       <div className="textNodeTtvTabs">
         {VIDEO_WORKFLOW_TAB_LABELS.map(({ workflow, label }) => {
-          const active = draft.workflow === workflow;
-          const enabled =
-            workflow === "text_to_video" ||
-            workflow === "first_last_frame" ||
-            workflow === "multimodal_reference" ||
-            workflow === "image_to_video";
+          const isActive = draft.workflow === workflow;
           return (
-            <button
+            <span
               key={`${workflow}-${label}`}
-              type="button"
-              className={`textNodeTtvTab ${active ? "textNodeTtvTab--active" : ""}`}
-              disabled={!enabled}
-              title={!enabled ? "敬请期待" : undefined}
-              onClick={() => {
-                if (workflow === "first_last_frame" && videoNodeId) {
-                  setupFirstLastFrameForVideoNode(videoNodeId);
-                  return;
-                }
-                patchDraft({ workflow });
-              }}
+              className={`textNodeTtvTab ${isActive ? "textNodeTtvTab--active" : "textNodeTtvTab--inactive"}`}
+              title={isActive ? undefined : "当前未激活"}
             >
               {label}
-            </button>
+            </span>
           );
         })}
         <button
@@ -454,13 +450,16 @@ export function TextNodeTextToVideoPanel({ videoNodeId }: TextNodeTextToVideoPan
         ) : null}
       </div>
       {videoNodeId ? <ScriptBeatBindingInline nodeId={videoNodeId} dense /> : null}
-      <TtvInlineCameraPrompt
-        ref={inlinePromptRef}
-        draft={draft}
-        patchDraft={patchDraft}
-        cameraLabel={cameraChipLabel}
-        hasCamera={hasCamera}
-      />
+      {videoNodeId ? (
+        <TtvInlineCameraPrompt
+          ref={inlinePromptRef}
+          nodeId={videoNodeId}
+          draft={draft}
+          patchDraft={patchDraft}
+          cameraLabel={cameraChipLabel}
+          hasCamera={hasCamera}
+        />
+      ) : null}
       {activeJob?.error ? (
         <div className="textNodeTtvJobErr mono" role="status">
           {activeJob.error}
@@ -631,7 +630,8 @@ export function TextNodeTextToVideoPanel({ videoNodeId }: TextNodeTextToVideoPan
 }
 
 /** 文字生音乐：底部占位面板 */
-export function TextNodeTextToMusicPanel({ audioNodeId: _audioNodeId }: { audioNodeId?: string }) {
+export function TextNodeTextToMusicPanel({ audioNodeId }: { audioNodeId?: string }) {
+  void audioNodeId; // 参数暂未使用
   return (
     <div className={`textNodeTtmPanel ${RF_NODE_INPUT_CLASS}`} onPointerDown={(e) => e.stopPropagation()}>
       <div className="textNodeTtmRow">

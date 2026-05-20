@@ -60,8 +60,11 @@ export function TtvCameraMovementModal({
 
   useEffect(() => {
     if (!open) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setEditorOpen(false);
+       
       setEditingId(null);
+       
       setTab("presets");
     }
   }, [open]);

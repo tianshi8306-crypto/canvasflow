@@ -5,6 +5,7 @@ import { FlowCanvas } from "@/components/FlowCanvas";
 import { AppTopBar } from "@/components/AppTopBar";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { ScriptNodeFullscreenOverlay } from "@/components/ScriptNodeFullscreenOverlay";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
 import { useProjectStore } from "@/store/projectStore";
 import { initHermesAutoChain } from "@/lib/hermes";
@@ -149,7 +150,7 @@ export default function App() {
 
   return (
     <div className="appShell">
-      <AppTopBar onOpenSettings={() => setSettingsOpen(true)} />
+      <AppTopBar />
 
       <div className="mainSplit">
         <FlowCanvas />
@@ -157,6 +158,7 @@ export default function App() {
 
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       {scriptFullscreenNodeId ? <ScriptNodeFullscreenOverlay /> : null}
+      <ConfirmDialog />
     </div>
   );
 }

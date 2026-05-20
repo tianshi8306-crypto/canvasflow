@@ -1,0 +1,1480 @@
+/* 视频节点 Chrome 专用；共享壳 / Token 见 nodeChrome/ */
+
+/* 视频预览 + 生成参数面板：与图片节点同色（#2b2b2b / #1f1f1f / #4d4d4d / #444444） */
+.minimal-video-node.nodeChrome-shell {
+  background: var(--bg-node, #2b2b2b);
+  border-color: var(--border-node, #4d4d4d);
+}
+
+.minimal-video-preview.nodeChrome-preview {
+  background: var(--bg-node-preview, #1f1f1f);
+}
+
+.videoGenPanel--chrome.nodeChrome--panel {
+  background: var(--bg-panel, #2b2b2b);
+  border-color: var(--border-node, #4d4d4d);
+}
+
+.minimal-video-preview.nodeChrome-preview,
+.minimal-video-preview {
+  pointer-events: none;
+}
+
+
+
+.minimal-video-preview .vidChromePreview,
+.minimal-video-preview .vidMinimalPlayer {
+  width: 100%;
+  height: 100%;
+  pointer-events: auto;
+}
+
+.minimal-video-preview .nodeMediaClip {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: var(--bg-node-preview, #1f1f1f);
+  border-radius: 0;
+  pointer-events: auto;
+}
+
+
+
+.minimal-video-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.minimal-video-placeholder svg {
+  width: clamp(56px, 20%, 88px);
+  height: clamp(56px, 20%, 88px);
+  fill: var(--text-placeholder, #616161);
+  opacity: 0.22;
+}
+
+.minimal-video-placeholder--upload {
+  margin: 0;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  background: transparent;
+}
+
+.minimal-video-placeholder--upload:hover svg {
+  opacity: 0.35;
+}
+
+
+
+/* 底栏 Portal：紧凑高度（对齐参考图 1 / 图片节点 500×180 量级） */
+
+.videoGenPanel--chrome.nodeChrome--panel {
+  /* 顶栏 Tab / 快捷钮 / 底栏 pill 共用（对齐图片 igp-control-*） */
+  --vgp-control-h: 36px;
+  --vgp-control-radius-pill: 999px;
+  --vgp-control-radius-square: 8px;
+  --vgp-control-border: 1px solid var(--border-button, #4d4d4d);
+  --vgp-control-bg: var(--bg-button, #2b2b2b);
+  --vgp-control-bg-hover: var(--bg-button-active, #444444);
+  --vgp-control-text: rgba(255, 255, 255, 0.88);
+  --vgp-control-text-muted: #9e9e9e;
+  --vgp-cta-bg-ready: #f0f0f0;
+  --vgp-cta-bg-ready-hover: #ffffff;
+  --vgp-cta-fg-ready: #121212;
+  --vgp-cta-bg-disabled: #2b2b2b;
+  --vgp-cta-fg-disabled: #616161;
+  --vgp-cta-bg-generating: #ffffff;
+  --vgp-cta-fg-generating: #121212;
+  --vgp-cta-border-generating: var(--border-button, #4d4d4d);
+
+  width: 500px;
+  max-width: calc(100vw - 16px);
+  height: auto;
+  min-height: 0;
+  max-height: min(calc(100vh - 88px), 320px);
+  overflow: visible;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+
+
+.videoGenPanel--chrome .mmPanel--chrome {
+
+  gap: 6px;
+
+  width: 100%;
+
+}
+
+
+
+/* 顶栏：标签 + 右上展开 */
+
+.videoGenPanel--chrome .mmChromeHead--compact {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  min-width: 0;
+
+}
+
+
+
+.videoGenPanel--chrome .mmChromeIconBtn {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 28px;
+
+  height: 28px;
+
+  padding: 0;
+
+  border-radius: 8px;
+
+  border: 1px solid var(--border-button, #4d4d4d);
+
+  background: var(--bg-button, #2b2b2b);
+
+  color: #bdbdbd;
+
+  cursor: pointer;
+
+  flex-shrink: 0;
+
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+}
+
+
+
+.videoGenPanel--chrome .mmChromeIconBtn:hover:not(:disabled) {
+
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+
+  color: #f0f0f0;
+
+  border-color: #5a5a5a;
+
+}
+
+
+
+.videoGenPanel--chrome .mmChromeExpandBtn {
+
+  margin-left: 2px;
+
+}
+
+
+
+.videoGenPanel--chrome .mmChromeHeadActions {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  margin-left: auto;
+
+  flex-shrink: 0;
+
+}
+
+
+
+.videoGenPanel--chrome .mmTabs--compact {
+
+  flex: 1;
+
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 4px;
+
+  padding: 0;
+
+  background: transparent;
+
+  overflow-x: auto;
+
+  scrollbar-width: none;
+
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 20px), transparent 100%);
+
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 20px), transparent 100%);
+
+}
+
+
+
+.videoGenPanel--chrome .mmTabs--compact::-webkit-scrollbar {
+
+  display: none;
+
+}
+
+
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: var(--vgp-control-h);
+  padding: 0 10px;
+  font-size: 11px;
+  line-height: 1.1;
+  border-radius: var(--vgp-control-radius-square);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab:hover {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-control-text);
+  transform: none;
+}
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab--active {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-control-text);
+  font-weight: 500;
+}
+
+/* 创作模式由连线自动识别，非激活 Tab 只读 */
+.videoGenPanel--chrome .mmTabs--compact .mmTab--inactive {
+  opacity: 0.5;
+  cursor: default;
+  pointer-events: none;
+}
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab--inactive:hover {
+  background: var(--vgp-control-bg);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-control-text-muted);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmQuickTool {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: var(--vgp-control-h);
+  height: var(--vgp-control-h);
+  padding: 3px 8px 2px;
+  font-size: 10px;
+  line-height: 1.1;
+  border-radius: var(--vgp-control-radius-square);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text-muted);
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmQuickTool:hover {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-control-text);
+  transform: translateY(-1px);
+  box-shadow: none;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmQuickTool--active {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-control-text);
+  box-shadow: none;
+}
+
+
+
+/* 快捷工具行 */
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact {
+  gap: 8px;
+  align-items: center;
+  min-height: var(--vgp-control-h);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbsWrapper {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  margin-left: 0;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb {
+  width: 36px;
+  height: 36px;
+}
+
+
+
+/* 提示词区 */
+
+.videoGenPanel--chrome .mmPromptArea--compact .vgp-prompt-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .vgp-prompt-wrap .mmPromptInput {
+  padding-bottom: 18px;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .vgp-prompt-counter {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  z-index: 3;
+  font-size: 11px;
+  color: var(--vgp-control-text-muted, #9e9e9e);
+  font-family: ui-monospace, monospace;
+  line-height: 1;
+  pointer-events: none;
+  text-align: right;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .mmPromptInput {
+  min-height: 44px;
+  max-height: 80px;
+  padding: 4px 0;
+  font-size: 13px;
+  line-height: 1.45;
+  border-radius: 0;
+  border: none;
+  border-color: transparent;
+  background: transparent;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .mmPromptInput:focus {
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .mmPromptFooter {
+  padding: 2px 0 0;
+  justify-content: flex-end;
+}
+
+.videoGenPanel--chrome .mmPromptLen {
+  font-size: 11px;
+  color: #616161;
+}
+
+
+
+/* 底栏：模型 + 合并参数 pill + 白底生成钮（对齐图片 igp-generate-btn） */
+
+.videoGenPanel--chrome .mmFoot--chrome {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  flex-wrap: nowrap;
+
+  padding: 0;
+
+  border-top: none;
+
+  background: transparent;
+
+  position: relative;
+
+}
+
+
+
+.videoGenPanel--chrome .mmFoot--chrome .mmModelSelect {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: min(180px, 38vw);
+  min-height: var(--vgp-control-h);
+  padding: 6px 24px 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--vgp-control-radius-pill);
+  border: var(--vgp-control-border);
+  background-color: var(--vgp-control-bg);
+  color: var(--vgp-control-text);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmModelSelect:hover {
+  background-color: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmModelSelect:focus {
+  outline: none;
+  border-color: var(--border-button, #4d4d4d);
+  background-color: var(--vgp-control-bg-hover);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmOutputCombo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: none;
+  min-height: var(--vgp-control-h);
+  padding: 6px 24px 6px 10px;
+  border-radius: var(--vgp-control-radius-pill);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  justify-content: flex-start;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmOutputCombo:hover,
+.videoGenPanel--chrome .mmFoot--chrome .mmOutputCombo--open {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+
+
+.videoGenPanel--chrome .mmOutputComboLabel {
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+}
+
+
+
+/* Portal 弹出层：锚定在底栏 pill 上方，对齐参考图 */
+.mmGenSettings.mmGenSettings--portal {
+  position: fixed;
+  max-height: min(420px, calc(100vh - 80px));
+  overflow-y: auto;
+  background: var(--bg-panel-elevated, #333333);
+  border: 1px solid var(--border-node, #4d4d4d);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+  scrollbar-width: thin;
+}
+
+.mmGenSettings--portal .mmGenSettingsLabel {
+  font-size: 12px;
+  color: #9e9e9e;
+  margin-bottom: 4px;
+}
+
+.mmGenSettings--portal .mmGenSettingsRatioGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.mmGenSettings--portal .mmGenSettingsRatioBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-button, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: #e0e0e0;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mmGenSettings--portal .mmGenSettingsRatioBtn--active {
+  border-color: var(--border-button, #4d4d4d);
+  background: var(--bg-button-active, #444444);
+}
+
+.mmGenSettings--portal .mmGenSettingsSeg {
+  display: flex;
+  gap: 6px;
+}
+
+.mmGenSettings--portal .mmGenSettingsSegBtn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-button, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: #e0e0e0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mmGenSettings--portal .mmGenSettingsSegBtn--active {
+  border-color: var(--border-button, #4d4d4d);
+  background: var(--bg-button-active, #444444);
+  font-weight: 600;
+}
+
+.mmGenSettings--portal .mmGenSettingsSection + .mmGenSettingsSection {
+  margin-top: 14px;
+}
+
+
+
+/* 视频模型 Portal 选择器（与图片 igp-model-* 同构） */
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-picker {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  max-width: min(180px, 38vw);
+  min-height: var(--vgp-control-h);
+  padding: 6px 24px 6px 10px;
+  border-radius: var(--vgp-control-radius-pill);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger:hover:not(:disabled),
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger.open {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger-label {
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #f0f0f0;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger-chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: #9e9e9e;
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger.open .igp-model-trigger-chevron {
+  transform: rotate(0deg);
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome {
+  box-sizing: border-box;
+  min-width: 280px;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-menu-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #e8e8e8;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item:hover:not(:disabled),
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item.selected {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item.disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #3d3d3d, #252525);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #f5f5f5;
+  flex-shrink: 0;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 生成钮：可生成 / 禁用 / 生成中 */
+.videoGenPanel--chrome .igp-generate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--vgp-control-h);
+  height: var(--vgp-control-h);
+  min-height: var(--vgp-control-h);
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--vgp-control-radius-square);
+  cursor: pointer;
+  opacity: 1;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.videoGenPanel--chrome .igp-generate-btn:not(:disabled):not(.generating) {
+  background: var(--vgp-cta-bg-ready);
+  color: var(--vgp-cta-fg-ready);
+}
+
+.videoGenPanel--chrome .igp-generate-btn:not(:disabled):not(.generating):hover {
+  background: var(--vgp-cta-bg-ready-hover);
+}
+
+.videoGenPanel--chrome .igp-generate-btn:disabled:not(.generating) {
+  background: var(--vgp-cta-bg-disabled);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-cta-fg-disabled);
+  cursor: not-allowed;
+}
+
+.videoGenPanel--chrome .igp-generate-btn.generating {
+  background: var(--vgp-cta-bg-generating);
+  border-color: var(--vgp-cta-border-generating);
+  color: var(--vgp-cta-fg-generating);
+}
+
+.videoGenPanel--chrome .igp-generate-btn.generating:hover {
+  background: var(--vgp-cta-bg-ready-hover);
+}
+
+.videoGenPanel--chrome .igp-generate-btn svg {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+
+.videoGenPanel--chrome .igp-generate-btn:not(:disabled):not(.generating) svg {
+  color: var(--vgp-cta-fg-ready);
+}
+
+.videoGenPanel--chrome .igp-generate-btn:disabled:not(.generating) svg {
+  color: var(--vgp-cta-fg-disabled);
+}
+
+.videoGenPanel--chrome .igp-generate-btn.generating svg {
+  fill: currentColor;
+  color: var(--vgp-cta-fg-generating);
+}
+
+
+
+/* 放大态：见 ImageGenerationPanelExpandedModal.css（.vgp-layout-expanded） */
+
+
+
+/* 有视频时：预览区上方外部功能栏 + 元信息行 Portal */
+.videoPreviewToolbarChrome {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  pointer-events: auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.videoPreviewChromeStack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2px;
+  width: 100%;
+}
+
+.videoNodeChromeMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 14px;
+  padding: 0 2px;
+  line-height: 1.1;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.videoNodeChromeMeta-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.videoNodeChromeMeta-duration {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.42);
+  line-height: 1;
+}
+
+.videoNodeChromeMeta-right {
+  flex-shrink: 0;
+}
+
+.videoNodeChromeMeta-dims {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.38);
+  white-space: nowrap;
+}
+
+.videoNodeChromeMeta-progress {
+  font-size: 11px;
+  color: rgba(147, 197, 253, 0.95);
+  animation: nodeChrome-gen-pulse 1.2s ease-in-out infinite;
+}
+
+/* 预览区内播放器 */
+.vidChromePreview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: calc(var(--radius-node, 12px) - 1px);
+  background: var(--bg-node-preview, #1f1f1f);
+}
+
+.vidChromePreview-upload {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 4;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.45);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+}
+
+.vidChromePreview-upload:hover {
+  background: rgba(0, 0, 0, 0.62);
+}
+
+.vidMinimalPlayer {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.vidMinimalPlayerMedia {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  object-position: center;
+  background: var(--bg-node-preview, #1f1f1f);
+  cursor: pointer;
+}
+
+.vidMinimalPlayerControls {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 10px;
+  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.55) 40%, rgba(0, 0, 0, 0.78) 100%);
+  pointer-events: auto;
+}
+
+.vidMinimalPlayerCtrlBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.vidMinimalPlayerCtrlBtn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.vidMinimalPlayerTime {
+  font-size: 11px;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.88);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.vidMinimalPlayerTime--current {
+  min-width: 32px;
+}
+
+.vidMinimalPlayerTime--total {
+  min-width: 32px;
+  text-align: right;
+}
+
+.vidMinimalPlayerProgress {
+  flex: 1;
+  min-width: 48px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 0 2px;
+}
+
+.vidMinimalPlayerProgressTrack {
+  position: relative;
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+}
+
+.vidMinimalPlayerProgressFill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.vidMinimalPlayerProgressThumb {
+  position: absolute;
+  top: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+  z-index: 3;
+}
+
+.vidMinimalPlayerProgress--trim .vidMinimalPlayerProgressTrack {
+  height: 4px;
+}
+
+.vidMinimalPlayerTrimDim {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.vidMinimalPlayerTrimActive {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.vidMinimalPlayerTrimHandle {
+  position: absolute;
+  top: 50%;
+  width: 8px;
+  height: 14px;
+  margin-left: -4px;
+  margin-top: -7px;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.vidMinimalPlayerTrimBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 2px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.88);
+}
+
+.vidMinimalPlayerTrimLabel {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vidMinimalPlayerTrimActions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vidMinimalPlayerTrimBtn {
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+}
+
+.vidMinimalPlayerTrimBtn:hover {
+  background: #fff;
+}
+
+.vidMinimalPlayerTrimBtn--ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.vidMinimalPlayerTrimBtn--ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* 框选去字幕 overlay */
+.vidSubtitleRegionOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  pointer-events: auto;
+}
+
+.vidSubtitleRegionBar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.92);
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.65), transparent);
+}
+
+.vidSubtitleRegionBar-label {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vidSubtitleRegionBar-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.vidSubtitleRegionBar-btn {
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+}
+
+.vidSubtitleRegionBar-btn:hover:not(:disabled) {
+  background: #fff;
+}
+
+.vidSubtitleRegionBar-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.vidSubtitleRegionBar-btn--ghost {
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.vidSubtitleRegionBar-btn--ghost:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.vidSubtitleRegion-dim {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.52);
+  pointer-events: none;
+}
+
+.vidSubtitleRegion-box {
+  position: absolute;
+  border: 2px solid rgba(96, 165, 250, 0.95);
+  background: rgba(96, 165, 250, 0.12);
+  box-sizing: border-box;
+  cursor: move;
+  touch-action: none;
+  z-index: 2;
+}
+
+.vidSubtitleRegion-handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-top: -5px;
+  border-radius: 2px;
+  background: #fff;
+  border: 1px solid rgba(96, 165, 250, 0.95);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.25);
+  z-index: 3;
+  touch-action: none;
+}
+
+.vidSubtitleRegion-handle--n,
+.vidSubtitleRegion-handle--s {
+  margin-left: -5px;
+  cursor: ns-resize;
+}
+
+.vidSubtitleRegion-handle--e,
+.vidSubtitleRegion-handle--w {
+  margin-top: -5px;
+  cursor: ew-resize;
+}
+
+.vidSubtitleRegion-handle--nw {
+  cursor: nwse-resize;
+}
+.vidSubtitleRegion-handle--se {
+  cursor: nwse-resize;
+}
+.vidSubtitleRegion-handle--ne {
+  cursor: nesw-resize;
+}
+.vidSubtitleRegion-handle--sw {
+  cursor: nesw-resize;
+}
+
+.vidChromePreview:has(.vidSubtitleRegionOverlay) .vidChromePreview-upload {
+  z-index: 2;
+}
+
+.vidMinimalPlayerVolWrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.vidMinimalPlayerVolPop {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 6px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 36px;
+  padding: 8px 6px 6px;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.72);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(8px);
+}
+
+.vidMinimalPlayerVolPct {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  line-height: 1;
+  margin-bottom: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vidMinimalPlayerVolTrack {
+  position: relative;
+  width: 4px;
+  height: 72px;
+  cursor: ns-resize;
+  touch-action: none;
+}
+
+.vidMinimalPlayerVolTrackLine {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+}
+
+.vidMinimalPlayerVolTrackFill {
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+  pointer-events: none;
+}
+
+.vidMinimalPlayerVolThumb {
+  position: absolute;
+  left: 50%;
+  width: 10px;
+  height: 10px;
+  margin-left: -5px;
+  margin-bottom: -5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.2);
+  pointer-events: none;
+}
+
+.vidMinimalPlayerCtrlBtn.is-active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* 截帧：悬停展开菜单 + 提示 */
+.vidMinimalPlayerCaptureWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+.vidMinimalPlayerCaptureMenu {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  min-width: 108px;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(22, 22, 22, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.vidMinimalPlayerCaptureMenuItem {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.vidMinimalPlayerCaptureMenuItem:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.vidMinimalPlayerCaptureBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  flex-shrink: 0;
+  backdrop-filter: blur(6px);
+}
+
+.vidMinimalPlayerCaptureBtn:hover {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.vidMinimalPlayerCaptureBtn.is-open {
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.videoPreviewToolbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  align-self: center;
+  max-width: 100%;
+  padding: 5px 8px 5px 6px;
+  background: rgba(43, 43, 43, 0.94);
+  border: 1px solid var(--border-node, #4d4d4d);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(10px);
+}
+
+.videoPreviewToolbar-main {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  max-width: min(420px, calc(100vw - 120px));
+}
+
+.videoPreviewToolbar-main::-webkit-scrollbar {
+  display: none;
+}
+
+.videoPreviewToolbar-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.videoPreviewToolbar-item:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.videoPreviewToolbar-item--menu {
+  padding-right: 6px;
+}
+
+.videoPreviewToolbar-itemWrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.videoPreviewToolbar-item.is-open {
+  background: var(--bg-button-active, #444444);
+}
+
+.videoPreviewToolbar-menuDrop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 132px;
+  z-index: 20;
+  background: var(--bg-panel-elevated, #333333);
+  border: 1px solid var(--border-node, #4d4d4d);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.videoPreviewToolbar-menuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 11px;
+  color: #e0e0e0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.videoPreviewToolbar-menuItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.videoPreviewToolbar-icon {
+  display: inline-flex;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  opacity: 0.95;
+}
+
+.videoPreviewToolbar-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.videoPreviewToolbar-label {
+  font-weight: 400;
+}
+
+.videoPreviewToolbar-chevron {
+  width: 10px;
+  height: 10px;
+  opacity: 0.75;
+  flex-shrink: 0;
+}
+
+.videoPreviewToolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 4px 6px;
+  background: rgba(255, 255, 255, 0.16);
+  flex-shrink: 0;
+}
+
+.videoPreviewToolbar-utils {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.videoPreviewToolbar-iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+}
+
+.videoPreviewToolbar-iconBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.videoPreviewToolbar-iconBtn svg {
+  width: 16px;
+  height: 16px;
+}
+
+

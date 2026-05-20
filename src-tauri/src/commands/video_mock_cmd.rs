@@ -67,6 +67,8 @@ pub async fn video_gen_start(
             polls: 0,
             result_rel_path: None,
             cancelled: false,
+            is_dreamina: false,
+            dreamina_workflow: None,
         },
     );
     Ok(VideoGenStartResponse { job_id })

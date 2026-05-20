@@ -1,0 +1,221 @@
+/* 节点壳、外置元信息、Portal 面板皮肤（中性 class + 图片节点别名） */
+
+.nodeChrome-shell,
+.minimal-image-node,
+.minimal-text-node {
+  --simple-anchor-gap: 6px;
+  --simple-anchor-knob: 18px;
+  position: relative;
+  padding: 0;
+  background: var(--bg-node, #1e1e1e);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-node, 8px);
+  overflow: visible;
+  box-sizing: border-box;
+}
+
+.nodeChrome-shell:hover,
+.minimal-image-node:hover,
+.minimal-text-node:hover {
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.nodeChrome-shell.selected,
+.minimal-image-node.selected,
+.minimal-text-node.selected {
+  border-color: rgba(255, 255, 255, 0.8);
+}
+
+.nodeChrome-preview,
+.minimal-image-preview,
+.minimal-text-preview {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-node, #1e1e1e);
+  overflow: hidden;
+  border-radius: 7px;
+  pointer-events: none;
+}
+
+.nodeChrome-preview .nodeMutedPreview,
+.minimal-image-preview .nodeMutedPreview {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #9e9e9e);
+  text-align: center;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.nodeChrome-placeholder,
+.minimal-image-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  color: rgba(255, 255, 255, 0.3);
+  pointer-events: auto;
+}
+
+.nodeChrome-placeholder svg,
+.minimal-image-placeholder svg {
+  width: clamp(56px, 20%, 88px);
+  height: clamp(56px, 20%, 88px);
+  fill: var(--text-placeholder, #616161);
+  opacity: 0.22;
+}
+
+/* 外置左上：可编辑标签 */
+.nodeChrome-metaLabel,
+.minimal-image-label {
+  position: absolute;
+  top: var(--chrome-meta-offset-top, -18px);
+  left: var(--chrome-meta-inset-x, 4px);
+  z-index: 2;
+  line-height: 1;
+}
+
+.nodeChrome-metaLabel--inline {
+  position: static;
+  top: auto;
+  left: auto;
+  z-index: auto;
+}
+
+.nodeChrome-metaLabel-text,
+.minimal-image-label-text {
+  font-size: 10px;
+  font-family: inherit;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition: color 0.15s;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.nodeChrome-metaLabel-text:hover,
+.minimal-image-label-text:hover {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.nodeChrome-metaLabel-input,
+.minimal-image-label-input {
+  background: rgba(18, 18, 18, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.5);
+  color: rgba(255, 255, 255, 0.75);
+  font-size: 10px;
+  font-family: inherit;
+  outline: none;
+  width: 72px;
+  padding: 2px 5px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+/* 外置右上：分辨率 / 生成进度 */
+.nodeChrome-metaStatus,
+.minimal-image-top-right {
+  position: absolute;
+  top: var(--chrome-meta-offset-top, -18px);
+  right: var(--chrome-meta-inset-x, 4px);
+  z-index: 2;
+  line-height: 1;
+  font-size: 10px;
+  font-family: inherit;
+  white-space: nowrap;
+  background: transparent;
+  padding: 0;
+}
+
+.nodeChrome-metaStatus-dims,
+.minimal-image-res-dims {
+  color: var(--text-meta, rgba(255, 255, 255, 0.28));
+}
+
+.nodeChrome-metaStatus-progress,
+.minimal-image-gen-progress {
+  color: var(--text-progress, rgba(147, 197, 253, 0.95));
+  font-variant-numeric: tabular-nums;
+  animation: nodeChrome-gen-pulse 1.2s ease-in-out infinite;
+}
+
+.nodeChrome-metaStatus--generating,
+.minimal-image-top-right--generating {
+  pointer-events: none;
+}
+
+@keyframes nodeChrome-gen-pulse {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* 无内容态：节点上方居中上传 */
+.nodeChrome-upload-float,
+.minimal-image-upload-float {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--bg-button, #252525);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 12px;
+  cursor: pointer;
+  pointer-events: auto;
+  font-family: inherit;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+}
+
+.nodeChrome-upload-float:hover,
+.minimal-image-upload-float:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Portal 浮层皮肤 */
+.nodeChrome--panel,
+.imageNodeChrome--minimal {
+  box-sizing: border-box;
+  background: var(--bg-node-preview, #1f1f1f);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  pointer-events: auto;
+}
+
+.nodeChrome--panel.imageGenPanel--minimal,
+.imageNodeChrome--minimal.imageGenPanel--minimal {
+  width: 500px;
+}
+
+.nodeChrome--top,
+.imageNodeChrome--top {
+  width: max-content;
+  max-width: calc(100vw - 16px);
+  height: 40px;
+  padding: 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

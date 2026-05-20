@@ -1,5 +1,7 @@
 use crate::command_common::pick_enabled_provider;
 use crate::db;
+use crate::dreamina_cli::DreaminaCliState;
+use crate::dreamina_gen;
 use crate::media;
 use crate::settings;
 use crate::vault;
@@ -10,18 +12,57 @@ use std::path::PathBuf;
 pub async fn generate_image_asset(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
+    dreamina: tauri::State<'_, DreaminaCliState>,
     project_path: String,
     prompt: String,
     image_model_id: Option<String>,
     model: String,
     task: Option<String>,
     reference_image_paths: Option<Vec<String>>,
+    aspect: Option<String>,
+    resolution: Option<String>,
+    count: Option<usize>,
+    negative_prompt: Option<String>,
+    style: Option<String>,
 ) -> Result<String, String> {
     use base64::Engine;
     use serde_json::json;
 
     if prompt.trim().is_empty() {
         return Err("提示词不能为空".into());
+    }
+
+    let resolved_model_for_route = if let Some(ref mid) = image_model_id {
+        settings::load_settings(&app)?
+            .image_models
+            .iter()
+            .find(|m| m.id == *mid)
+            .map(|m| m.model.clone())
+            .unwrap_or_else(|| model.clone())
+    } else {
+        model.clone()
+    };
+
+    if dreamina_gen::is_dreamina_model(&resolved_model_for_route)
+        || dreamina_gen::is_dreamina_model(model.trim())
+    {
+        let model_id = if dreamina_gen::is_dreamina_model(&resolved_model_for_route) {
+            resolved_model_for_route
+        } else {
+            model.trim().to_string()
+        };
+        return dreamina_gen::generate_image_via_cli(
+            &dreamina,
+            &state.http,
+            &project_path,
+            &prompt,
+            &model_id,
+            task.as_deref(),
+            reference_image_paths,
+            aspect,
+            resolution,
+        )
+        .await;
     }
 
     let settings = settings::load_settings(&app)?;
@@ -60,6 +101,7 @@ pub async fn generate_image_asset(
         (provider.base_url.trim().to_string(), mdl, key)
     };
 
+    // image_edit：期望单张参考图（通常为当前节点预览图），与 image_to_image 共用 images[] 字段
     let refs = reference_image_paths.unwrap_or_default();
     let mut refs_b64: Vec<String> = Vec::new();
     for rel in refs.iter().take(4) {
@@ -69,86 +111,112 @@ pub async fn generate_image_asset(
         }
     }
 
-    let mut body = json!({
-        "model": resolved_model,
-        "prompt": prompt,
-        "size": "1024x1024",
-        "response_format": "b64_json",
-    });
-    if let Some(obj) = body.as_object_mut() {
-        if let Some(t) = task {
-            obj.insert("task".into(), json!(t));
-        }
-        if let Some(first) = refs_b64.first() {
-            obj.insert("image".into(), json!(first));
-        }
-        if !refs_b64.is_empty() {
-            obj.insert("images".into(), json!(refs_b64));
-        }
-    }
-
-    let url = format!(
-        "{}/images/generations",
-        resolved_base_url.trim_end_matches('/')
-    );
-    let resp = state
-        .http
-        .post(url)
-        .header("Authorization", format!("Bearer {}", api_key))
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| format!("请求图片生成失败：{}", e))?;
-
-    let status = resp.status();
-    let text = resp
-        .text()
-        .await
-        .map_err(|e| format!("读取图片响应失败：{}", e))?;
-    let parsed: serde_json::Value =
-        serde_json::from_str(&text).unwrap_or_else(|_| json!({ "raw": text }));
-    if !status.is_success() {
-        return Err(format!(
-            "图片生成失败: {}",
-            serde_json::to_string(&parsed).unwrap_or_default()
-        ));
-    }
-
-    let bytes = if let Some(b64) = parsed.pointer("/data/0/b64_json").and_then(|v| v.as_str()) {
-        base64::engine::general_purpose::STANDARD
-            .decode(b64)
-            .map_err(|e| format!("解析图片失败：{}", e))?
-    } else if let Some(img_url) = parsed.pointer("/data/0/url").and_then(|v| v.as_str()) {
-        state
-            .http
-            .get(img_url)
-            .send()
-            .await
-            .map_err(|e| format!("下载图片失败：{}", e))?
-            .bytes()
-            .await
-            .map_err(|e| format!("读取下载图片失败：{}", e))?
-            .to_vec()
-    } else {
-        return Err("返回内容中未找到图片数据".into());
-    };
-
+    let n = count.unwrap_or(1).max(1).min(4);
+    let mut rel_paths: Vec<String> = Vec::new();
     let root = PathBuf::from(&project_path);
     let assets_dir = root.join("assets");
     std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let file_name = format!(
-        "gen_{}_{}.png",
-        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
-        &uuid::Uuid::new_v4().to_string()[..8]
-    );
-    let out = assets_dir.join(&file_name);
-    std::fs::write(&out, bytes).map_err(|e| format!("保存图片失败：{}", e))?;
-
-    let rel = format!("assets/{}", file_name);
     let conn = db::open_run_db(&root)?;
-    let meta_json = media::meta_json_for_image(&out);
-    let _aid = db::upsert_asset(&conn, &rel, "image", Some("generate"), meta_json.as_deref())?;
-    Ok(rel)
+
+    for i in 0..n {
+        let size = resolution.as_deref().unwrap_or("1024x1024");
+        let mut body = json!({
+            "model": resolved_model,
+            "prompt": prompt,
+            "size": size,
+            "response_format": "b64_json",
+        });
+        if let Some(obj) = body.as_object_mut() {
+            if let Some(t) = &task {
+                obj.insert("task".into(), json!(t));
+            }
+            if let Some(first) = refs_b64.first() {
+                obj.insert("image".into(), json!(first));
+            }
+            if !refs_b64.is_empty() {
+                obj.insert("images".into(), json!(refs_b64));
+            }
+            if let Some(np) = negative_prompt.as_ref() {
+                if !np.is_empty() {
+                    obj.insert("negative_prompt".into(), json!(np));
+                }
+            }
+            if let Some(s) = style.as_ref() {
+                if !s.is_empty() {
+                    obj.insert("style".into(), json!(s));
+                }
+            }
+        }
+
+        let url = format!(
+            "{}/images/generations",
+            resolved_base_url.trim_end_matches('/')
+        );
+        let resp = state
+            .http
+            .post(url)
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| format!("请求图片生成失败：{}", e))?;
+
+        let status = resp.status();
+        let text = resp
+            .text()
+            .await
+            .map_err(|e| format!("读取图片响应失败：{}", e))?;
+        let parsed: serde_json::Value =
+            serde_json::from_str(&text).unwrap_or_else(|_| json!({ "raw": text }));
+        if !status.is_success() {
+            return Err(format!(
+                "第 {} 张图片生成失败: {}",
+                i + 1,
+                serde_json::to_string(&parsed).unwrap_or_default()
+            ));
+        }
+
+        let bytes = if let Some(b64) = parsed.pointer("/data/0/b64_json").and_then(|v| v.as_str()) {
+            base64::engine::general_purpose::STANDARD
+                .decode(b64)
+                .map_err(|e| format!("解析图片失败：{}", e))?
+        } else if let Some(img_url) = parsed.pointer("/data/0/url").and_then(|v| v.as_str()) {
+            state
+                .http
+                .get(img_url)
+                .send()
+                .await
+                .map_err(|e| format!("下载图片失败：{}", e))?
+                .bytes()
+                .await
+                .map_err(|e| format!("读取下载图片失败：{}", e))?
+                .to_vec()
+        } else {
+            return Err("返回内容中未找到图片数据".into());
+        };
+
+        let seq_suffix = if n > 1 { format!("_{}", i + 1) } else { String::new() };
+        let file_name = format!(
+            "gen_{}{}_{}.png",
+            chrono::Utc::now().format("%Y%m%d_%H%M%S"),
+            seq_suffix,
+            &uuid::Uuid::new_v4().to_string()[..8]
+        );
+        let out = assets_dir.join(&file_name);
+        std::fs::write(&out, bytes).map_err(|e| format!("保存图片失败：{}", e))?;
+
+        let rel = format!("assets/{}", file_name);
+        let meta_json = media::meta_json_for_image(&out);
+        let _aid = db::upsert_asset(&conn, &rel, "image", Some("generate"), meta_json.as_deref())?;
+        rel_paths.push(rel);
+    }
+
+    // 多张时返回 JSON 数组，单张时返回字符串供兼容
+    if rel_paths.len() == 1 {
+        Ok(rel_paths.into_iter().next().unwrap())
+    } else {
+        Ok(serde_json::to_string(&rel_paths).unwrap())
+    }
 }
 
 /// OpenAI 兼容 `POST /v1/audio/speech`：生成 MP3 写入工程 `assets/`，并登记素材库。

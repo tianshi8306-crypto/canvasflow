@@ -18,6 +18,7 @@ export function SelectionBoundsOverlay({ marqueeActive }: Props) {
 
   useLayoutEffect(() => {
     if (selectedNodeIds.length < 2 || marqueeActive) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setRect(null);
       return;
     }
@@ -27,6 +28,7 @@ export function SelectionBoundsOverlay({ marqueeActive }: Props) {
       const p2 = flowToScreenPosition({ x: b.x + b.width, y: b.y + b.height });
       const left = Math.min(p1.x, p2.x);
       const top = Math.min(p1.y, p2.y);
+       
       setRect({
         left,
         top,
@@ -34,6 +36,7 @@ export function SelectionBoundsOverlay({ marqueeActive }: Props) {
         height: Math.abs(p2.y - p1.y),
       });
     } catch {
+       
       setRect(null);
     }
   }, [flowToScreenPosition, getNodesBounds, selectedNodeIds, viewport, marqueeActive]);

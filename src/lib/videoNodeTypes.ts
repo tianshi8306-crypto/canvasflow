@@ -14,11 +14,12 @@ export type VideoGenerationWorkflow =
   | "image_to_video"
   | "first_last_frame"
   | "image_reference"
+  | "video_reference"
   | "video_edit"
   | "video_extend";
 
-/** 接入池中的模型标识（当前聚焦火山引擎） */
-export type VideoModelId = "doubao_seedance_2_0";
+/** 视频模型标识，取 Settings.videoModels[].model 的值（API 真实标识） */
+export type VideoModelId = string;
 
 export const TEXT_TO_VIDEO_ASPECT_IDS = [
   "auto",
@@ -88,6 +89,22 @@ export type VideoGenOutputSpec = {
   resolution: "480P" | "720P" | "1080P";
   durationSec: number;
   generateAudio: boolean;
+  /** 水印开关，默认 false（无水印） */
+  watermark?: boolean;
+};
+
+/** 单段裁剪入出点（秒）；导出后仍保留便于再调 */
+export type VideoSourceTrim = {
+  inSec: number;
+  outSec: number;
+};
+
+/** 框选去字幕：相对编码帧的归一化矩形（原点左上，0..1） */
+export type VideoSubtitleRegion = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 };
 
 /** 与面板同步的生成草稿（持久化） */
@@ -118,6 +135,14 @@ export type VideoJobStatus = "idle" | "queued" | "running" | "succeeded" | "fail
 export type VideoNodePersisted = {
   /** 最近一次写入成片的来源 */
   source?: VideoSourceKind;
+  /** 预览元数据：用于裁剪 / 框选 UI */
+  sourceDurationSec?: number;
+  sourceWidth?: number;
+  sourceHeight?: number;
+  /** 单段裁剪范围 */
+  sourceTrim?: VideoSourceTrim;
+  /** 框选去字幕区域（持久化） */
+  subtitleRegion?: VideoSubtitleRegion;
   draft: VideoGenerationDraft;
   /** 进行中的远端任务（由 API 返回 jobId） */
   activeJob?: {
@@ -140,6 +165,7 @@ export function defaultVideoGenerationDraft(): VideoGenerationDraft {
       resolution: "720P",
       durationSec: 5,
       generateAudio: true,
+      watermark: false,
     },
   };
 }

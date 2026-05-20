@@ -1,4 +1,5 @@
 import { memo, type Dispatch, type ReactNode, type SetStateAction } from "react";
+import { createPortal } from "react-dom";
 import type { AssetSummary } from "@/shared/api/assets";
 import { useAssetIdVisibilityPreference } from "@/hooks/useAssetIdVisibilityPreference";
 import { clampContextMenuPosition } from "@/lib/clampFloatingUi";
@@ -360,7 +361,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
   const sk = canvasModHints();
   const [showAssetIds, setShowAssetIds] = useAssetIdVisibilityPreference();
 
-  return (
+  const menuRoot = (
     <div
       className={usesPaneMenuChrome ? "canvasPaneCtxMenuRoot" : "canvasFlowFloatingShell"}
       style={{
@@ -783,6 +784,9 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
       ) : null}
     </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(menuRoot, document.body);
 }
 
 export const CanvasContextMenus = memo(CanvasContextMenusInner);

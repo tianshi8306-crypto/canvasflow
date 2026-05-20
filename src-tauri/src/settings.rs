@@ -29,6 +29,21 @@ pub struct ImageModelConfig {
     pub api_base_url: String,
     pub enabled: bool,
     pub priority: i32,
+    /// 为 false 时前端多图融合降级为单张图生图
+    #[serde(default = "default_true")]
+    pub supports_multi_ref_fusion: bool,
+    #[serde(default = "default_max_reference_images")]
+    pub max_reference_images: u8,
+    #[serde(default = "default_true")]
+    pub supports_image_edit: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_max_reference_images() -> u8 {
+    4
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

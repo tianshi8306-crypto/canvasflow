@@ -1,7 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { extractJsonArray } from "@/lib/storyboardParse";
 import { normalizeScriptBeat } from "@/lib/scriptBeatHelpers";
-import type { ScriptBeat, StoryboardShot } from "@/lib/types";
+import type { ScriptBeat, StoryboardShot, StoryboardShotStatus } from "@/lib/types";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
 
 const SB_SYSTEM = `你是影视分镜助理。用户会给出多条「脚本镜头」JSON，每条含 id、场次、景别、描述等。
@@ -36,11 +36,27 @@ function mergeShots(prev: StoryboardShot[] | undefined, parsed: ParsedRow[]): St
         typeof p.compositionNote === "string" && p.compositionNote ? p.compositionNote : undefined,
       negativePrompt:
         typeof p.negativePrompt === "string" && p.negativePrompt ? p.negativePrompt : undefined,
+      status: "generated",
+      error: undefined,
       ...(existing?.imagePath ? { imagePath: existing.imagePath } : {}),
       ...(existing?.imageAssetId ? { imageAssetId: existing.imageAssetId } : {}),
     });
   }
   return [...map.values()];
+}
+
+function setShotsStatus(
+  shots: StoryboardShot[] | undefined,
+  targetIds: string[],
+  status: StoryboardShotStatus,
+  error?: string,
+): StoryboardShot[] {
+  const targetSet = new Set(targetIds);
+  return (shots ?? []).map((s) =>
+    targetSet.has(s.scriptBeatId)
+      ? { ...s, status, ...(error ? { error } : {}), ...(status === "generating" ? { retryCount: String((Number(s.retryCount) || 0) + 1) } : {}) }
+      : s,
+  );
 }
 
 type StoryboardGenerateInput = {
@@ -84,14 +100,27 @@ export const scriptStoryboardGenerateAgentRuntime: NodeTaskAgentRuntime<
     return { payload, theme, prevShots };
   },
   execute: async ({ payload, theme, prevShots }, ctx) => {
+    const targetIds = payload.map((b) => b.id);
     ctx.setStatusText(`正在请求 LLM 生成分镜文案（${payload.length} 条）…`);
-    const user = `全剧主题/梗概：${theme}\n\n请为以下脚本镜头生成分镜 JSON 数组：\n${JSON.stringify(payload, null, 2)}`;
-    const raw = await invoke<string>("llm_complete_text", {
-      systemPrompt: SB_SYSTEM,
-      userPrompt: user,
+    // Mark targets as generating before LLM call
+    ctx.updateNodeData(ctx.nodeId, {
+      storyboardShots: setShotsStatus(prevShots, targetIds, "generating"),
     });
-    const parsed = extractJsonArray<ParsedRow>(raw) ?? [];
-    return { parsed, prevShots };
+    try {
+      const user = `全剧主题/梗概：${theme}\n\n请为以下脚本镜头生成分镜 JSON 数组：\n${JSON.stringify(payload, null, 2)}`;
+      const raw = await invoke<string>("llm_complete_text", {
+        systemPrompt: SB_SYSTEM,
+        userPrompt: user,
+      });
+      const parsed = extractJsonArray<ParsedRow>(raw) ?? [];
+      return { parsed, prevShots };
+    } catch (err) {
+      // Mark targets as failed on error
+      ctx.updateNodeData(ctx.nodeId, {
+        storyboardShots: setShotsStatus(prevShots, targetIds, "failed", String(err)),
+      });
+      throw err;
+    }
   },
   validate: ({ parsed, prevShots }) => {
     if (!parsed || parsed.length === 0) {

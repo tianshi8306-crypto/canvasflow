@@ -1,6 +1,7 @@
 import React, { useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
 import "./MentionInput.css";
 import { useUpstreamNodeCandidates } from "../../hooks/useUpstreamNodeCandidates";
+import { parsePromptInlineSegments } from "@/lib/imageGeneration/imageStyleTokens";
 import { USER_INPUT_PLACEHOLDER } from "@/lib/slashPresets";
 
 export interface MentionInputProps {
@@ -25,7 +26,6 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
     const [showDropdown, setShowDropdown] = useState(false);
     const [dropdownQuery, setDropdownQuery] = useState("");
     const [dropdownIndex, setDropdownIndex] = useState(0);
-    // Use refs for immediate value/cursor tracking (not batched like state)
     const pendingValueRef = useRef(value);
     const pendingCursorRef = useRef(0);
     const upstreamNodes = useUpstreamNodeCandidates(nodeId);
@@ -75,13 +75,20 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
     (e: React.ChangeEvent<HTMLTextAreaElement>) => {
       const newValue = e.target.value;
       const cursor = e.target.selectionStart ?? 0;
-      // Use refs for immediate tracking (not batched)
       pendingValueRef.current = newValue;
       pendingCursorRef.current = cursor;
       onChange(newValue);
 
-      // Detect @ trigger
+      // / 触发优先级高于 @
       const textBefore = newValue.slice(0, cursor);
+      const slashMatch = textBefore.match(/\/([^/\n]*)$/);
+      if (slashMatch) {
+        setShowDropdown(false);
+        onSlashTrigger?.(textareaRef.current!.getBoundingClientRect());
+        return;
+      }
+
+      // @ 触发节点引用下拉
       const atMatch = textBefore.match(/@([^@\n]*)$/);
       if (atMatch) {
         setDropdownQuery(atMatch[1]);
@@ -89,13 +96,6 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
         setDropdownIndex(0);
       } else {
         setShowDropdown(false);
-      }
-
-      // Detect / trigger
-      const slashMatch = textBefore.match(/\/([^/\n]*)$/);
-      if (slashMatch) {
-        onSlashTrigger?.(textareaRef.current!.getBoundingClientRect());
-        return;
       }
     },
     [onChange, onSlashTrigger]
@@ -105,7 +105,6 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
     (targetNodeId: string) => {
       const textarea = textareaRef.current;
       if (!textarea) return;
-      // Use refs for current value and cursor (immediately available, not batched)
       const currentValue = pendingValueRef.current;
       const cursor = pendingCursorRef.current;
       const textBefore = currentValue.slice(0, cursor);
@@ -119,9 +118,7 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
         textAfter;
       onChange(newValue);
       setShowDropdown(false);
-      // Update ref with new value
       pendingValueRef.current = newValue;
-      // Restore cursor after inserted text
       requestAnimationFrame(() => {
         textarea.focus();
         const newPos = textBefore.length - atMatch[0].length + insertText.length;
@@ -152,44 +149,37 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
     [showDropdown, filteredNodes, dropdownIndex, insertMention]
   );
 
-  const pills = useMemo(() => {
-    const result: { nodeId: string; label: string; start: number; end: number }[] = [];
-    const regex = /@\[([^\]]+)\]/g;
-    let match;
-    while ((match = regex.exec(value)) !== null) {
-      const id = match[1];
-      result.push({
-        nodeId: id,
-        label: nodeLabels[id] ?? id,
-        start: match.index,
-        end: match.index + match[0].length,
-      });
-    }
-    return result;
-  }, [value, nodeLabels]);
+  const overlaySegments = useMemo(
+    () => parsePromptInlineSegments(value, nodeLabels),
+    [value, nodeLabels],
+  );
 
   return (
     <div className={`mention-input-wrapper ${className}`} style={style}>
       <div className="mention-overlay" ref={overlayRef}>
-        {(() => {
-          const parts: React.ReactNode[] = [];
-          let lastIndex = 0;
-          for (const pill of pills) {
-            if (pill.start > lastIndex) {
-              parts.push(value.slice(lastIndex, pill.start));
-            }
-            parts.push(
-              <span key={`${pill.start}-${pill.nodeId}`} className="mention-pill">
-                @{pill.label}
+        {overlaySegments.map((seg, idx) => {
+          if (seg.kind === "text") {
+            return <React.Fragment key={`t-${idx}`}>{seg.text}</React.Fragment>;
+          }
+          if (seg.kind === "mention") {
+            return (
+              <span key={`m-${idx}-${seg.nodeId}`} className="mention-token-slot">
+                <span className="mention-token-measure" aria-hidden>
+                  {seg.token}
+                </span>
+                <span className="mention-pill">@{seg.label}</span>
               </span>
             );
-            lastIndex = pill.end;
           }
-          if (lastIndex < value.length) {
-            parts.push(value.slice(lastIndex));
-          }
-          return parts;
-        })()}
+          return (
+            <span key={`s-${idx}-${seg.styleId}`} className="mention-token-slot">
+              <span className="mention-token-measure" aria-hidden>
+                {seg.token}
+              </span>
+              <span className="mention-pill mention-pill--style">#{seg.label}</span>
+            </span>
+          );
+        })}
       </div>
       <textarea
         ref={textareaRef}
@@ -198,7 +188,7 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         placeholder={placeholder}
-        rows={4}
+        rows={3}
       />
       {showDropdown && filteredNodes.length > 0 && (
         <div className="mention-dropdown">

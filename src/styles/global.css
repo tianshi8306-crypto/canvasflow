@@ -659,6 +659,17 @@ select {
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
 }
 
+.flowConnectHint {
+  max-width: min(72vw, 420px);
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  background: rgba(15, 23, 42, 0.94);
+  font-size: 11px;
+  line-height: 1.35;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
 .flowConnectHint--valid {
   color: #93c5fd;
   border-color: rgba(96, 165, 250, 0.5);
@@ -669,6 +680,44 @@ select {
   color: #fca5a5;
   border-color: rgba(239, 68, 68, 0.5);
   background: rgba(239, 68, 68, 0.12);
+}
+
+/* 拖拽连线预览 */
+.connection-line {
+  stroke: #60a5fa;
+  stroke-width: 2.5px;
+  fill: none;
+}
+
+.connection-line-shadow {
+  stroke: rgba(96, 165, 250, 0.25);
+  stroke-width: 5px;
+}
+
+.connection-line--valid {
+  stroke: #3b82f6;
+}
+
+.connection-line--invalid {
+  stroke: #ef4444;
+}
+
+.connection-line-endpoint {
+  fill: #60a5fa;
+}
+
+.connection-line-endpoint--target {
+  fill: #93c5fd;
+}
+
+.pending-connection-line {
+  stroke: rgba(96, 165, 250, 0.85);
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.pending-connection-line-end {
+  fill: rgba(147, 197, 253, 0.95);
 }
 
 .canvasMarqueeRect {
@@ -803,9 +852,14 @@ select {
   opacity: 0.75;
 }
 
-/* 标记导航工具栏 */
+/* 标记导航工具栏：固定在画布区域顶部居中 */
 .markerToolbar {
   pointer-events: auto;
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 50;
 }
 
 .markerToolbarInner {
@@ -922,38 +976,6 @@ select {
 .zoomCaret {
   font-size: 8px;
   opacity: 0.6;
-}
-
-.zoomMenu {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  right: 0;
-  background: rgba(22, 26, 34, 0.96);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 4px;
-  min-width: 130px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-  z-index: 20;
-}
-
-.zoomMenuItem {
-  display: block;
-  width: 100%;
-  padding: 7px 12px;
-  border: none;
-  background: transparent;
-  color: var(--text);
-  font-size: 12px;
-  text-align: left;
-  cursor: pointer;
-  border-radius: 5px;
-  transition: background 0.12s;
-}
-
-.zoomMenuItem:hover {
-  background: rgba(255, 255, 255, 0.1);
 }
 
 .multiSelLayoutGlyph {
@@ -1330,6 +1352,12 @@ select {
   margin-top: 4px;
 }
 
+.inspectorScriptSyncRow {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-start;
+}
+
 .inspectorWeakHint {
   margin-top: 6px;
   color: var(--muted);
@@ -1487,6 +1515,62 @@ select {
 .settings-checkbox-row span { line-height: 1.45; }
 
 .settings-sections { display: flex; flex-direction: column; gap: 0; }
+
+.settingsSection { margin-bottom: 20px; }
+.settingsSectionTitle { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+.settings-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+.settings-desc-lead { margin-bottom: 16px; }
+.settings-desc-tight { margin-top: 8px; margin-bottom: 0; }
+.settingsField { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.settingsFieldLabel { font-size: 12px; color: var(--muted); }
+.settingsInput { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); font-size: 13px; }
+.settings-test-error { font-size: 12px; color: var(--danger); margin: 8px 0; line-height: 1.45; }
+
+.settings-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.settings-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.settings-card-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px;
+  background: rgba(99, 102, 241, 0.2); color: #a5b4fc; font-size: 11px; font-weight: 700;
+}
+.settings-card-title { font-weight: 600; font-size: 14px; flex: 1; }
+.settings-getkey { font-size: 12px; color: var(--accent, #60a5fa); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.settings-getkey--muted { color: var(--muted); cursor: default; }
+.settings-provider-status { font-size: 11px; margin-left: auto; }
+.settings-provider-status--pass { color: #4ade80; }
+.settings-provider-status--fail { color: #f87171; }
+.settings-provider-status--testing { color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+
+.settings-dreamina-section { display: flex; flex-direction: column; gap: 10px; }
+.settings-dreamina-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-dreamina-actions--footer { margin-top: 4px; }
+.dreamina-settings-status { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.dreamina-settings-status-text { font-weight: 500; }
+.dreamina-settings-credit { font-size: 12px; color: var(--muted); }
+.dreamina-login-progress {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.dreamina-login-message { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text); }
+.dreamina-login-usercode { margin: 0; font-size: 12px; color: #fbbf24; font-family: ui-monospace, monospace; }
+.dreamina-qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.dreamina-qr-image { width: 180px; height: 180px; border-radius: 8px; background: #fff; padding: 8px; }
+.dreamina-qr-hint { margin: 0; font-size: 11px; color: var(--muted); text-align: center; }
+
+.settingsProviderList { display: flex; flex-direction: column; gap: 0; }
+.settingsApiActions { margin-top: 12px; display: flex; gap: 8px; }
 
 /* 统一节点尺寸 864×682 */
 .nodeCard {
@@ -6286,8 +6370,45 @@ select {
   gap: 4px;
   color: #64748b;
   font-size: 11px;
-  cursor: grab;
-  min-width: 28px;
+  min-width: 20px;
+}
+
+.ffmpegClipReorder {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ffmpegClipReorderBtn {
+  padding: 2px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.ffmpegClipReorderBtn:hover:not(:disabled) {
+  background: rgba(148, 163, 184, 0.12);
+  color: #cbd5e1;
+}
+
+.ffmpegClipReorderBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.ffmpegRefreshRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ffmpegRefreshRow .ffmpegActionBtn {
+  flex: 1;
+  min-width: 0;
 }
 
 .ffmpegClipIndex span {
@@ -7770,6 +7891,10 @@ select {
   margin: 0 0 10px;
 }
 
+.storyboardComposeHint {
+  color: #fbbf24;
+}
+
 .storyboardHealthBar {
   display: flex;
   align-items: flex-start;
@@ -9160,39 +9285,128 @@ select {
    圆形边框 + 符号，hover 显示
    ═══════════════════════════════════════════════════════════════════ */
 
-/* 锚点基础样式 */
-.simple-anchor {
-  width: 14px !important;
-  height: 14px !important;
-  background: transparent !important;
-  border: 2px solid rgba(255, 255, 255, 0.35) !important;
-  border-radius: 50% !important;
-  opacity: 0 !important;
-  transition: transform 0.15s ease, border-color 0.15s ease, opacity 0.15s ease !important;
-}
-
-/* + 符号 */
-.simple-anchor::before {
-  content: "+";
+/* 锚点层：高于预览图，左右为可命中热区 */
+.simple-anchor-layer {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: rgba(255, 255, 255, 0.5);
-  font-size: 12px;
-  font-weight: 300;
-  line-height: 1;
+  inset: 0;
+  z-index: 6;
   pointer-events: none;
 }
 
-/* hover 显示 - 锚点组在节点 hover 时显示 */
-.react-flow__node:hover .simple-anchor {
-  opacity: 1 !important;
+.simple-anchor-zone {
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  width: 48px;
+  height: auto;
+  pointer-events: auto;
+  cursor: default;
 }
 
-/* hover 节点时显示十字光标 */
-.react-flow__node:hover {
+/* 左右与节点外缘等距：感应区右/左缘距节点 6px，锚点圆心再外移 9px（半径） */
+.simple-anchor-zone--left {
+  right: calc(100% + var(--simple-anchor-gap));
+  left: auto;
+}
+
+.simple-anchor-zone--right {
+  left: calc(100% + var(--simple-anchor-gap));
+  right: auto;
+}
+
+.simple-anchor-zone--magnet {
   cursor: crosshair;
+}
+
+.simple-anchor-knob-wrap {
+  position: absolute;
+  width: var(--simple-anchor-knob);
+  height: var(--simple-anchor-knob);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+  will-change: left, top;
+}
+
+.simple-anchor-zone--left:not(.simple-anchor-zone--magnet) .simple-anchor-knob-wrap {
+  left: calc(100% - var(--simple-anchor-knob));
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.simple-anchor-zone--right:not(.simple-anchor-zone--magnet) .simple-anchor-knob-wrap {
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.simple-anchor-zone--magnet .simple-anchor-knob-wrap {
+  transform: none;
+}
+
+.simple-anchor-knob-wrap--visible,
+.react-flow__node:hover .simple-anchor-knob-wrap,
+.react-flow__node.selected .simple-anchor-knob-wrap {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+/* 锚点：细线圆 + SVG 十字（图一） */
+.simple-anchor {
+  width: var(--simple-anchor-knob) !important;
+  height: var(--simple-anchor-knob) !important;
+  min-width: var(--simple-anchor-knob) !important;
+  min-height: var(--simple-anchor-knob) !important;
+  background: transparent !important;
+  border: 1.5px solid rgba(255, 255, 255, 0.55) !important;
+  border-radius: 50% !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  transition: transform 0.12s ease, border-color 0.12s ease !important;
+  pointer-events: auto !important;
+}
+
+.simple-anchor-glyph {
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.72);
+  pointer-events: none;
+}
+
+.simple-anchor-zone--magnet .simple-anchor,
+.react-flow__node:hover .simple-anchor:hover {
+  border-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.simple-anchor-zone--magnet .simple-anchor-glyph,
+.react-flow__node:hover .simple-anchor:hover .simple-anchor-glyph {
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.simple-anchor-aim {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.simple-anchor-aim .anchor-crosshair-h {
+  width: 22px;
+}
+
+.simple-anchor-aim .anchor-crosshair-v {
+  height: 22px;
+}
+
+.canvasWrap--node-snap-active .react-flow__node.draggable.dragging,
+.canvasWrap--node-snap-active .react-flow__node.draggable.dragging * {
+  cursor: crosshair !important;
 }
 
 /* 锚点十字准星 */
@@ -9224,153 +9438,35 @@ select {
   transform: translate(-50%, -50%);
 }
 
-/* hover 放大 */
+.node-snap-guide-line {
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: 0 0 6px rgba(255, 255, 255, 0.25);
+}
+
+.node-snap-guide-crosshair .anchor-crosshair-h,
+.node-snap-guide-crosshair .anchor-crosshair-v {
+  background: rgba(255, 255, 255, 0.85);
+}
+
 .react-flow__node:hover .simple-anchor:hover {
-  transform: scale(1.12) !important;
-  border-color: rgba(255, 255, 255, 0.7) !important;
+  transform: scale(1.08) !important;
 }
 
-/* hover 时符号更亮 */
-.react-flow__node:hover .simple-anchor:hover::before {
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-/* 连接中全局显示 */
-.react-flow--connecting .simple-anchor,
-.react-flow--drag-connecting .simple-anchor {
+.react-flow--connecting .simple-anchor-knob-wrap,
+.react-flow--drag-connecting .simple-anchor-knob-wrap {
   opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
 }
 
-/* 锚点位置 - 向外偏移，不压入节点 */
-.simple-anchor--left {
-  left: -10px !important;
-}
-
+.simple-anchor--left,
 .simple-anchor--right {
-  right: -10px !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  transform: none !important;
 }
 
-/* ═══════════════════════════════════════════════════════════════════
-   极简图片节点 - 实验性
-   参考 AI-CanvasPro 风格
-   ═══════════════════════════════════════════════════════════════════ */
-
-.minimal-image-node {
-  position: relative;
-  width: 280px;
-  background: #1a1a1e;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  overflow: hidden;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-.minimal-image-node:hover {
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.minimal-image-node.selected {
-  border-color: rgba(99, 102, 241, 0.4);
-  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.15);
-}
-
-/* 图片预览区 */
-.minimal-image-preview {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  background: #141414;
-  overflow: hidden;
-}
-
-.minimal-image-content {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-}
-
-/* 空状态占位 - 图标居中 */
-.minimal-image-placeholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.02);
-  color: rgba(255, 255, 255, 0.15);
-  transition: background 0.15s;
-}
-
-.minimal-image-preview:hover .minimal-image-placeholder {
-  background: rgba(255, 255, 255, 0.04);
-  color: rgba(255, 255, 255, 0.25);
-}
-
-/* 预览区外左上角标签 */
-.minimal-image-label {
-  position: absolute;
-  top: -16px;
-  left: 4px;
-  z-index: 2;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-}
-
-.minimal-image-label-text {
-  font-size: 9px;
-  font-family: inherit;
-  color: rgba(255, 255, 255, 0.3);
-  cursor: pointer;
-  transition: color 0.15s;
-}
-
-.minimal-image-label-text:hover {
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.minimal-image-label-input {
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid rgba(99, 102, 241, 0.5);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 9px;
-  font-family: inherit;
-  outline: none;
-  width: 72px;
-  padding: 0;
-  line-height: 1;
-}
-
-/* 预览区外右上角分辨率 - 与标签同一水平线 */
-.minimal-image-res {
-  position: absolute;
-  top: -16px;
-  right: 4px;
-  z-index: 2;
-  font-size: 9px;
-  font-family: inherit;
-  color: rgba(255, 255, 255, 0.25);
-  white-space: nowrap;
-  pointer-events: none;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-}
-
-/* 节点本身需relative以便绝对定位子元素 */
-.minimal-image-node {
-  position: relative;
-  width: 280px;
-  background: #1a1a1e;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
-  overflow: visible;
-  transition: border-color 0.15s, box-shadow 0.15s;
-}
-
-/* Toolbar delete button — appears when rows are selected in ScriptBeatsEditorTable */
 .toolbar-delete-btn {
   background: #dc2626;
   color: white;

@@ -11,6 +11,12 @@ type NodeMediaPreviewProps = {
   /** 若存在则优先查库解析为 `rel_path`（M1-3.2） */
   assetId?: string;
   kind: Kind;
+  /** 仅 `kind="image"`：覆盖 img 的 class */
+  imageClassName?: string;
+  /** 仅 `kind="image"`：图片加载完成回调 */
+  onImageLoad?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  /** 仅 `kind="video"`：视频元数据加载完成 */
+  onVideoLoadedMetadata?: (e: React.SyntheticEvent<HTMLVideoElement>) => void;
 };
 
 function formatSec(sec: number): string {
@@ -183,7 +189,14 @@ function AudioWavePreview({ src, onBroken }: { src: string; onBroken: () => void
   );
 }
 
-export function NodeMediaPreview({ relPath, assetId, kind }: NodeMediaPreviewProps) {
+export function NodeMediaPreview({
+  relPath,
+  assetId,
+  kind,
+  imageClassName,
+  onImageLoad,
+  onVideoLoadedMetadata,
+}: NodeMediaPreviewProps) {
   const projectPath = useProjectStore((s) => s.projectPath);
   const { effectiveRelPath, loading } = useResolvedAssetRelPath(relPath, assetId);
   const src = useMemo(
@@ -218,7 +231,8 @@ export function NodeMediaPreview({ relPath, assetId, kind }: NodeMediaPreviewPro
       <img
         src={src}
         alt=""
-        className="nodeThumb"
+        className={imageClassName ?? "nodeThumb"}
+        onLoad={onImageLoad}
         onError={() => setBroken(true)}
         loading="lazy"
       />
@@ -232,6 +246,7 @@ export function NodeMediaPreview({ relPath, assetId, kind }: NodeMediaPreviewPro
         muted
         controls
         preload="metadata"
+        onLoadedMetadata={onVideoLoadedMetadata}
         onError={() => setBroken(true)}
       />
     );

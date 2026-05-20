@@ -1,6 +1,6 @@
 import type { Dispatch, SetStateAction } from "react";
 import type { AppSettings, ProviderConfig } from "@/lib/settingsPanelTypes";
-import { SettingsFormField } from "@/components/SettingsFormField";
+import { useState } from "react";
 
 type Props = {
   settings: AppSettings;
@@ -10,17 +10,56 @@ type Props = {
   hasKey: Record<string, boolean>;
 };
 
+function ApiKeyInput({
+  value,
+  placeholder,
+  onChange,
+}: {
+  value: string;
+  placeholder: string;
+  onChange: (v: string) => void;
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="settingsApiKeyInput">
+      <input
+        type={visible ? "text" : "password"}
+        className="settingsInput mono"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+      <button
+        type="button"
+        className="settingsApiKeyToggle"
+        onClick={() => setVisible(!visible)}
+        aria-label={visible ? "隐藏密钥" : "显示密钥"}
+      >
+        {visible ? (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19M1 1l22 22" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        ) : (
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="1.5" />
+            <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.5" />
+          </svg>
+        )}
+      </button>
+    </div>
+  );
+}
+
 export function SettingsTextProvidersSection({ settings, setSettings, keys, setKeys, hasKey }: Props) {
   return (
-    <>
-      <div style={{ height: 12 }} />
-      <div style={{ fontWeight: 650, marginBottom: 10 }}>文本模型（文本节点 / 脚本节点）</div>
+    <div className="settingsProviderList">
       {settings.providers.map((p) => (
-        <div key={p.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10 }}>
-            <div style={{ fontWeight: 650 }}>{p.label}</div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
+        <div key={p.id} className="settingsProviderCard">
+          <div className="settingsProviderHeader">
+            <div className="settingsProviderLabel">{p.label}</div>
+            <div className="settingsProviderActions">
+              <label className="settingsProviderToggle">
                 <input
                   type="checkbox"
                   checked={p.enabled}
@@ -35,7 +74,8 @@ export function SettingsTextProvidersSection({ settings, setSettings, keys, setK
                     )
                   }
                 />
-                启用
+                <span className="settingsProviderToggleSwitch" />
+                <span>启用</span>
               </label>
               <button
                 type="button"
@@ -57,68 +97,78 @@ export function SettingsTextProvidersSection({ settings, setSettings, keys, setK
               </button>
             </div>
           </div>
-          <div style={{ height: 10 }} />
-          <SettingsFormField label="Base URL">
-            <input
-              className="mono"
-              value={p.baseUrl}
-              onChange={(e) =>
-                setSettings((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        providers: prev.providers.map((x) => (x.id === p.id ? { ...x, baseUrl: e.target.value } : x)),
-                      }
-                    : prev,
-                )
-              }
-            />
-          </SettingsFormField>
-          <SettingsFormField label="Model">
-            <input
-              className="mono"
-              value={p.model}
-              onChange={(e) =>
-                setSettings((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        providers: prev.providers.map((x) => (x.id === p.id ? { ...x, model: e.target.value } : x)),
-                      }
-                    : prev,
-                )
-              }
-            />
-          </SettingsFormField>
-          <SettingsFormField label="优先级（数字越小越优先）">
-            <input
-              type="number"
-              value={p.priority}
-              onChange={(e) => {
-                const v = Number(e.target.value);
-                setSettings((prev) =>
-                  prev
-                    ? {
-                        ...prev,
-                        providers: prev.providers.map((x) =>
-                          x.id === p.id ? { ...x, priority: Number.isFinite(v) ? v : 0 } : x,
-                        ),
-                      }
-                    : prev,
-                );
-              }}
-            />
-          </SettingsFormField>
-          <SettingsFormField label="API Key（文本节点/脚本节点；不会回显，保存后写入系统凭据）">
-            <input
-              className="mono"
-              value={keys[p.id] ?? ""}
-              placeholder={hasKey[p.id] ? "已保存（输入新值可覆盖）" : "请输入 API Key"}
-              onChange={(e) => setKeys((prev) => ({ ...prev, [p.id]: e.target.value }))}
-            />
-          </SettingsFormField>
+
+          <div className="settingsProviderBody">
+            <div className="settingsField">
+              <label className="settingsFieldLabel">Base URL</label>
+              <input
+                className="settingsInput mono"
+                value={p.baseUrl}
+                onChange={(e) =>
+                  setSettings((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          providers: prev.providers.map((x) => (x.id === p.id ? { ...x, baseUrl: e.target.value } : x)),
+                        }
+                      : prev,
+                  )
+                }
+              />
+            </div>
+
+            <div className="settingsField">
+              <label className="settingsFieldLabel">Model</label>
+              <input
+                className="settingsInput mono"
+                value={p.model}
+                onChange={(e) =>
+                  setSettings((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          providers: prev.providers.map((x) => (x.id === p.id ? { ...x, model: e.target.value } : x)),
+                        }
+                      : prev,
+                  )
+                }
+              />
+            </div>
+
+            <div className="settingsField">
+              <label className="settingsFieldLabel">优先级（数字越小越优先）</label>
+              <input
+                type="number"
+                className="settingsInput"
+                value={p.priority}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setSettings((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          providers: prev.providers.map((x) =>
+                            x.id === p.id ? { ...x, priority: Number.isFinite(v) ? v : 0 } : x,
+                          ),
+                        }
+                      : prev,
+                  );
+                }}
+              />
+            </div>
+
+            <div className="settingsField">
+              <label className="settingsFieldLabel">API Key</label>
+              <span className="settingsFieldHint">文本节点/脚本节点使用；不会回显，保存后写入系统凭据</span>
+              <ApiKeyInput
+                value={keys[p.id] ?? ""}
+                placeholder={hasKey[p.id] ? "已保存（输入新值可覆盖）" : "请输入 API Key"}
+                onChange={(v) => setKeys((prev) => ({ ...prev, [p.id]: v }))}
+              />
+            </div>
+          </div>
         </div>
       ))}
-    </>
+    </div>
   );
 }

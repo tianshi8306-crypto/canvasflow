@@ -5,14 +5,28 @@ export type VideoModelCatalogEntry = {
   /** 展示名 */
   label: string;
   /** 供应商/池内分组 */
-  provider: "doubao";
+  provider: "doubao" | "dreamina";
   /** 未列出表示支持全部已声明工作流 */
   supportedWorkflows?: VideoGenerationWorkflow[];
 };
 
-/** 当前版本：火山引擎视频模型池 */
+/** 视频节点模型下拉：内置项（含即梦 CLI，与 settings 自定义项合并） */
+export const VIDEO_BUILTIN_MODEL_OPTIONS: { id: string; label: string }[] = [
+  { id: "doubao_seedance_2_0", label: "Doubao Seedance 2.0" },
+  { id: "dreamina/seedance2.0", label: "即梦 Seedance 2.0（CLI）" },
+  { id: "dreamina/seedance2.0fast", label: "即梦 Seedance 2.0 Fast（CLI）" },
+  { id: "dreamina/3.5pro", label: "即梦 3.5 Pro（CLI）" },
+  { id: "dreamina/3.0pro", label: "即梦 3.0 Pro（CLI）" },
+];
+
+/** Mock / 文档用模型池 */
 export const VIDEO_MODEL_CATALOG: VideoModelCatalogEntry[] = [
   { id: "doubao_seedance_2_0", label: "Doubao-Seedance-2.0", provider: "doubao" },
+  ...VIDEO_BUILTIN_MODEL_OPTIONS.filter((m) => m.id.startsWith("dreamina/")).map((m) => ({
+    id: m.id,
+    label: m.label.replace("（CLI）", ""),
+    provider: "dreamina" as const,
+  })),
 ];
 
 export const VIDEO_WORKFLOW_TAB_LABELS: { workflow: VideoGenerationWorkflow; label: string }[] = [
@@ -21,6 +35,7 @@ export const VIDEO_WORKFLOW_TAB_LABELS: { workflow: VideoGenerationWorkflow; lab
   { workflow: "image_to_video", label: "图生视频" },
   { workflow: "first_last_frame", label: "首尾帧" },
   { workflow: "image_reference", label: "图片参考" },
+  { workflow: "video_reference", label: "参考视频" },
 ];
 
 export function modelSupportsWorkflow(

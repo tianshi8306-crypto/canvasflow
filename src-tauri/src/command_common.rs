@@ -21,7 +21,7 @@ pub fn pick_enabled_provider(settings: &AppSettings) -> Result<settings::Provide
 pub fn media_type_from_ext(ext: &str) -> &'static str {
     match ext.to_ascii_lowercase().as_str() {
         "png" | "jpg" | "jpeg" | "webp" | "bmp" | "gif" => "image",
-        "mp4" | "mov" | "webm" | "avi" | "mkv" => "video",
+        "mp4" | "mov" | "webm" | "avi" | "mkv" | "m4v" | "mpeg" | "mpg" => "video",
         "mp3" | "wav" | "m4a" | "flac" | "ogg" => "audio",
         _ => "file",
     }

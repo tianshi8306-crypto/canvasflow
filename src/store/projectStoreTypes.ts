@@ -1,6 +1,8 @@
 import type { Connection, Edge, Node, NodeChange, Viewport } from "@xyflow/react";
 import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
+import type { ComposeMissingShot } from "@/lib/compose";
 import type { FlowNodeData } from "@/lib/types";
+import type { VideoSubtitleRegion } from "@/lib/videoNodeTypes";
 import type { NodeRunState } from "@/lib/runNodeState";
 
 export type GraphSnapshot = {
@@ -17,6 +19,14 @@ export type NodeDataPatchPayload = {
 export type GraphRunWithPatchResult = {
   runId: string;
   nodePatches: NodeDataPatchPayload[];
+};
+
+export type ScriptComposeExportResult = {
+  concatNodeId: string;
+  clipPaths: string[];
+  missing: ComposeMissingShot[];
+  outputRelPath?: string;
+  createdConcat: boolean;
 };
 
 export type ProjectState = {
@@ -39,6 +49,15 @@ export type ProjectState = {
   /** 脚本节点画布内「展开全屏」时对应的节点 id（与侧栏「全屏表格」共用） */
   scriptFullscreenNodeId: string | null;
 
+  /** 图片节点序号计数器，每个工程独立（用于 "图片 1", "图片 2" ...） */
+  imageNodeCounter: number;
+  /** 获取并递增下一个图片节点序号标签 */
+  nextImageNodeLabel: () => string;
+  /** 视频节点序号计数器（用于 "视频 1", "视频 2" ...） */
+  videoNodeCounter: number;
+  /** 获取并递增下一个视频节点序号标签 */
+  nextVideoNodeLabel: () => string;
+
   setProjectPath: (p: string | null) => void;
   setSelectedNodeId: (id: string | null) => void;
   setSelectedNodeIds: (ids: string[]) => void;
@@ -47,16 +66,22 @@ export type ProjectState = {
   setViewport: (v: Viewport) => void;
   openScriptFullscreen: (nodeId: string) => void;
   closeScriptFullscreen: () => void;
+  setLastRunId: (runId: string) => void;
 
   onNodesChange: (changes: NodeChange<Node<FlowNodeData>>[]) => void;
   onEdgesChange: (changes: import("@xyflow/react").EdgeChange[]) => void;
   onConnect: (c: Connection) => void;
+
+  /** 删除指定连线 */
+  deleteEdge: (edgeId: string) => void;
 
   updateNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
 
   newProject: () => Promise<void>;
   openProject: () => Promise<void>;
   saveProject: () => Promise<void>;
+  /** 另存为：选择新位置保存工程 */
+  saveProjectAs: () => Promise<void>;
   runWorkflow: () => Promise<void>;
   /** 从指定节点起点触发子图执行（走 DAG 调度入口） */
   runNodeSubgraph: (fromNodeId: string, force?: boolean) => Promise<void>;
@@ -91,6 +116,40 @@ export type ProjectState = {
     videoNodeId: string,
     kind: "image" | "referenceVideo" | "audio",
   ) => void;
+  /** 从视频提取音轨到 assets，并在左侧新建音频节点并联线 */
+  extractVideoAudioLeftOfNode: (
+    videoNodeId: string,
+    mode: "vocal" | "bgm",
+  ) => Promise<void>;
+  /** 在右侧创建/聚焦视频合成节点，用于多段剪辑拼接 */
+  openVideoClipConcat: (videoNodeId: string) => void;
+  /** 按脚本镜号准备合成节点并可选自动 FFmpeg 导出成片 */
+  exportScriptCompose: (
+    scriptNodeId: string,
+    opts?: { autoRender?: boolean },
+  ) => Promise<ScriptComposeExportResult | null>;
+  /** 顶栏「解析 / 高清 / 去字幕」：预填生成草稿并选中节点 */
+  openVideoToolbarWorkflow: (
+    videoNodeId: string,
+    mode: "parse" | "hd" | "subtitle-auto",
+  ) => void;
+  /** 进入预览区单段裁剪模式 */
+  enterVideoTrimMode: (videoNodeId: string) => void;
+  /** 更新裁剪入出点（持久化到 data.video.sourceTrim） */
+  patchVideoSourceTrim: (videoNodeId: string, trim: { inSec: number; outSec: number }) => void;
+  /** 记录源视频时长与编码尺寸 */
+  setVideoSourceMeta: (
+    videoNodeId: string,
+    meta: { durationSec: number; width: number; height: number },
+  ) => void;
+  /** 进入框选去字幕模式 */
+  enterVideoSubtitleRegionMode: (videoNodeId: string) => void;
+  /** 更新框选区域（持久化到 data.video.subtitleRegion） */
+  patchVideoSubtitleRegion: (videoNodeId: string, region: VideoSubtitleRegion) => void;
+  /** FFmpeg delogo 导出并替换节点成片 */
+  exportVideoSubtitleDelogo: (videoNodeId: string) => Promise<void>;
+  /** FFmpeg 导出裁剪片段并替换节点成片 */
+  exportVideoTrim: (videoNodeId: string) => Promise<void>;
   /**
    * 图生图：将本机图片导入工程，在当前图片节点左侧新建图片节点并写入路径，再并联线。
    */

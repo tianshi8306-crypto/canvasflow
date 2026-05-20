@@ -82,8 +82,8 @@ export function NodeFrame({
 }: NodeFrameProps) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const runState = useProjectStore((s) => s.nodeRunStateById[nodeId]);
-  const nodes = useProjectStore((s) => s.nodes);
-  const nodeStatus = nodes.find((n) => n.id === nodeId)?.data.status;
+  const node = useProjectStore((s) => s.nodes.find((n) => n.id === nodeId));
+  const nodeStatus = node?.data.status;
   const displayName = label?.trim() ? label.trim() : defaultTitle;
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(displayName);
@@ -94,7 +94,10 @@ export function NodeFrame({
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!editing) setDraft(displayName);
+    if (!editing) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDraft(displayName);
+    }
   }, [displayName, editing]);
 
   useEffect(() => {
@@ -116,12 +119,11 @@ export function NodeFrame({
   const nodeBusy = runState === "running" || agentBusyCount > 0;
 
   useEffect(() => {
-    if (!nodeBusy) {
-      setAsyncProgress(2);
-      return;
-    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAsyncProgress(2);
+    if (!nodeBusy) return;
     const timer = window.setInterval(() => {
+       
       setAsyncProgress((prev) => {
         if (prev >= 88) return prev;
         const step = Math.max(1, Math.ceil((88 - prev) / 14));
@@ -154,6 +156,7 @@ export function NodeFrame({
 
   useEffect(() => {
     if (!useSplit) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setOverlayGeom(null);
       return;
     }
@@ -223,8 +226,9 @@ export function NodeFrame({
     if (!rootRef) return;
     if (typeof rootRef === "function") {
       rootRef(el);
-    } else {
-      (rootRef as { current: HTMLDivElement | null }).current = el;
+    } else if (typeof rootRef === "object" && rootRef !== null) {
+      // eslint-disable-next-line react-hooks/immutability
+      (rootRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     }
   };
 

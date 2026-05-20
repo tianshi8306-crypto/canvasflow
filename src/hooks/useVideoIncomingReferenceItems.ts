@@ -7,6 +7,7 @@ import {
 } from "@/lib/videoInputConstraints";
 import { isEdgeDisabled } from "@/lib/edgeState";
 import { resolveAssetRelPath } from "@/shared/api/assets";
+import type { VideoGenerationWorkflow } from "@/lib/videoNodeTypes";
 
 export type VideoIncomingRefKind = "image" | "video" | "audio";
 
@@ -17,6 +18,8 @@ export type VideoIncomingRefItem = {
   assetId?: string;
   /** 自上而下排序用 */
   y: number;
+  /** 对应的连线 ID（用于删除） */
+  edgeId: string;
 };
 
 /** 将连线上的 path/assetId 解析为可用于草稿/API 的 `path`（优先 assetId） */
@@ -58,12 +61,15 @@ export function useVideoIncomingReferenceItems(videoNodeId: string | undefined):
       const p = n.data.path?.trim();
       const aid = n.data.assetId?.trim();
       if (!p && !aid) continue;
+      // 找到连接 source -> target 的第一条有效连线
+      const edge = incoming.find((e) => e.source === sid);
+      const eid = edge?.id ?? "";
       if (n.type === "imageNode") {
-        items.push({ kind: "image", path: p ?? "", assetId: aid, y: n.position.y });
+        items.push({ kind: "image", path: p ?? "", assetId: aid, y: n.position.y, edgeId: eid });
       } else if (n.type === "videoNode") {
-        items.push({ kind: "video", path: p ?? "", assetId: aid, y: n.position.y });
+        items.push({ kind: "video", path: p ?? "", assetId: aid, y: n.position.y, edgeId: eid });
       } else if (n.type === "audioNode") {
-        items.push({ kind: "audio", path: p ?? "", assetId: aid, y: n.position.y });
+        items.push({ kind: "audio", path: p ?? "", assetId: aid, y: n.position.y, edgeId: eid });
       }
     }
 
@@ -115,3 +121,54 @@ export function incomingRefsForDisplayStrip(items: VideoIncomingRefItem[]): Vide
   }
   return out;
 }
+
+/**
+ * 根据连线输入自动检测当前应亮起的 workflow 状态。
+ *
+ * 规则：
+ * - 有参考视频 → video_reference
+ * - 2 张图片（无视频） → first_last_frame
+ * - 有音频，或 1 张 / 3+ 张图片 → multimodal_reference
+ * - 无连线但有文字 → text_to_video
+ * - 无任何有效输入 → null（全部灭）
+ */
+export function detectWorkflow(
+  items: VideoIncomingRefItem[],
+  promptText: string,
+): VideoGenerationWorkflow | null {
+  const hasVideo = items.some((i) => i.kind === "video");
+  const hasAudio = items.some((i) => i.kind === "audio");
+  const images = items.filter((i) => i.kind === "image");
+  const imageCount = images.length;
+  const hasPrompt = promptText.trim().length > 0;
+
+  // 有参考视频 → 参考视频模式
+  if (hasVideo) return "video_reference";
+
+  // 有音频 → 全能参考
+  if (hasAudio) return "multimodal_reference";
+
+  // 2 张纯图片 → 首尾帧
+  if (imageCount === 2) return "first_last_frame";
+
+  // 1 张或 3+ 张图片 → 全能参考
+  if (imageCount >= 1) return "multimodal_reference";
+
+  // 无连线，有文字 → 文生视频
+  if (hasPrompt) return "text_to_video";
+
+  // 没有任何输入
+  return null;
+}
+
+/** 各状态的中文标签 */
+export const WORKFLOW_STATUS_LABELS: Record<NonNullable<VideoGenerationWorkflow>, string> = {
+  text_to_video: "文生视频",
+  multimodal_reference: "全能参考",
+  image_to_video: "图生视频",
+  first_last_frame: "首尾帧",
+  image_reference: "图片参考",
+  video_reference: "参考视频",
+  video_edit: "视频编辑",
+  video_extend: "视频延伸",
+};

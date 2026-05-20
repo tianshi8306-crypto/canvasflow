@@ -1,7 +1,10 @@
 import type { FlowCanvasMenuState } from "@/components/canvas/flowCanvasMenuState";
 
+/** 高于生成参数面板 Portal（GEN_PANEL_CHROME_Z=40），与风格浮层同层 */
+export const CANVAS_CONTEXT_MENU_Z = 1300;
+
 export const FLOW_MENU = {
-  zIndex: 40,
+  zIndex: CANVAS_CONTEXT_MENU_Z,
   dropOverlayZIndex: 10,
   widths: {
     gallery: 300,

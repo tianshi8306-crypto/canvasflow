@@ -1,4 +1,14 @@
 import { useMemo } from "react";
+import {
+  getImageEditIntent,
+  imageEditIntentParams,
+} from "@/lib/imageGeneration/imageEditIntent";
+import {
+  applyImagePromptFromScript,
+  getImageScriptBoundPrompt,
+  getImageScriptUpstreamState,
+} from "@/lib/imageGeneration/imageScriptPromptSync";
+import { scriptSyncButtonTitle } from "@/lib/incomingScriptBinding";
 import { ScriptNodeWorkbench } from "@/components/ScriptNodeWorkbench";
 import { ScriptStoryboardSection } from "@/components/ScriptStoryboardSection";
 import {
@@ -20,6 +30,7 @@ export function Inspector() {
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
+  const setStatusText = useProjectStore((s) => s.setStatusText);
 
   const node = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId) ?? null,
@@ -107,7 +118,7 @@ export function Inspector() {
         ? "脚本"
         : type === "ffmpegConcat"
           ? "视频合成"
-          : type === "imageNode" || type === "imageAsset"
+          : type === "imageNode"
             ? "图片"
             : type === "videoNode"
               ? "视频"
@@ -120,7 +131,6 @@ export function Inspector() {
   const isMediaPath =
     type === "mediaImport" ||
     type === "imageNode" ||
-    type === "imageAsset" ||
     type === "videoNode" ||
     type === "audioNode";
   const imagePromptLen = (node.data.prompt ?? "").length;
@@ -269,7 +279,7 @@ export function Inspector() {
         </>
       )}
 
-      {(type === "imageNode" || type === "imageAsset") && (
+      {type === "imageNode" && (
         <div className="field">
           <label>图片提示词（与节点内生成面板同步）</label>
           <textarea
@@ -284,6 +294,54 @@ export function Inspector() {
           />
           <div className="fieldCounter">
             {imagePromptLen}/{IMAGE_GENERATION_PROMPT_MAX_CHARS}
+          </div>
+          <div className="inspectorWeakHint">
+            编辑模式：{getImageEditIntent(node.data).active ? "开启" : "关闭"}
+            {getImageEditIntent(node.data).active ? (
+              <button
+                type="button"
+                className="btn"
+                style={{ marginLeft: 8 }}
+                onClick={() => {
+                  const prev = node.data.params;
+                  const base =
+                    prev && typeof prev === "object" && !Array.isArray(prev) ? { ...prev } : {};
+                  updateNodeData(node.id, {
+                    params: { ...base, ...imageEditIntentParams({ active: false }) },
+                  });
+                  setStatusText("已退出图像编辑模式");
+                }}
+              >
+                退出编辑
+              </button>
+            ) : null}
+          </div>
+          <div className="inspectorScriptSyncRow">
+            <button
+              type="button"
+              className="btn"
+              disabled={!getImageScriptBoundPrompt(nodes, edges, node.id)?.trim()}
+              title={scriptSyncButtonTitle(
+                getImageScriptUpstreamState(nodes, edges, node.id),
+                "根据 params.scriptBeatId 与上游脚本镜头的画面描述填入",
+              )}
+              onClick={() => {
+                const result = applyImagePromptFromScript(
+                  nodes,
+                  edges,
+                  node.id,
+                  IMAGE_GENERATION_PROMPT_MAX_CHARS,
+                );
+                if (!result.ok) {
+                  setStatusText(result.statusMessage);
+                  return;
+                }
+                updateNodeData(node.id, { prompt: result.prompt });
+                setStatusText("已从脚本镜头同步图片提示词");
+              }}
+            >
+              从脚本同步
+            </button>
           </div>
         </div>
       )}
@@ -378,7 +436,7 @@ export function Inspector() {
               className="mono"
               value={node.data.output ?? ""}
               onChange={(e) => updateNodeData(node.id, { output: e.target.value })}
-              placeholder="例如：output/final.mp4"
+              placeholder="assets/exports/final.mp4"
             />
           </div>
         </>

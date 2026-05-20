@@ -1,0 +1,1836 @@
+/* 图片节点专用样式；共享壳/Token/外置元信息见 nodeChrome/（由 MinimalImageNode.tsx 引入） */
+
+/* 有图时：预览功能栏 Portal（节点预览区上方外部） */
+.imagePreviewToolbarChrome {
+  padding: 4px 8px;
+}
+
+.imagePreviewToolbarChrome .imagePreviewToolbar {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  padding: 0;
+}
+
+.imagePreviewToolbar {
+  max-width: 100%;
+  background: rgba(26, 26, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  padding: 4px 6px;
+}
+
+.imagePreviewToolbarScroll {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  max-width: 100%;
+  scrollbar-width: thin;
+}
+
+.imagePreviewToolbarGroup {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.imagePreviewToolbarGroupLabel {
+  font-size: 10px;
+  color: #9e9e9e;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+
+.imagePreviewToolbarBtn {
+  font-size: 11px;
+  color: #e0e0e0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.imagePreviewToolbarBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.imagePreviewToolbarBtn.active {
+  background: rgba(100, 160, 255, 0.2);
+  color: #a8c8f0;
+}
+
+.imagePreviewToolbarBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.imagePreviewToolbarMenu {
+  position: relative;
+}
+
+.imagePreviewToolbarMenuTrigger.open {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.imagePreviewToolbarMenuCaret {
+  margin-left: 2px;
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.imagePreviewToolbarMenuDrop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 140px;
+  z-index: 20;
+  background: rgba(30, 30, 30, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 4px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.imagePreviewToolbarMenuItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  font-size: 11px;
+  color: #e0e0e0;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.imagePreviewToolbarMenuItem:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.imagePreviewToolbarMenuItem:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.imageGenPanel--minimal .igp-edit-exit-btn {
+  margin-left: 8px;
+  font-size: 11px;
+  color: #a8c8f0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.imageNodeTopToolbar--embedded {
+  padding: 2px 4px;
+  gap: 0;
+  background: rgba(26, 26, 26, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.imageNodeTopToolbar--embedded .imageNodeTopToolbarBtn {
+  width: 28px;
+  height: 28px;
+}
+
+.imageNodeTopToolbar--embedded .imageNodeTopToolbarSep {
+  height: 16px;
+  margin: 0 2px;
+}
+
+.minimal-image-content {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  object-fit: contain;
+  object-position: center;
+  display: block;
+  border-radius: 0;
+  background: transparent;
+  pointer-events: none;
+}
+
+.imageNodeTopToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+
+.imageNodeTopToolbarBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #BDBDBD;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.imageNodeTopToolbarBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+  color: #E0E0E0;
+}
+
+.imageNodeTopToolbarBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.imageNodeTopToolbarBtn--danger {
+  color: #f87171;
+}
+
+.imageNodeTopToolbarBtn--danger:hover:not(:disabled) {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fca5a5;
+}
+
+.imageNodeTopToolbarSep {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+  flex-shrink: 0;
+}
+
+/* ── 生成面板（Portal 渲染）500px 宽，高度随内容 ── */
+.imageGenPanel--minimal {
+  /* 顶栏方钮 / 底栏 pill 共用控件 token */
+  --igp-control-h: 36px;
+  --igp-control-radius-pill: 999px;
+  --igp-control-radius-square: 8px;
+  --igp-control-border: 1px solid var(--border-button, #4d4d4d);
+  --igp-control-bg: var(--bg-button, #2b2b2b);
+  --igp-control-bg-hover: var(--bg-button-active, #444444);
+  --igp-control-text: rgba(255, 255, 255, 0.88);
+  --igp-control-text-muted: #9e9e9e;
+  /* 生成钮 CTA 三态 */
+  --igp-cta-bg-ready: #f0f0f0;
+  --igp-cta-bg-ready-hover: #ffffff;
+  --igp-cta-fg-ready: #121212;
+  --igp-cta-bg-disabled: #2b2b2b;
+  --igp-cta-fg-disabled: #616161;
+  --igp-cta-bg-generating: #ffffff;
+  --igp-cta-fg-generating: #121212;
+  --igp-cta-border-generating: var(--border-button, #4d4d4d);
+
+  min-height: 220px;
+  max-height: min(360px, 52vh);
+  padding: 12px 14px 14px;
+  font-size: 13px;
+  color: var(--text-primary, #e0e0e0);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--bg-node-preview, #1f1f1f);
+  overflow: hidden;
+}
+
+.imageGenPanel--minimal-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+  height: 100%;
+}
+
+.imageGenPanel--minimal .igp-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px;
+  width: 100%;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.imageGenPanel--minimal .igp-header-row--empty {
+  margin-bottom: 0;
+}
+
+.imageGenPanel--minimal .igp-header-quick {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-header-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  padding-top: 2px;
+}
+
+.imageGenPanel--minimal .igp-ref-status {
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  white-space: nowrap;
+}
+
+.imageGenPanel--minimal .igp-ready-status {
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.imageGenPanel--minimal .igp-subject-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-subject-select {
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 12px;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.imageGenPanel--minimal .igp-subject-preview {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  line-height: 1.35;
+}
+
+.imageGenPanel--minimal .igp-subject-preview-desc {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.imageGenPanel--minimal .igp-subject-clear {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #9e9e9e);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 0 2px;
+}
+
+.imageGenPanel--minimal .igp-script-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-script-sync-btn {
+  align-self: flex-start;
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-secondary, #9e9e9e);
+  cursor: pointer;
+}
+
+.imageGenPanel--minimal .igp-script-sync-btn:hover:not(:disabled) {
+  color: var(--text-primary, #e0e0e0);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.imageGenPanel--minimal .igp-script-sync-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.imageGenPanel--minimal .scriptBeatInline--dense {
+  font-size: 11px;
+}
+
+.imageGenPanel--minimal .igp-bottom-tail {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-foot-hint {
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 120px;
+}
+
+.imageGenPanel--minimal .igp-cost-estimate {
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-icon, #bdbdbd);
+  font-size: 11px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn span {
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn:hover,
+.imageGenPanel--minimal .igp-negative-toggle-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text-primary, #e0e0e0);
+}
+
+/* 顶栏：风格 / 标记（遗留 .igp-quick-btn，与 .igp-icon-btn 同 token） */
+.imageGenPanel--minimal .igp-quick-btn {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: var(--igp-control-h);
+  height: var(--igp-control-h);
+  padding: 3px 8px 2px;
+  border: var(--igp-control-border);
+  background: var(--igp-control-bg);
+  border-radius: var(--igp-control-radius-square);
+  cursor: pointer;
+  color: var(--igp-control-text-muted);
+  font-size: 10px;
+  line-height: 1.1;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-quick-btn span {
+  color: inherit;
+  font-size: 10px;
+}
+
+.imageGenPanel--minimal .igp-quick-btn:hover {
+  background: var(--igp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--igp-control-text);
+}
+
+.imageGenPanel--minimal .igp-quick-btn.active {
+  background: var(--igp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--igp-control-text);
+}
+
+.imageGenPanel--minimal .igp-quick-btn.active span {
+  color: inherit;
+}
+
+.imageGenPanel--minimal .igp-prompt-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  overflow: hidden;
+}
+
+.imageGenPanel--minimal .igp-header-row .igp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-header-row .igp-header-actions .igp-header-icon-btn,
+.imageGenPanel--minimal .igp-header-row .igp-header-actions .igp-expand-trigger {
+  position: static;
+  margin-top: 0;
+}
+
+.imageGenPanel--minimal.igp-layout-empty,
+.imageNodeChrome--minimal.imageGenPanel--minimal.igp-layout-empty {
+  min-height: 168px;
+  max-height: min(260px, 46vh);
+}
+
+.imageGenPanel--minimal.igp-layout-empty .imageGenPanel--minimal-inner {
+  gap: 8px;
+}
+
+.imageGenPanel--minimal.igp-layout-empty .mention-textarea {
+  min-height: 44px;
+  max-height: 80px;
+}
+
+/* 顶栏右侧：展开 / 钉住 / 关闭 */
+.imageGenPanel--minimal .igp-header-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #bdbdbd;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-header-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #e8e8e8;
+}
+
+.imageGenPanel--minimal .igp-header-icon-btn svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
+/* 自动推断 task 只读状态（顶栏 meta 区） */
+.imageGenPanel--minimal .igp-task-status {
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  white-space: nowrap;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 任务模式切换按钮组（已移除，保留样式供回滚） */
+.imageGenPanel--minimal .igp-task-mode-group {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.imageGenPanel--minimal .igp-task-mode-btn {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: #252525;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #9E9E9E;
+  font-size: 12px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.imageGenPanel--minimal .igp-task-mode-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #E0E0E0;
+}
+
+.imageGenPanel--minimal .igp-task-mode-btn.active {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.35);
+  color: #E0E0E0;
+}
+
+/* 负面提示词开关按钮 */
+.imageGenPanel--minimal .igp-negative-toggle {
+  display: flex;
+  align-items: center;
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #616161;
+  font-size: 11px;
+  transition: color 0.15s, border-color 0.15s;
+  font-family: inherit;
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn svg {
+  fill: #616161;
+  transition: fill 0.15s;
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn:hover {
+  color: #9E9E9E;
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn:hover svg {
+  fill: #9E9E9E;
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn.active {
+  color: #9E9E9E;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.imageGenPanel--minimal .igp-negative-toggle-btn.active svg {
+  fill: #9E9E9E;
+}
+
+/* 负面提示词输入框 */
+.imageGenPanel--minimal .igp-negative-input {
+  background: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: #E0E0E0;
+  font-size: 12px;
+  font-family: inherit;
+  padding: 8px 10px;
+  resize: none;
+  outline: none;
+  width: 100%;
+  box-sizing: border-box;
+  transition: border-color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-negative-input::placeholder {
+  color: #616161;
+}
+
+.imageGenPanel--minimal .igp-negative-input:focus {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* 顶栏快捷钮：上图标 + 下文案（与底栏 pill 共用 token，略缩小） */
+.imageGenPanel--minimal .igp-header-quick .igp-icon-btn,
+.imageGenPanel--minimal .igp-header-quick .igp-meta-tile {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  box-sizing: border-box;
+  min-width: 44px;
+  width: auto;
+  max-width: 64px;
+  min-height: var(--igp-control-h);
+  height: var(--igp-control-h);
+  padding: 3px 8px 2px;
+  border: var(--igp-control-border);
+  background: var(--igp-control-bg);
+  border-radius: var(--igp-control-radius-square);
+  cursor: pointer;
+  color: var(--igp-control-text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.1;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease,
+    transform 0.12s ease;
+}
+
+.imageGenPanel--minimal .igp-header-quick .igp-icon-btn span,
+.imageGenPanel--minimal .igp-header-quick .igp-meta-tile span {
+  color: inherit;
+  font-size: 10px;
+  white-space: nowrap;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.imageGenPanel--minimal .igp-header-quick .igp-icon-btn:hover {
+  background: var(--igp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--igp-control-text);
+  transform: translateY(-1px);
+}
+
+.imageGenPanel--minimal .igp-header-quick .igp-icon-btn:active {
+  transform: translateY(0) scale(0.98);
+}
+
+.imageGenPanel--minimal .igp-header-quick .igp-icon-btn.active {
+  background: var(--igp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--igp-control-text);
+  transform: none;
+}
+
+/* 顶栏任务 meta（与风格/标记同尺寸，只读） */
+.imageGenPanel--minimal .igp-header-quick .igp-meta-tile {
+  cursor: default;
+  pointer-events: none;
+}
+
+.imageGenPanel--minimal .igp-header-quick .igp-meta-tile:hover {
+  background: var(--igp-control-bg);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--igp-control-text-muted);
+}
+
+.imageGenPanel--minimal .igp-header-quick .igp-meta-icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-quick-icon-wrap {
+  position: relative;
+  display: block;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-quick-icon-wrap > svg:first-of-type {
+  display: block;
+  width: 16px;
+  height: 16px;
+  color: inherit;
+}
+
+.imageGenPanel--minimal .igp-quick-icon-plus {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 7px;
+  height: 7px;
+  color: inherit;
+  pointer-events: none;
+}
+
+/* 提示输入区 */
+.imageGenPanel--minimal .igp-prompt-hint {
+  color: var(--text-placeholder, #616161);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* 底栏：模型 + 比例/分辨率 + 张数 + 白底生成钮（对齐视频 videoGenPanel--chrome） */
+.imageGenPanel--minimal .igp-bottom-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0;
+  position: relative;
+}
+
+.imageGenPanel--minimal .igp-bottom-bar .igp-model-picker {
+  flex: 0 0 auto;
+  min-width: 0;
+  max-width: none;
+}
+
+.imageGenPanel--minimal .igp-bottom-bar .igp-model-trigger {
+  width: auto;
+  max-width: min(168px, 38vw);
+  min-height: var(--igp-control-h);
+  padding: 6px 24px 6px 10px;
+  font-size: 11px;
+  border-radius: var(--igp-control-radius-pill);
+  border: var(--igp-control-border);
+  background-color: var(--igp-control-bg);
+  color: var(--igp-control-text);
+}
+
+.imageGenPanel--minimal .igp-bottom-bar .igp-model-trigger-label {
+  max-width: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.imageGenPanel--minimal .igp-bottom-bar .igp-model-trigger:hover:not(:disabled),
+.imageGenPanel--minimal .igp-bottom-bar .igp-model-trigger.open {
+  background-color: var(--igp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.imageGenPanel--minimal .igp-bottom-bar .igp-ar-picker {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.imageGenPanel--minimal .igp-bottom-bar .igp-ar-trigger {
+  width: auto;
+  max-width: none;
+  min-height: var(--igp-control-h);
+  padding: 6px 24px 6px 10px;
+  font-size: 11px;
+  border-radius: var(--igp-control-radius-pill);
+  border: var(--igp-control-border);
+  background: var(--igp-control-bg);
+  color: var(--igp-control-text);
+  justify-content: flex-start;
+}
+
+.imageGenPanel--minimal .igp-bottom-bar .igp-ar-trigger:hover,
+.imageGenPanel--minimal .igp-bottom-bar .igp-ar-trigger.open {
+  background: var(--igp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.imageGenPanel--minimal .igp-count-select {
+  flex-shrink: 0;
+  min-height: var(--igp-control-h);
+  max-width: 72px;
+  padding: 6px 24px 6px 10px;
+  border-radius: var(--igp-control-radius-pill);
+  border: var(--igp-control-border);
+  background-color: var(--igp-control-bg);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239e9e9e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.imageGenPanel--minimal .igp-count-select:hover {
+  background-color: var(--igp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.imageGenPanel--minimal .igp-toolbar-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-icon, #bdbdbd);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-toolbar-icon-btn:hover,
+.imageGenPanel--minimal .igp-toolbar-icon-btn.active {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--text-primary, #e0e0e0);
+}
+
+/* 模型选择（图一：圆角按钮 + 上浮菜单） */
+.imageGenPanel--minimal .igp-model-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-model-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 8px 6px 6px;
+  border-radius: 10px;
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-model-trigger:hover:not(:disabled),
+.imageGenPanel--minimal .igp-model-trigger.open {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.imageGenPanel--minimal .igp-model-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.imageGenPanel--minimal .igp-model-trigger-icon {
+  width: 16px;
+  height: 16px;
+  color: #f0f0f0;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-model-trigger-label {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imageGenPanel--minimal .igp-model-trigger-chevron {
+  width: 12px;
+  height: 12px;
+  color: #9e9e9e;
+  flex-shrink: 0;
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
+}
+
+.imageGenPanel--minimal .igp-model-trigger.open .igp-model-trigger-chevron {
+  transform: rotate(0deg);
+}
+
+/* 模型菜单：Portal 到 body，避免被面板 overflow 裁切 */
+.imageGenPanel--minimal .igp-model-menu {
+  box-sizing: border-box;
+  min-width: 280px;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.imageGenPanel--minimal .igp-model-menu--portal {
+  position: fixed;
+}
+
+.imageGenPanel--minimal .igp-model-menu-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.imageGenPanel--minimal .igp-model-menu-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+
+.imageGenPanel--minimal .igp-model-menu-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 4px;
+}
+
+.imageGenPanel--minimal .igp-model-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #e8e8e8;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.imageGenPanel--minimal .igp-model-item:hover:not(:disabled),
+.imageGenPanel--minimal .igp-model-item.selected {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.imageGenPanel--minimal .igp-model-item.disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.imageGenPanel--minimal .igp-model-item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #3d3d3d, #252525);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #f5f5f5;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-model-item-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.imageGenPanel--minimal .igp-model-item-title-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.imageGenPanel--minimal .igp-model-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.imageGenPanel--minimal .igp-model-item-subtitle {
+  font-size: 11px;
+  color: #9e9e9e;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.imageGenPanel--minimal .igp-model-item-estimate {
+  font-size: 12px;
+  color: #757575;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* 分辨率 + 比例（图一） */
+.imageGenPanel--minimal .igp-ar-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-ar-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+
+.imageGenPanel--minimal .igp-ar-trigger:hover,
+.imageGenPanel--minimal .igp-ar-trigger.open {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.imageGenPanel--minimal .igp-ar-trigger-wire {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 16px;
+  color: #bdbdbd;
+}
+
+.imageGenPanel--minimal .igp-ar-trigger-wire .igp-ar-wire-viewport {
+  width: 20px;
+  height: 14px;
+}
+
+.imageGenPanel--minimal .igp-ar-trigger.open .igp-ar-trigger-chevron {
+  transform: rotate(0deg);
+}
+
+.imageGenPanel--minimal .igp-ar-trigger-label {
+  white-space: nowrap;
+}
+
+.imageGenPanel--minimal .igp-ar-trigger-sep {
+  color: #757575;
+  margin: 0 1px;
+}
+
+.imageGenPanel--minimal .igp-ar-trigger-chevron {
+  width: 12px;
+  height: 12px;
+  color: #9e9e9e;
+  flex-shrink: 0;
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
+}
+
+/* 浮层：Portal 到 body，避免被面板 overflow 裁切 */
+.imageGenPanel--minimal .igp-ar-menu {
+  box-sizing: border-box;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+  padding: 14px 14px 12px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.imageGenPanel--minimal .igp-ar-menu--portal {
+  position: fixed;
+}
+
+.imageGenPanel--minimal .igp-ar-menu-section + .igp-ar-menu-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.imageGenPanel--minimal .igp-ar-menu-heading {
+  font-size: 11px;
+  font-weight: 500;
+  color: #888888;
+  margin-bottom: 10px;
+}
+
+.imageGenPanel--minimal .igp-ar-res-row {
+  display: flex;
+  gap: 8px;
+}
+
+.imageGenPanel--minimal .igp-ar-res-btn {
+  flex: 1;
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  color: #9e9e9e;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.imageGenPanel--minimal .igp-ar-res-btn:hover {
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #d0d0d0;
+}
+
+.imageGenPanel--minimal .igp-ar-res-btn.selected {
+  border-color: #ffffff;
+  border-width: 1.5px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.imageGenPanel--minimal .igp-ar-ratio-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.imageGenPanel--minimal .igp-ar-ratio-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 8px 4px 6px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: transparent;
+  color: #9e9e9e;
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+
+.imageGenPanel--minimal .igp-ar-ratio-btn:hover {
+  border-color: rgba(255, 255, 255, 0.24);
+  color: #d8d8d8;
+}
+
+.imageGenPanel--minimal .igp-ar-ratio-btn.selected {
+  border-color: #ffffff;
+  border-width: 1.5px;
+  color: #ffffff;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.imageGenPanel--minimal .igp-ar-wire-viewport {
+  width: 32px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.imageGenPanel--minimal .igp-ar-wire-inner {
+  border: 1.5px solid currentColor;
+  border-radius: 2px;
+  box-sizing: border-box;
+}
+
+.imageGenPanel--minimal .igp-ar-wire-inner--auto {
+  border-style: dashed;
+}
+
+.imageGenPanel--minimal .igp-ar-ratio-btn.selected .igp-ar-wire-inner {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.imageGenPanel--minimal .igp-param-item {
+  color: #E0E0E0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.imageGenPanel--minimal .igp-param-item svg {
+  width: 15px;
+  height: 15px;
+  fill: #9E9E9E;
+}
+
+/* 下拉框统一样式（非张数栏） */
+.imageGenPanel--minimal .igp-toolbar-select:not(.igp-count-select) {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #e8e8e8;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  font: inherit;
+  outline: none;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+/* 合二为一下拉框 */
+.imageGenPanel--minimal .igp-param-combined {
+  position: relative;
+}
+
+.imageGenPanel--minimal .igp-combined-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+/* 触发按钮（显示当前比例+三角） */
+.imageGenPanel--minimal .igp-combined-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: #111111;
+  color: #9E9E9E;
+  font-size: 13px;
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-combined-trigger:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+  color: #BDBDBD;
+}
+
+.imageGenPanel--minimal .igp-combined-icon {
+  width: 14px;
+  height: 14px;
+  fill: #E0E0E0;
+  flex-shrink: 0;
+}
+
+.imageGenPanel--minimal .igp-combined-label {
+  font-size: 13px;
+  color: #E0E0E0;
+}
+
+.imageGenPanel--minimal .igp-combined-res {
+  font-size: 11px;
+  color: #9E9E9E;
+}
+
+.imageGenPanel--minimal .igp-combined-arrow {
+  width: 16px;
+  height: 16px;
+  fill: #9E9E9E;
+  margin-left: 2px;
+}
+
+.imageGenPanel--minimal .igp-combined-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: #1A1A1A;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  padding: 12px;
+  min-width: 340px;
+  z-index: 1000;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.imageGenPanel--minimal .igp-combined-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.imageGenPanel--minimal .igp-combined-row-label {
+  font-size: 11px;
+  color: #9E9E9E;
+  white-space: nowrap;
+  width: 64px;
+}
+
+.imageGenPanel--minimal .igp-combined-row-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.imageGenPanel--minimal .igp-combined-aspect-btn,
+.imageGenPanel--minimal .igp-combined-res-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #9E9E9E;
+  font-size: 12px;
+  padding: 8px 6px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 52px;
+}
+
+.imageGenPanel--minimal .igp-aspect-box {
+  width: 28px;
+  height: 20px;
+  border: 1.5px solid #9E9E9E;
+  border-radius: 3px;
+  background: transparent;
+}
+
+.imageGenPanel--minimal .igp-aspect-label {
+  font-size: 11px;
+  color: #9E9E9E;
+}
+
+.imageGenPanel--minimal .igp-combined-aspect-btn:hover,
+.imageGenPanel--minimal .igp-combined-res-btn:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #E0E0E0;
+}
+
+.imageGenPanel--minimal .igp-combined-aspect-btn.selected .igp-aspect-box,
+.imageGenPanel--minimal .igp-combined-res-btn.selected .igp-aspect-box {
+  border-color: #E0E0E0;
+  background: rgba(224, 224, 224, 0.1);
+}
+
+.imageGenPanel--minimal .igp-combined-aspect-btn.selected .igp-aspect-label,
+.imageGenPanel--minimal .igp-combined-res-btn.selected .igp-aspect-label {
+  color: #E0E0E0;
+}
+
+.imageGenPanel--minimal .igp-combined-aspect-btn:hover .igp-aspect-box,
+.imageGenPanel--minimal .igp-combined-res-btn:hover .igp-aspect-box {
+  border-color: #BDBDBD;
+  background: rgba(189, 189, 189, 0.05);
+}
+
+.imageGenPanel--minimal .igp-combined-aspect-btn:hover .igp-aspect-label,
+.imageGenPanel--minimal .igp-combined-res-btn:hover .igp-aspect-label {
+  color: #BDBDBD;
+}
+
+/* 分辨率按钮（无图标，和比例按钮等高） */
+.imageGenPanel--minimal .igp-combined-res-btn {
+  min-height: 52px;
+  justify-content: flex-end;
+}
+
+.imageGenPanel--minimal .igp-combined-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 8px 0;
+}
+
+/* 提示词区 + 右下角字数 */
+.imageGenPanel--minimal .igp-prompt-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.imageGenPanel--minimal .igp-prompt-wrap .mention-input-wrapper {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+}
+
+.imageGenPanel--minimal .igp-prompt-wrap .mention-textarea {
+  padding-bottom: 18px;
+}
+
+.imageGenPanel--minimal .igp-prompt-wrap .igp-counter {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  z-index: 3;
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  font-family: ui-monospace, monospace;
+  line-height: 1;
+  pointer-events: none;
+  text-align: right;
+}
+
+/* 生成钮：可生成 / 禁用 / 生成中（停止） */
+.imageGenPanel--minimal .igp-generate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--igp-control-h);
+  height: var(--igp-control-h);
+  min-height: var(--igp-control-h);
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--igp-control-radius-square);
+  cursor: pointer;
+  opacity: 1;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+/* 可生成 */
+.imageGenPanel--minimal .igp-generate-btn:not(:disabled):not(.generating) {
+  background: var(--igp-cta-bg-ready);
+  color: var(--igp-cta-fg-ready);
+}
+
+.imageGenPanel--minimal .igp-generate-btn:not(:disabled):not(.generating):hover {
+  background: var(--igp-cta-bg-ready-hover);
+}
+
+/* 禁用 */
+.imageGenPanel--minimal .igp-generate-btn:disabled:not(.generating) {
+  background: var(--igp-cta-bg-disabled);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--igp-cta-fg-disabled);
+  cursor: not-allowed;
+}
+
+/* 生成中（可点停止） */
+.imageGenPanel--minimal .igp-generate-btn.generating {
+  background: var(--igp-cta-bg-generating);
+  border-color: var(--igp-cta-border-generating);
+  color: var(--igp-cta-fg-generating);
+}
+
+.imageGenPanel--minimal .igp-generate-btn.generating:hover {
+  background: var(--igp-cta-bg-ready-hover);
+}
+
+.imageGenPanel--minimal .igp-generate-btn svg {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+
+.imageGenPanel--minimal .igp-generate-btn:not(:disabled):not(.generating) svg {
+  color: var(--igp-cta-fg-ready);
+}
+
+.imageGenPanel--minimal .igp-generate-btn:disabled:not(.generating) svg {
+  color: var(--igp-cta-fg-disabled);
+}
+
+.imageGenPanel--minimal .igp-generate-btn.generating svg {
+  fill: currentColor;
+  color: var(--igp-cta-fg-generating);
+}
+
+/* 已连接参考图标签 */
+.imageGenPanel--minimal .igp-ref-tag {
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+  padding: 3px 8px;
+  white-space: nowrap;
+}
+
+.imageGenPanel--minimal .igp-feedback {
+  font-size: 12px;
+  line-height: 1.45;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.imageGenPanel--minimal .igp-feedback--block {
+  color: #ffb4b4;
+  background: rgba(255, 80, 80, 0.12);
+  border: 1px solid rgba(255, 100, 100, 0.25);
+}
+
+.imageGenPanel--minimal .igp-feedback--warn {
+  color: #f5d78a;
+  background: rgba(255, 193, 7, 0.1);
+  border: 1px solid rgba(255, 193, 7, 0.22);
+}
+
+.imageGenPanel--minimal .igp-feedback--info {
+  color: #a8c8f0;
+  background: rgba(100, 160, 255, 0.08);
+  border: 1px solid rgba(100, 160, 255, 0.18);
+}
+
+.imageGenPanel--minimal .igp-script-row {
+  margin-top: 4px;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.imageGenPanel--minimal .igp-script-sync-btn {
+  font-size: 12px;
+  padding: 4px 10px;
+}
+
+/* 生成面板输入区：与面板同色，无框中框（覆盖 global .imageGenPanelTextarea） */
+.imageGenPanel--minimal .mention-overlay {
+  color: var(--text-primary, #e0e0e0);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.imageGenPanel--minimal .mention-input-wrapper.imageGenPanelTextarea,
+.imageGenPanel--minimal .mention-input-wrapper.imageGenPanelTextarea--minimal,
+.imageGenPanel--minimal .mention-input-wrapper.imageGenPanelTextarea--expanded {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0;
+}
+
+.imageGenPanel--minimal .mention-input-wrapper.imageGenPanelTextarea:focus-within {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.imageGenPanel--minimal .mention-textarea {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-size: 13px;
+  color: transparent !important;
+  caret-color: var(--text-primary, #e0e0e0);
+  padding: 0;
+  border-radius: 0;
+  min-height: 56px;
+  max-height: 100px;
+  overflow-y: auto;
+  line-height: 1.45;
+}
+
+.imageGenPanel--minimal .mention-textarea:focus,
+.imageGenPanel--minimal .mention-textarea:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.imageGenPanel--minimal .mention-textarea::placeholder {
+  color: var(--text-placeholder, #616161);
+}
+
+/* 第三层工具栏容器 */
+.imageGenPanel--minimal .igp-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* 画风 chip 行 */
+.imageGenPanel--minimal .igp-style-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+}
+
+.imageGenPanel--minimal .igp-style-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px 2px 10px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 999px;
+  color: #E0E0E0;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.imageGenPanel--minimal .igp-style-chip-remove {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: #9E9E9E;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  border-radius: 50%;
+}
+
+.imageGenPanel--minimal .igp-style-chip-remove:hover {
+  color: #E0E0E0;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.imageGenPanel--minimal .igp-style-add-btn {
+  padding: 2px 10px;
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  background: transparent;
+  border-radius: 999px;
+  color: #9E9E9E;
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.imageGenPanel--minimal .igp-style-add-btn:hover,
+.imageGenPanel--minimal .igp-style-add-btn.active {
+  color: #E0E0E0;
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.imageGenPanel--minimal .igp-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.imageGenPanel--minimal .igp-quick-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #1A1A1A;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #9E9E9E;
+  font-size: 12px;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-quick-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #E0E0E0;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.imageGenPanel--minimal .igp-quick-btn.active {
+  background: rgba(99, 179, 237, 0.15);
+  border-color: rgba(99, 179, 237, 0.5);
+  color: #90CDF4;
+}
+
+/* 风格浮层（Portal，与生成参数面板一致） */
+.igp-style-popover.imageGenPanel--minimal {
+  box-sizing: border-box;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+  padding: 0;
+  pointer-events: auto;
+}
+
+.igp-style-popover .igp-style-popover-inner {
+  padding: 12px 14px 14px;
+}
+
+.igp-style-popover .igp-style-popover-title {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9e9e9e;
+  margin-bottom: 10px;
+  letter-spacing: 0.02em;
+}
+
+/* 风格网格 */
+.imageGenPanel--minimal .igp-style-grid,
+.igp-style-popover .igp-style-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  max-height: min(280px, calc(100vh - 120px));
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.imageGenPanel--minimal .igp-style-btn,
+.igp-style-popover .igp-style-btn {
+  padding: 6px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #9E9E9E;
+  font-size: 12px;
+  font-family: inherit;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-style-btn:hover,
+.igp-style-popover .igp-style-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #e0e0e0;
+  border-color: rgba(255, 255, 255, 0.24);
+}
+
+.imageGenPanel--minimal .igp-style-btn.active,
+.igp-style-popover .igp-style-btn.active {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: #ffffff;
+  border-width: 1.5px;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.imageGenPanel--minimal .igp-style-clear-btn {
+  padding: 4px 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  color: #616161;
+  font-size: 12px;
+  font-family: inherit;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.imageGenPanel--minimal .igp-style-clear-btn:hover {
+  color: #9E9E9E;
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.imageGenPanel--minimal .igp-style-clear-btn.active {
+  color: #9E9E9E;
+  border-color: rgba(255, 255, 255, 0.2);
+}

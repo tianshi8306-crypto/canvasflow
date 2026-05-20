@@ -1,0 +1,150 @@
+@import "./nodeChrome/nodeChromeTokens.css";
+
+/* 视频输出参数浮层（Portal 到 body，勿复用 .mmGenSettings 以免继承 absolute 定位） */
+
+.video-output-settings-popover {
+  position: fixed;
+  bottom: auto;
+  right: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: min(380px, calc(100vw - 24px));
+  max-height: min(420px, calc(100vh - 48px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding: 14px;
+  box-sizing: border-box;
+  background: var(--bg-panel-elevated, #333333);
+  border: 1px solid var(--border-node, #4d4d4d);
+  border-radius: 14px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  scrollbar-width: thin;
+  pointer-events: auto;
+}
+
+.video-output-settings-popover .vos-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.video-output-settings-popover .vos-heading {
+  font-size: 12px;
+  font-weight: 500;
+  color: #9e9e9e;
+}
+
+.video-output-settings-popover .vos-ratio-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.video-output-settings-popover .vos-ratio-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-button, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: #e0e0e0;
+  font-size: 11px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.video-output-settings-popover .vos-ratio-btn:hover {
+  border-color: #5a5a5a;
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+}
+
+.video-output-settings-popover .vos-ratio-btn--active {
+  border-color: var(--border-button, #4d4d4d);
+  background: var(--bg-button-active, #444444);
+  color: #e0e0e0;
+}
+
+.video-output-settings-popover .vos-res-row {
+  display: flex;
+  gap: 6px;
+}
+
+.video-output-settings-popover .vos-res-btn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-button, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: #e0e0e0;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.video-output-settings-popover .vos-res-btn:hover {
+  border-color: #5a5a5a;
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+}
+
+.video-output-settings-popover .vos-res-btn--active {
+  border-color: var(--border-button, #4d4d4d);
+  background: var(--bg-button-active, #444444);
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.video-output-settings-popover .vos-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.video-output-settings-popover .vos-row-label {
+  font-size: 12px;
+  color: #9e9e9e;
+}
+
+.video-output-settings-popover .vos-duration-val {
+  font-size: 12px;
+  font-weight: 600;
+  color: #e0e0e0;
+}
+
+.video-output-settings-popover .vos-slider {
+  width: 100%;
+  accent-color: #3b82f6;
+}
+
+.video-output-settings-popover .vos-toggle {
+  position: relative;
+  width: 40px;
+  height: 22px;
+  border-radius: 11px;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.video-output-settings-popover .vos-toggle--on {
+  background: #3b82f6;
+}
+
+.video-output-settings-popover .vos-toggle-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  transition: transform 0.15s;
+}
+
+.video-output-settings-popover .vos-toggle--on .vos-toggle-thumb {
+  transform: translateX(18px);
+}

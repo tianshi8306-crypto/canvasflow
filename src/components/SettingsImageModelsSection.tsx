@@ -95,6 +95,44 @@ export function SettingsImageModelsSection({
                   />
                   启用
                 </label>
+                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
+                  <input
+                    type="checkbox"
+                    checked={m.supportsMultiRefFusion !== false}
+                    onChange={(e) =>
+                      setSettings((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              imageModels: prev.imageModels.map((x) =>
+                                x.id === m.id ? { ...x, supportsMultiRefFusion: e.target.checked } : x,
+                              ),
+                            }
+                          : prev,
+                      )
+                    }
+                  />
+                  多图参考
+                </label>
+                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
+                  <input
+                    type="checkbox"
+                    checked={m.supportsImageEdit !== false}
+                    onChange={(e) =>
+                      setSettings((prev) =>
+                        prev
+                          ? {
+                              ...prev,
+                              imageModels: prev.imageModels.map((x) =>
+                                x.id === m.id ? { ...x, supportsImageEdit: e.target.checked } : x,
+                              ),
+                            }
+                          : prev,
+                      )
+                    }
+                  />
+                  图像编辑
+                </label>
                 <button
                   type="button"
                   className="btn"
@@ -317,6 +355,28 @@ export function SettingsImageModelsSection({
                           ...prev,
                           imageModels: prev.imageModels.map((x) =>
                             x.id === m.id ? { ...x, priority: Number.isFinite(v) ? v : 0 } : x,
+                          ),
+                        }
+                      : prev,
+                  );
+                }}
+              />
+            </SettingsFormField>
+
+            <SettingsFormField label="参考图上限（1～4）">
+              <input
+                type="number"
+                min={1}
+                max={4}
+                value={m.maxReferenceImages ?? 4}
+                onChange={(e) => {
+                  const v = Math.min(4, Math.max(1, Number(e.target.value) || 4));
+                  setSettings((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          imageModels: prev.imageModels.map((x) =>
+                            x.id === m.id ? { ...x, maxReferenceImages: v } : x,
                           ),
                         }
                       : prev,

@@ -18,6 +18,7 @@ type HasKeyMaps = {
 };
 
 type SaveSettingsResult = HasKeyMaps & {
+  settings: AppSettings;
   keyPreviews: Record<string, KeyPreviewItem>;
   notice: string;
 };
@@ -26,6 +27,30 @@ export function normalizeLoadedSettings(s: AppSettings): AppSettings {
   return {
     ...s,
     abortWorkflowOnFailure: s.abortWorkflowOnFailure ?? false,
+    // 外观
+    themePreset: s.themePreset ?? "dark",
+    fontSize: s.fontSize ?? "medium",
+    cursorStyle: s.cursorStyle ?? "default",
+    gridDotsVisible: s.gridDotsVisible ?? true,
+    promptActionSurface: s.promptActionSurface ?? "themed",
+    // 节点行为
+    showVideoMeta: s.showVideoMeta ?? true,
+    imageVideoNodeResizeEnabled: s.imageVideoNodeResizeEnabled ?? true,
+    promptBoxResizeEnabled: s.promptBoxResizeEnabled ?? true,
+    titleFollowsCanvasZoom: s.titleFollowsCanvasZoom ?? true,
+    nodeSpacing: s.nodeSpacing ?? 120,
+    nodeDirection: s.nodeDirection ?? "right",
+    nodeAvoidOverlap: s.nodeAvoidOverlap ?? true,
+    // 画布对齐
+    selectionRelatedHighlightEnabled: s.selectionRelatedHighlightEnabled ?? true,
+    selectionRelatedHighlightColor: s.selectionRelatedHighlightColor ?? "white",
+    snapGuidesEnabled: s.snapGuidesEnabled ?? true,
+    connectionLinesVisible: s.connectionLinesVisible ?? true,
+    snapGridEnabled: s.snapGridEnabled ?? true,
+    alignFeatureTriggerMode: s.alignFeatureTriggerMode ?? "click",
+    alignDistributeGap: s.alignDistributeGap ?? 40,
+    // 素材
+    uploadQuality: s.uploadQuality ?? "standard",
     imageModels: (s.imageModels ?? []).map((m) => ({
       ...m,
       vendorName: m.vendorName ?? m.modelName ?? "",
@@ -51,7 +76,9 @@ export function normalizeLoadedSettings(s: AppSettings): AppSettings {
 }
 
 export function mergeImportedSettings(prev: AppSettings, parsed: Partial<AppSettings>): AppSettings {
+  const next = normalizeLoadedSettings({ ...prev, ...parsed });
   return {
+    ...next,
     providers: Array.isArray(parsed.providers) ? (parsed.providers as ProviderConfig[]) : prev.providers,
     imageModels: Array.isArray(parsed.imageModels)
       ? (parsed.imageModels as ImageModelConfig[]).map((m) => ({
@@ -70,7 +97,7 @@ export function mergeImportedSettings(prev: AppSettings, parsed: Partial<AppSett
           modelVariant: m.modelVariant ?? m.model ?? "",
           apiBaseUrl: m.apiBaseUrl ?? "",
         }))
-      : (prev.videoModels ?? []),
+      : prev.videoModels ?? [],
     audioModels: Array.isArray(parsed.audioModels)
       ? (parsed.audioModels as ImageModelConfig[]).map((m) => ({
           ...m,
@@ -79,14 +106,7 @@ export function mergeImportedSettings(prev: AppSettings, parsed: Partial<AppSett
           modelVariant: m.modelVariant ?? m.model ?? "",
           apiBaseUrl: m.apiBaseUrl ?? "",
         }))
-      : (prev.audioModels ?? []),
-    defaultProviderId:
-      typeof parsed.defaultProviderId === "string" || parsed.defaultProviderId === null
-        ? parsed.defaultProviderId
-        : prev.defaultProviderId,
-    ffmpegPath: typeof parsed.ffmpegPath === "string" || parsed.ffmpegPath === null ? parsed.ffmpegPath : prev.ffmpegPath,
-    abortWorkflowOnFailure:
-      typeof parsed.abortWorkflowOnFailure === "boolean" ? parsed.abortWorkflowOnFailure : prev.abortWorkflowOnFailure,
+      : prev.audioModels ?? [],
   };
 }
 
@@ -127,12 +147,12 @@ export async function loadSettingsPanelData(): Promise<
 export async function saveSettingsAndKeys(params: {
   settings: AppSettings;
   keys: Record<string, string>;
-  imageModelKeys: Record<string, string>;
-  audioModelKeys: Record<string, string>;
-  videoModelKeys: Record<string, string>;
+  imageModelKeys?: Record<string, string>;
+  audioModelKeys?: Record<string, string>;
+  videoModelKeys?: Record<string, string>;
   keyPreviews: Record<string, KeyPreviewItem>;
 }): Promise<SaveSettingsResult> {
-  const { settings, keys, imageModelKeys, audioModelKeys, videoModelKeys, keyPreviews } = params;
+  const { settings, keys, imageModelKeys = {}, audioModelKeys = {}, videoModelKeys = {}, keyPreviews } = params;
   if (!isTauri()) throw new Error(DESKTOP_SHELL_HINT);
 
   await invoke("save_settings", { settings });
@@ -200,6 +220,7 @@ export async function saveSettingsAndKeys(params: {
   const maps = await readHasKeyMaps(settings);
   return {
     ...maps,
+    settings,
     keyPreviews: nextPreview,
     notice: "保存成功：设置与 API Key 已写入。出于安全考虑，输入框不会回显。",
   };

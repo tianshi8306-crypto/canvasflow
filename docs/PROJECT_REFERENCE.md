@@ -2,6 +2,8 @@
 
 > 本文件是开发参考手册，涵盖架构决策、技术栈、代码约定和核心概念。开发功能前必读。
 
+**画布节点 UX 真源**：[`docs/图片节点设计.md`](./图片节点设计.md)（预览与生成分离、节点外浮层）。产品对齐 [`docs/product/LIBTV_GUIDE_ALIGNMENT.md`](./product/LIBTV_GUIDE_ALIGNMENT.md)；快捷键 [`docs/product/SHORTCUTS.md`](./product/SHORTCUTS.md)。**不采用** LibTV 底部生成器 Dock。
+
 ---
 
 ## 1. 技术栈速查

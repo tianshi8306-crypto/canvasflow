@@ -1,11 +1,11 @@
 use crate::command_common::resolve_ffmpeg_bin;
+use crate::compose_concat::compose_concat_clips;
 use crate::db;
 use crate::graph::FlowNode;
 use crate::settings::AppSettings;
 use rusqlite::Connection;
 use serde_json::json;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::path::Path;
 
 pub(crate) fn run_ffmpeg_concat(
     project_root: &Path,
@@ -30,73 +30,18 @@ pub(crate) fn run_ffmpeg_concat(
         .data
         .get("output")
         .and_then(|v| v.as_str())
-        .unwrap_or("output/render.mp4");
-
-    let out_path: PathBuf = project_root.join(output_rel);
-    if let Some(parent) = out_path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
-    }
-
-    if inputs.is_empty() {
-        return Err("FFmpeg 节点：inputs 为空".into());
-    }
-
-    let dot_dir = project_root.join(".canvasflow");
-    std::fs::create_dir_all(&dot_dir).map_err(|e| e.to_string())?;
-    let list_path = dot_dir.join(format!(
-        "concat_{}.txt",
-        node.id.replace(['/', '\\', ':'], "_")
-    ));
-
-    let mut list = String::new();
-    for p in &inputs {
-        let abs = project_root.join(p);
-        if !abs.exists() {
-            return Err(format!("找不到输入文件：{}", abs.display()));
-        }
-        let s = abs.to_string_lossy().replace('\\', "/");
-        list.push_str(&format!("file '{}'\n", s));
-    }
-    std::fs::write(&list_path, list).map_err(|e| e.to_string())?;
-
-    let args: Vec<String> = vec![
-        "-y".into(),
-        "-f".into(),
-        "concat".into(),
-        "-safe".into(),
-        "0".into(),
-        "-i".into(),
-        list_path.to_string_lossy().to_string(),
-        "-c:v".into(),
-        "libx264".into(),
-        "-c:a".into(),
-        "aac".into(),
-        "-pix_fmt".into(),
-        "yuv420p".into(),
-        out_path.to_string_lossy().to_string(),
-    ];
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("assets/exports/final.mp4");
 
     db::log_event(
         conn,
         run_id,
         Some(&node.id),
         "ffmpeg_invocation",
-        &json!({ "ffmpeg": ffmpeg, "args": args }),
+        &json!({ "ffmpeg": ffmpeg, "inputs": inputs, "output": output_rel }),
     )?;
 
-    let status = Command::new(&ffmpeg)
-        .args(&args)
-        .status()
-        .map_err(|e| format!("无法启动 ffmpeg（{}）：{}", ffmpeg, e))?;
-
-    if !status.success() {
-        return Err(format!("ffmpeg 退出码: {:?}", status.code()));
-    }
-
-    let rel = out_path
-        .strip_prefix(project_root)
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
-        .unwrap_or_else(|_| output_rel.to_string());
+    let rel = compose_concat_clips(project_root, &ffmpeg, &inputs, output_rel)?;
 
     db::log_event(
         conn,

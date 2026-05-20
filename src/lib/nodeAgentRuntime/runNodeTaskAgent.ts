@@ -27,6 +27,7 @@ function emitAgentEvent(
 /**
  * 统一单任务 Agent 调度入口：
  * 感知输入 -> 执行 -> 结果校验 -> 回写节点记忆体。
+ * 返回 abort controller，可外部调用 cancel() 中止执行。
  */
 export async function runNodeTaskAgent<TInput, TSensed, TExecuted, TCommitted>(
   runtime: NodeTaskAgentRuntime<TInput, TSensed, TExecuted, TCommitted>,

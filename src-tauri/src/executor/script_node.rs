@@ -4,6 +4,7 @@ use crate::settings::AppSettings;
 use rusqlite::Connection;
 use serde_json::json;
 use std::collections::HashMap;
+use std::path::Path;
 
 use super::graph_flow::{
     incoming_reference_video_paths_ordered, incoming_texts_ordered_with_prompt_fallback,
@@ -16,6 +17,7 @@ use super::script_parse::{
 
 pub(crate) async fn run_script_node(
     http: &reqwest::Client,
+    project_root: &Path,
     graph: &CanvasGraph,
     node: &FlowNode,
     settings: &AppSettings,
@@ -34,7 +36,7 @@ pub(crate) async fn run_script_node(
     }
     let upstream_parts = incoming_texts_ordered_with_prompt_fallback(graph, &node.id, outputs);
     let upstream_joined = upstream_parts.join("\n\n");
-    let video_paths = incoming_reference_video_paths_ordered(graph, &node.id);
+    let video_paths = incoming_reference_video_paths_ordered(project_root, graph, &node.id);
     let has_upstream_text = !upstream_joined.trim().is_empty();
 
     let body_for_parse = if has_upstream_text {

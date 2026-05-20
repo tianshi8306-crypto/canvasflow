@@ -9,11 +9,12 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { type Node, type NodeProps } from "@xyflow/react";
-import { MagneticNodeAnchors } from "@/components/nodes/MagneticNodeAnchors";
+import { NodeAnchors } from "@/components/nodes/anchors";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import type { FlowNodeData, TextWorkflowKind } from "@/lib/types";
-import { NodeFrame } from "@/components/nodes/NodeFrame";
-import { textNodeSubtitle } from "@/lib/nodeUiStrings";
+import { NodeChromeShell, NodeMetaLabel, NodeMetaStatus } from "@/components/nodes/nodeChrome";
+import { computeTextNodeFrameSize } from "@/lib/textNodeChrome";
+import { TextNodeBottomPortal } from "@/components/nodes/TextNodeBottomPortal";
 import { TextNodeComposerBar } from "@/components/nodes/TextNodeComposerBar";
 import { TextNodeComposerInput } from "@/components/nodes/TextNodeComposerInput";
 import { TextNodeExpandEditModal } from "@/components/nodes/TextNodeExpandEditModal";
@@ -33,21 +34,7 @@ import {
 } from "@/lib/textNodeProviders";
 import { dispatchTextNodeComposerRun } from "@/lib/textNodeDispatch";
 import { downloadTextAsFile, readClipboardText, writeClipboardText } from "@/lib/textNodeClipboard";
-
-function TextDocIcon() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M7 3h8l4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path d="M15 3v4h4" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" />
-      <path d="M8 12h8M8 16h6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
+import "./TextNodeChrome.css";
 
 type TextParams = {
   textChrome?: boolean;
@@ -78,8 +65,10 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const setStatusText = useProjectStore((s) => s.setStatusText);
   const runNodeSubgraph = useProjectStore((s) => s.runNodeSubgraph);
-  const { multiSelect } = useNodeExpandedChrome(selected);
+  const { expandedChrome, multiSelect } = useNodeExpandedChrome(selected);
   const uiSelected = selected;
+  const previewRef = useRef<HTMLDivElement>(null);
+  const bottomPanelRef = useRef<HTMLDivElement>(null);
 
   const prompt = data.prompt ?? "";
   const hasBody = prompt.trim().length > 0;
@@ -365,11 +354,27 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
   );
 
   const showScriptComposer =
-    uiSelected &&
+    expandedChrome &&
     !editing &&
     (hasBody || textWorkflow === "writeSelf") &&
     textWorkflow !== "textToVideo" &&
     textWorkflow !== "textToMusic";
+
+  const frameSize = useMemo(
+    () =>
+      computeTextNodeFrameSize({
+        hasBody,
+        writeSelfEmpty: !hasBody && textWorkflow === "writeSelf",
+      }),
+    [hasBody, textWorkflow],
+  );
+
+  const metaText = hasBody ? `${prompt.length} 字` : null;
+
+  const commitLabel = useCallback(
+    (next: string | undefined) => updateNodeData(id, { label: next }),
+    [id, updateNodeData],
+  );
 
   const composer = showScriptComposer ? (
     <div className={`scriptGenComposer ${RF_NODE_INPUT_CLASS}`} onPointerDown={stop} onWheel={stopWheel}>
@@ -395,29 +400,26 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
   ) : null;
 
   const workflowBottomPanel =
-    selected && !editing && textWorkflow === "textToVideo" ? (
+    expandedChrome && !editing && textWorkflow === "textToVideo" ? (
       <TextNodeTextToVideoPanel videoNodeId={videoNodeId} />
-    ) : selected && !editing && textWorkflow === "textToMusic" ? (
+    ) : expandedChrome && !editing && textWorkflow === "textToMusic" ? (
       <TextNodeTextToMusicPanel audioNodeId={audioNodeId} />
-    ) : selected && !editing && textWorkflow === "scriptToText" ? (
+    ) : expandedChrome && !editing && textWorkflow === "scriptToText" ? (
       <TextNodeScriptSyncPanel textNodeId={id} scriptNodeId={scriptNodeId} />
     ) : null;
 
-  const rootClass = [
-    "textNodeCard",
-    hasBody ? "textNodeCard--hasBody" : "",
-    selected && !hasBody ? "textNodeCard--emptySelected" : "",
-    textChrome && hasBody ? "textNodeCard--chrome" : "",
-    editing ? "textNodeCard--editing" : "",
-    textWorkflow === "textToVideo" ? "textNodeCard--ttv" : "",
-    textWorkflow === "textToMusic" ? "textNodeCard--ttm" : "",
-    textWorkflow === "writeSelf" && !hasBody ? "textNodeCard--writeSelf" : "",
+  const showBottomPortal =
+    expandedChrome && !editing && Boolean(composer || workflowBottomPanel);
+
+  const shellClass = [
+    "minimal-text-node",
+    "textNodeChrome",
+    hasBody ? "textNodeChrome--hasBody" : "",
+    editing ? "textNodeChrome--editing" : "",
+    textWorkflow === "writeSelf" && !hasBody ? "textNodeChrome--writeSelf" : "",
   ]
     .filter(Boolean)
     .join(" ");
-
-  const splitExpanded =
-    selected && !editing && Boolean(composer || workflowBottomPanel);
 
   /** 渲染空状态按钮（选择 textWorkflow） */
   const renderEmptyState = () => (
@@ -478,7 +480,7 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
 
   /** 渲染正文区域（编辑态/只读态） */
   const renderBodyContent = () => (
-    <div className="textNodeBodyWrap">
+    <div className="textNodeBodyWrap textNodeChrome-body">
       {textChrome ? (
         <button
           type="button"
@@ -546,62 +548,52 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
       </div>
     ) : null;
 
-  /** 分体模式下：上卡主体内容 */
-  const upperBodyContent = (
-    <>
+  const shellContent = (
+    <div className="textNodeChrome-inner">
       {!hasBody && textWorkflow === undefined ? renderEmptyState() : null}
       {uiSelected && !hasBody && textWorkflow === "writeSelf" ? renderWriteSelfEditor() : null}
       {uiSelected && !hasBody && textWorkflow === "imageToPrompt" ? renderImageToPromptEmpty() : null}
+      {renderWorkflowHint()}
       {hasBody ? renderBodyContent() : null}
-      <MagneticNodeAnchors nodeId={id} nodeType={type} />
-    </>
+    </div>
   );
 
-  /** 分体模式下：下浮层内容 */
-  const lowerPanelContent = (
+  const bottomPortalContent = (
     <>
-      {renderWorkflowHint()}
-      {composer}
       {workflowBottomPanel}
-    </>
-  );
-
-  /** 非分体模式下的 children 内容 */
-  const childrenContent = (
-    <>
-      {!hasBody && textWorkflow === undefined ? renderEmptyState() : null}
-      {uiSelected && !hasBody && textWorkflow === "writeSelf" ? renderWriteSelfEditor() : null}
-      {uiSelected && !hasBody && textWorkflow === "imageToPrompt" ? renderImageToPromptEmpty() : null}
-      {renderWorkflowHint()}
-      {hasBody ? (
-        <>
-          {renderBodyContent()}
-          {composer}
-          {workflowBottomPanel}
-        </>
-      ) : null}
-      <MagneticNodeAnchors nodeId={id} nodeType={type} />
+      {composer}
     </>
   );
 
   return (
     <>
-      <NodeFrame
-        defaultTitle="文本"
-        label={data.label}
-        nodeId={id}
+      <NodeMetaLabel
+        label={data.label ?? ""}
+        defaultLabel="文本"
+        onCommit={commitLabel}
+      />
+
+      <NodeMetaStatus dimsText={metaText} />
+
+      <NodeChromeShell
         selected={selected}
-        tone="text"
-        icon={<TextDocIcon />}
-        subtitle={textNodeSubtitle(hasBody, prompt)}
-        rootClassName={rootClass}
-        expandedSplit={splitExpanded}
-        upperBody={splitExpanded ? upperBodyContent : undefined}
-        floatingBottomOverlay={splitExpanded ? <div className="nodeFloatingBottomPanel">{lowerPanelContent}</div> : undefined}
-        lowerBody={undefined}
+        width={frameSize.width}
+        height={frameSize.height}
+        previewRef={previewRef}
+        shellClassName={shellClass}
+        previewClassName="minimal-text-preview"
+        afterPreview={<NodeAnchors nodeId={id} nodeType={type} variant="simple" />}
       >
-        {!splitExpanded ? childrenContent : null}
-      </NodeFrame>
+        {shellContent}
+      </NodeChromeShell>
+
+      <TextNodeBottomPortal
+        anchorRef={previewRef}
+        active={showBottomPortal}
+        panelRef={bottomPanelRef}
+      >
+        {bottomPortalContent}
+      </TextNodeBottomPortal>
 
       <TextNodeExpandEditModal
         open={expandEditOpen}

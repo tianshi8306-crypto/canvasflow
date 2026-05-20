@@ -11,6 +11,9 @@ export function newImageModelTemplate(): ImageModelConfig {
     apiBaseUrl: "",
     enabled: true,
     priority: 0,
+    supportsMultiRefFusion: true,
+    maxReferenceImages: 4,
+    supportsImageEdit: true,
   };
 }
 

@@ -37,13 +37,13 @@ describe("§30 五类节点初始空 data", () => {
 
   it("imageNode 初始 data 含 label 和空 path", () => {
     const d = newNodeDataByType.imageNode();
-    expect(d.label).toBe("图片");
+    expect(d.label).toMatch(/^图片 \d+$/);
     expect(d.path).toBe("");
   });
 
   it("videoNode 初始 data 含 label、空 path 和 video 字段", () => {
     const d = newNodeDataByType.videoNode();
-    expect(d.label).toBe("视频");
+    expect(d.label).toMatch(/^视频 \d+$/);
     expect(d.path).toBe("");
     expect(d.video).toBeDefined();
   });
@@ -221,8 +221,8 @@ describe("§31 §34 复制/粘贴含脚本子图 – beatId 独立副本", () =>
       copiedEdges: [],
     });
     const newData = nextNodes[0]!.data;
-    const newA = newData.scriptBeats?.[0]?.id!;
-    const newB = newData.scriptBeats?.[1]?.id!;
+    const newA = newData.scriptBeats?.[0]?.id;
+    const newB = newData.scriptBeats?.[1]?.id;
 
     // scriptBeats[].id 已更新
     expect(newData.scriptBeats?.[0]?.id).toBe(newA);

@@ -1,9 +1,25 @@
 import type { Node, NodeChange } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import { nodeLayoutDimensions } from "@/lib/nodeLayout";
+import { SIMPLE_ANCHOR_ALIGN_SNAP_PX } from "@/lib/simpleAnchorGeometry";
 
-/** 画布坐标系下的吸附阈值（像素与缩放无关，与节点 position 同单位） */
-const SNAP_PX = 14;
+/** 边对齐吸附阈值 */
+const SNAP_EDGE_PX = 14;
+
+/** 水平中心（锚点连线）吸附阈值 */
+const SNAP_CENTER_PX = SIMPLE_ANCHOR_ALIGN_SNAP_PX;
+
+export type NodeSnapVisual = {
+  /** 对齐参考线在 flow 坐标下的 y */
+  flowY: number;
+  flowXMin: number;
+  flowXMax: number;
+};
+
+export type SnapNodePositionResult = {
+  changes: NodeChange<Node<FlowNodeData>>[];
+  visual: NodeSnapVisual | null;
+};
 
 type Rect = { left: number; right: number; top: number; bottom: number; cx: number; cy: number };
 
@@ -21,7 +37,10 @@ function toRect(n: Node<FlowNodeData>): Rect {
   };
 }
 
-function pickBestDelta(candidates: number[], threshold: number): number {
+function pickBestDelta(
+  candidates: number[],
+  threshold: number,
+): { delta: number; abs: number } {
   let best = 0;
   let bestAbs = threshold + 1;
   for (const d of candidates) {
@@ -31,7 +50,7 @@ function pickBestDelta(candidates: number[], threshold: number): number {
       best = d;
     }
   }
-  return best;
+  return { delta: best, abs: bestAbs };
 }
 
 /**
@@ -40,19 +59,20 @@ function pickBestDelta(candidates: number[], threshold: number): number {
 export function snapNodePositionChanges(
   changes: NodeChange<Node<FlowNodeData>>[],
   nodes: Node<FlowNodeData>[],
-): NodeChange<Node<FlowNodeData>>[] {
+): SnapNodePositionResult {
   const posIdx: number[] = [];
   const movingIds = new Set<string>();
 
   changes.forEach((c, i) => {
     if (c.type !== "position" || !c.position) return;
-    /** 仅用户拖拽产生的 position 带 dragging；撤销/父级展开等不走吸附 */
     if (typeof (c as { dragging?: boolean }).dragging !== "boolean") return;
     posIdx.push(i);
     movingIds.add(c.id);
   });
 
-  if (movingIds.size === 0) return changes;
+  if (movingIds.size === 0) {
+    return { changes, visual: null };
+  }
 
   const proposed = new Map<string, { x: number; y: number }>();
   for (const n of nodes) {
@@ -64,12 +84,14 @@ export function snapNodePositionChanges(
   }
 
   const firstMoving = nodes.find((n) => movingIds.has(n.id));
-  if (!firstMoving) return changes;
+  if (!firstMoving) {
+    return { changes, visual: null };
+  }
   const scopeParent = firstMoving.parentId ?? null;
   for (const id of movingIds) {
     const n = nodes.find((x) => x.id === id);
     if (!n || (n.parentId ?? null) !== scopeParent) {
-      return changes;
+      return { changes, visual: null };
     }
   }
 
@@ -79,7 +101,9 @@ export function snapNodePositionChanges(
     if ((n.parentId ?? null) !== scopeParent) continue;
     snapTargets.push(toRect(n));
   }
-  if (snapTargets.length === 0) return changes;
+  if (snapTargets.length === 0) {
+    return { changes, visual: null };
+  }
 
   let minX = Infinity;
   let minY = Infinity;
@@ -97,13 +121,17 @@ export function snapNodePositionChanges(
     maxY = Math.max(maxY, p.y + h);
   }
 
-  if (!Number.isFinite(minX)) return changes;
+  if (!Number.isFinite(minX)) {
+    return { changes, visual: null };
+  }
 
   const bboxW = maxX - minX;
   const bboxH = maxY - minY;
+  const movingCy = minY + bboxH / 2;
 
   const dxCandidates: number[] = [];
   const dyCandidates: number[] = [];
+  const centerDyMeta: { delta: number; targetCy: number; target: Rect }[] = [];
 
   for (const t of snapTargets) {
     dxCandidates.push(
@@ -113,19 +141,35 @@ export function snapNodePositionChanges(
       t.right - maxX,
       t.cx - (minX + bboxW / 2),
     );
+    const centerDelta = t.cy - movingCy;
     dyCandidates.push(
       t.top - minY,
       t.bottom - minY,
       t.top - maxY,
       t.bottom - maxY,
-      t.cy - (minY + bboxH / 2),
+      centerDelta,
     );
+    centerDyMeta.push({ delta: centerDelta, targetCy: t.cy, target: t });
   }
 
-  const dx = pickBestDelta(dxCandidates, SNAP_PX);
-  const dy = pickBestDelta(dyCandidates, SNAP_PX);
+  const dxPick = pickBestDelta(dxCandidates, SNAP_EDGE_PX);
+  const dyPick = pickBestDelta(dyCandidates, SNAP_CENTER_PX);
 
-  if (dx === 0 && dy === 0) return changes;
+  const dx = dxPick.delta;
+  const dy = dyPick.delta;
+
+  if (dx === 0 && dy === 0) {
+    return { changes, visual: null };
+  }
+
+  let visual: NodeSnapVisual | null = null;
+  if (dyPick.abs > 0 && dyPick.abs <= SNAP_CENTER_PX) {
+    const matched = centerDyMeta.find((m) => m.delta === dy);
+    const flowY = matched?.targetCy ?? movingCy + dy;
+    const xMin = Math.min(minX, ...(snapTargets.map((t) => t.left)));
+    const xMax = Math.max(maxX, ...(snapTargets.map((t) => t.right)));
+    visual = { flowY, flowXMin: xMin, flowXMax: xMax };
+  }
 
   const out = changes.slice();
   for (const i of posIdx) {
@@ -139,5 +183,5 @@ export function snapNodePositionChanges(
       },
     };
   }
-  return out;
+  return { changes: out, visual };
 }

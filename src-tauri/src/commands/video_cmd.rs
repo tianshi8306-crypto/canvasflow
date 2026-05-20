@@ -7,6 +7,8 @@
 use crate::command_common::resolve_ffmpeg_bin;
 use crate::commands::types::{VideoGenStartResponse, VideoGenerationStartRequest, VideoJobSnapshot};
 use crate::db;
+use crate::dreamina_cli::DreaminaCliState;
+use crate::dreamina_gen;
 use crate::media;
 use crate::settings;
 use crate::vault::get_api_key;
@@ -358,6 +360,7 @@ async fn download_video_to_assets(
 pub async fn video_gen_start(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
+    dreamina: tauri::State<'_, DreaminaCliState>,
     req: VideoGenerationStartRequest,
 ) -> Result<VideoGenStartResponse, String> {
     // 完整打印收到的请求（用于调试）
@@ -386,15 +389,22 @@ pub async fn video_gen_start(
 
     eprintln!("[video_gen_start] project_path={}, node_id={}, model_id={}", req.project_path, req.node_id, model_id);
 
-    // 尝试真实供应商；API Key 未配置或调用失败时向上传播错误，不走 mock
-    let job_id = match submit_video_job_http(&app, &state.http, &req).await {
-        Ok(id) => {
-            eprintln!("[video_gen_start] 成功，job_id={}", id);
-            id
-        }
-        Err(e) => {
-            eprintln!("[video_gen_start] 失败: {}", e);
-            return Err(e);
+    let is_dreamina = dreamina_gen::is_dreamina_model(&model_id);
+    let workflow = req.payload.workflow.clone();
+
+    let job_id = if is_dreamina {
+        eprintln!("[video_gen_start] 即梦 CLI 路由");
+        dreamina_gen::submit_video_via_cli(&dreamina, &state.http, &req).await?
+    } else {
+        match submit_video_job_http(&app, &state.http, &req).await {
+            Ok(id) => {
+                eprintln!("[video_gen_start] 成功，job_id={}", id);
+                id
+            }
+            Err(e) => {
+                eprintln!("[video_gen_start] 失败: {}", e);
+                return Err(e);
+            }
         }
     };
 
@@ -411,6 +421,12 @@ pub async fn video_gen_start(
             polls: 0,
             result_rel_path: None,
             cancelled: false,
+            is_dreamina,
+            dreamina_workflow: if is_dreamina {
+                Some(workflow)
+            } else {
+                None
+            },
         },
     );
     Ok(VideoGenStartResponse { job_id })
@@ -430,7 +446,7 @@ pub async fn video_gen_get_job(
     // ============================================================
     // 阶段 1：快速路径（不持有锁的分支）
     // ============================================================
-    {
+    let dreamina_poll_ctx = {
         let mut map = state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
         let Some(j) = map.get_mut(id) else {
             return Ok(VideoJobSnapshot {
@@ -454,19 +470,63 @@ pub async fn video_gen_get_job(
             });
         }
 
-        j.polls += 1;
-        if j.polls < 4 {
-            let st = if j.polls == 1 { "queued" } else { "running" };
-            let p = (j.polls as f64) * 0.25;
+        if j.result_rel_path.is_some() {
+            let rel = j.result_rel_path.clone();
+            let mid = j.model_id.clone();
             return Ok(VideoJobSnapshot {
                 id: id.to_string(),
-                status: st.into(),
-                progress: Some(p.min(0.95)),
+                status: "succeeded".into(),
+                progress: Some(1.0),
                 error: None,
-                model_id: j.model_id.clone(),
-                result_rel_path: None,
+                model_id: mid,
+                result_rel_path: rel,
             });
         }
+
+        if j.is_dreamina {
+            j.polls += 1;
+            Some((
+                j.project_path.clone(),
+                j.model_id.clone(),
+                j.dreamina_workflow.clone().unwrap_or_else(|| "text_to_video".into()),
+            ))
+        } else {
+            j.polls += 1;
+            if j.polls < 4 {
+                let st = if j.polls == 1 { "queued" } else { "running" };
+                let p = (j.polls as f64) * 0.25;
+                return Ok(VideoJobSnapshot {
+                    id: id.to_string(),
+                    status: st.into(),
+                    progress: Some(p.min(0.95)),
+                    error: None,
+                    model_id: j.model_id.clone(),
+                    result_rel_path: None,
+                });
+            }
+            None
+        }
+    };
+
+    if let Some((project_path, model_id, workflow)) = dreamina_poll_ctx {
+        let snap = dreamina_gen::poll_video_via_cli(
+            &state.http,
+            id,
+            &project_path,
+            &model_id,
+            &workflow,
+        )
+        .await?;
+        if snap.status == "succeeded" {
+            if let Some(ref rel) = snap.result_rel_path {
+                let mut map =
+                    state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
+                if let Some(job) = map.get_mut(id) {
+                    job.result_rel_path = Some(rel.clone());
+                }
+            }
+        }
+        return Ok(snap);
     }
 
     // ============================================================

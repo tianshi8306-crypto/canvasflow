@@ -1,0 +1,161 @@
+/* 文本节点 Chrome：配色与图片节点壳层一致（#2b2b2b / #1f1f1f / #4d4d4d） */
+
+.minimal-text-node.nodeChrome-shell {
+  background: var(--bg-node, #2b2b2b);
+  border-color: var(--border-node, #4d4d4d);
+}
+
+.minimal-text-preview.nodeChrome-preview {
+  background: var(--bg-node-preview, #1f1f1f);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  pointer-events: auto;
+}
+
+.textNodeChrome-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.textNodeChrome .textNodeBodyWrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.textNodeChrome-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.textNodeChrome--minimal {
+  width: 500px;
+  max-width: calc(100vw - 24px);
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  font-size: 13px;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.textNodeChrome--minimal .scriptGenComposer {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+.textNodeChrome--minimal .scriptGenComposerInput {
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-node-preview, #1f1f1f);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.textNodeChrome--minimal .scriptGenComposerInput::placeholder {
+  color: var(--text-placeholder, #616161);
+}
+
+.textNodeChrome--minimal .scriptGenModelSelect {
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.textNodeChrome--minimal .scriptGenSend {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: none;
+  background: #ffffff;
+  color: #121212;
+}
+
+.textNodeChrome--minimal .scriptGenSend:hover {
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.textNodeChrome--minimal .btn {
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.textNodeChrome--minimal .btn:hover {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+}
+
+/* 正文区 */
+.textNodeChrome .textNodeReadOnly,
+.textNodeChrome .textNodeEditable,
+.textNodeChrome .textNodeWriteSelfEditable {
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-node-preview, #1f1f1f);
+  color: var(--text-primary, #e0e0e0);
+  border-radius: var(--radius-sm, 6px);
+}
+
+.textNodeChrome .textNodeReadOnly {
+  flex: 1;
+  min-height: 80px;
+  overflow: auto;
+}
+
+.textNodeChrome .textNodeFormatBar {
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-panel, #2b2b2b);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+}
+
+.textNodeChrome .textNodeFmtBtn {
+  color: var(--text-icon, #bdbdbd);
+}
+
+.textNodeChrome .textNodeFmtBtn:hover {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #e0e0e0);
+}
+
+.textNodeChrome .textNodeDownloadFloat {
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-icon, #bdbdbd);
+}
+
+.textNodeChrome .textNodeDownloadFloat:hover {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+  color: var(--text-primary, #e0e0e0);
+}
+
+.textNodeChrome .scriptGenEmptyCard,
+.textNodeChrome .textNodeFigure3Empty {
+  border: 1px dashed var(--border-node, #4d4d4d);
+  background: var(--bg-node-preview, #1f1f1f);
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.textNodeChrome .textNodeFigure3Hint {
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.textNodeChrome .textNodeWorkflowHint {
+  color: var(--text-secondary, #9e9e9e);
+  font-size: 11px;
+  padding: 0 2px 8px;
+}
+
+.textNodeChrome .textNodeTtvPanel,
+.textNodeChrome .textNodeTtmPanel {
+  border-color: var(--border-node, #4d4d4d);
+}

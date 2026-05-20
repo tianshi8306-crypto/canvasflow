@@ -1,4 +1,5 @@
 pub mod assets_cmd;
+pub mod dreamina_cmd;
 pub mod download_cmd;
 pub mod file_cmd;
 pub mod generic_api_cmd;
@@ -10,3 +11,4 @@ pub mod settings_cmd;
 pub mod timeline_cmd;
 pub mod types;
 pub mod video_cmd;
+pub mod video_tools_cmd;

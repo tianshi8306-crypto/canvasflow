@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useReactFlow } from "@xyflow/react";
+import { Panel, useReactFlow } from "@xyflow/react";
 
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3.0;
@@ -89,14 +89,12 @@ export function ZoomControls() {
   const handleFit = useCallback(() => {
     const nodes = getNodes();
     if (nodes.length === 0) {
-      const cur = getViewport();
       setViewport({ x: 0, y: 0, zoom: 1 });
       setZoomPercent(100);
       return;
     }
 
     const padding = 80;
-    const vp = getViewport();
     const container = document.querySelector(".react-flow__viewport")?.parentElement;
     if (!container) return;
     const cw = container.clientWidth;
@@ -124,6 +122,7 @@ export function ZoomControls() {
 
     setViewport({ x: newX, y: newY, zoom: newZoom });
     setZoomPercent(calcZoomPercent(newZoom));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getNodes, getViewport, setViewport]);
 
   const setZoom = useCallback(
@@ -149,6 +148,7 @@ export function ZoomControls() {
   const atMax = getViewport().zoom >= MAX_ZOOM;
 
   return (
+    <Panel position="bottom-right" style={{ bottom: 80, right: 10, zIndex: 5 }}>
     <div className="zoomControls" ref={menuRef}>
         <button
           className="zoomBtn"
@@ -204,5 +204,6 @@ export function ZoomControls() {
           </div>
         )}
       </div>
+    </Panel>
   );
 }

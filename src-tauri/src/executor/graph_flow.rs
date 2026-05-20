@@ -1,6 +1,8 @@
+use crate::executor::asset_resolve::resolve_node_media_rel_path;
 use crate::graph::{CanvasGraph, FlowNode};
 use serde_json::json;
 use std::collections::{HashMap, HashSet};
+use std::path::Path;
 
 pub(crate) fn node_by_id<'a>(graph: &'a CanvasGraph, id: &str) -> Option<&'a FlowNode> {
     graph.nodes.iter().find(|n| n.id == id)
@@ -89,7 +91,11 @@ pub(crate) fn incoming_texts_ordered_with_prompt_fallback(
 }
 
 /// 指向脚本节点的上游 `videoNode` 参考视频路径（拓扑序；去重）。
-pub(crate) fn incoming_reference_video_paths_ordered(graph: &CanvasGraph, node_id: &str) -> Vec<String> {
+pub(crate) fn incoming_reference_video_paths_ordered(
+    project_root: &Path,
+    graph: &CanvasGraph,
+    node_id: &str,
+) -> Vec<String> {
     let order = match crate::graph::topological_order(graph) {
         Ok(o) => o,
         Err(_) => return Vec::new(),
@@ -109,16 +115,9 @@ pub(crate) fn incoming_reference_video_paths_ordered(graph: &CanvasGraph, node_i
         if src.node_type != "videoNode" {
             continue;
         }
-        let p = src
-            .data
-            .get("path")
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .trim()
-            .to_string();
-        if p.is_empty() {
+        let Some(p) = resolve_node_media_rel_path(project_root, &src.data) else {
             continue;
-        }
+        };
         let idx = topo_index.get(&e.source).copied().unwrap_or(0);
         pairs.push((idx, p));
     }

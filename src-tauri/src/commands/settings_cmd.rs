@@ -24,3 +24,8 @@ pub fn clear_api_key(provider_id: String) -> Result<(), String> {
 pub fn has_api_key(provider_id: String) -> Result<bool, String> {
     Ok(crate::vault::get_api_key(&provider_id)?.is_some())
 }
+
+#[tauri::command]
+pub fn load_api_key(provider_id: String) -> Result<Option<String>, String> {
+    crate::vault::get_api_key(&provider_id)
+}

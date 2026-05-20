@@ -10,6 +10,8 @@ export type NodeAgentContext = {
   updateNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
   setStatusText: (text: string) => void;
   reportAgentEvent?: (event: NodeAgentRuntimeEvent) => void;
+  /** 外部可通过此对象主动取消执行（Agent execute 应检查 cancelToken?.cancelled） */
+  cancelToken?: { cancelled: boolean };
 };
 
 export type NodeAgentPhase =

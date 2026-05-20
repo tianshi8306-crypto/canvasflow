@@ -54,7 +54,7 @@ export async function pickVideoPathsForImport(multiple: boolean): Promise<string
   if (!isTauri()) return null;
   const selected = await open({
     multiple,
-    filters: [{ name: "视频", extensions: ["mp4", "mov", "webm", "avi", "mkv"] }],
+    filters: [{ name: "视频", extensions: ["mp4", "mov", "webm", "avi", "mkv", "m4v", "mpeg", "mpg"] }],
   });
   return normalize(selected);
 }

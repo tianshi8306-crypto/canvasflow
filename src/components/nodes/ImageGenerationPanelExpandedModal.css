@@ -1,0 +1,153 @@
+.igp-expanded-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 32px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  box-sizing: border-box;
+}
+
+.igp-expanded-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* 与底栏 Portal 同构：500px 宽、同款 chrome，仅放大高度与正文字号 */
+.igp-expanded-card.igp-layout-expanded.imageGenPanel--minimal {
+  width: 500px;
+  min-height: min(420px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+  --igp-control-h: 40px;
+  --igp-quick-icon-size: 18px;
+}
+
+.igp-expanded-card.igp-layout-expanded .imageGenPanel--minimal-inner {
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+}
+
+.igp-expanded-card.igp-layout-expanded .mention-overlay,
+.igp-expanded-card.igp-layout-expanded .mention-textarea {
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.igp-expanded-card.igp-layout-expanded .mention-input-wrapper.imageGenPanelTextarea,
+.igp-expanded-card.igp-layout-expanded .mention-input-wrapper.imageGenPanelTextarea--minimal,
+.igp-expanded-card.igp-layout-expanded .mention-input-wrapper.imageGenPanelTextarea--expanded {
+  flex: 1;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+
+.igp-expanded-card.igp-layout-expanded .mention-textarea {
+  flex: 1;
+  min-height: 140px;
+  max-height: min(360px, calc(100vh - 220px));
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.igp-expanded-card.igp-layout-expanded .mention-textarea:focus,
+.igp-expanded-card.igp-layout-expanded .mention-textarea:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+.igp-expanded-card.igp-layout-expanded .igp-header-quick .igp-icon-btn span,
+.igp-expanded-card.igp-layout-expanded .igp-header-quick .igp-meta-tile span {
+  font-size: 11px;
+}
+
+.igp-expanded-card.igp-layout-expanded .igp-bottom-bar .igp-model-trigger,
+.igp-expanded-card.igp-layout-expanded .igp-bottom-bar .igp-ar-trigger,
+.igp-expanded-card.igp-layout-expanded .igp-count-select {
+  font-size: 12px;
+}
+
+.igp-expanded-card.igp-layout-expanded .igp-quick-icon-wrap,
+.igp-expanded-card.igp-layout-expanded .igp-quick-icon-wrap > svg:first-of-type,
+.igp-expanded-card.igp-layout-expanded .igp-meta-icon {
+  width: var(--igp-quick-icon-size);
+  height: var(--igp-quick-icon-size);
+}
+
+.igp-expanded-card.igp-layout-expanded .igp-prompt-wrap .igp-counter {
+  font-size: 11px;
+}
+
+/* ── 视频生成面板展开态：与底栏 Portal 同构，仅增高与字号放大 ── */
+.igp-expanded-card.vgp-layout-expanded.videoGenPanel--chrome {
+  width: 500px;
+  min-height: min(420px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+  --vgp-control-h: 40px;
+}
+
+.igp-expanded-card.vgp-layout-expanded .mmPanel--chrome.mmPanel--expanded {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.igp-expanded-card.vgp-layout-expanded .mmPromptArea--compact {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.igp-expanded-card.vgp-layout-expanded .mmPromptArea--compact .mmPromptInput {
+  flex: 1;
+  min-height: 140px;
+  max-height: min(360px, calc(100vh - 220px));
+  padding: 4px 0;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.igp-expanded-card.vgp-layout-expanded .vgp-prompt-counter,
+.igp-expanded-card.vgp-layout-expanded .mmPromptLen {
+  font-size: 11px;
+  color: #616161;
+}
+
+.igp-expanded-card.vgp-layout-expanded .mmFoot--chrome .mmModelSelect,
+.igp-expanded-card.vgp-layout-expanded .mmFoot--chrome .mmOutputCombo {
+  font-size: 12px;
+  min-height: var(--vgp-control-h);
+}
+
+.igp-expanded-card.vgp-layout-expanded .igp-generate-btn {
+  width: var(--vgp-control-h);
+  height: var(--vgp-control-h);
+  min-height: var(--vgp-control-h);
+}

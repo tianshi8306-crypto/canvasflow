@@ -54,6 +54,12 @@ export type ScriptBeat = {
 };
 
 /** 由脚本条目生成的分镜文案（R4：文生图/视频前的画面描述，持久化进脚本节点） */
+export type StoryboardShotStatus = "idle" | "generating" | "generated" | "failed";
+
+/** 视频生成状态（R4 联动：跟踪 videoNode 生成状态） */
+export type VideoShotStatus = "idle" | "generating" | "generated" | "failed";
+
+/** 由脚本条目生成的分镜文案（R4：文生图/视频前的画面描述，持久化进脚本节点） */
 export type StoryboardShot = {
   /** 对应 `ScriptBeat.id` */
   scriptBeatId: string;
@@ -67,10 +73,41 @@ export type StoryboardShot = {
   imagePath?: string;
   /** 可选：分镜图对应素材 ID（与 imagePath 同步，供按 id 解析） */
   imageAssetId?: string;
+  /** 生成状态：idle | generating | generated | failed */
+  status?: StoryboardShotStatus;
+  /** 失败原因（供 UI 显示） */
+  error?: string;
+  /** 重试次数 */
+  retryCount?: string;
+  /** 视频生成状态（R4 联动：videoNode 生成状态） */
+  videoStatus?: VideoShotStatus;
+  /** 关联的 videoNodeId（Hermes 创建时写入） */
+  videoNodeId?: string;
+  /** 视频生成失败原因 */
+  videoError?: string;
 };
 
 /** 文本节点「尝试」入口进入的工作流（存于 params.textWorkflow） */
-export type TextWorkflowKind = "writeSelf" | "textToVideo" | "imageToPrompt" | "textToMusic";
+export type TextWorkflowKind = "writeSelf" | "textToVideo" | "imageToPrompt" | "textToMusic" | "scriptToText";
+
+/** 节点运行状态（C.1：节点状态机） */
+export type NodeExecutionStatus = "idle" | "pending" | "running" | "succeeded" | "failed" | "skipped";
+
+/** 节点状态记录 */
+export type NodeStatus = {
+  /** 当前状态 */
+  status: NodeExecutionStatus;
+  /** 最后更新时间 */
+  updatedAt: number;
+  /** 当前运行的 Agent 名称 */
+  agentName?: string;
+  /** 当前运行阶段 */
+  phase?: string;
+  /** 错误信息 */
+  error?: string;
+  /** 进度 0-100 */
+  progress?: number;
+};
 
 export type FlowNodeData = {
   label?: string;
@@ -79,6 +116,10 @@ export type FlowNodeData = {
   /** 各节点自定义参数；图片/音频/视频可与脚本镜头绑定 `scriptBeatId`、`shotNumber` */
   params?: Record<string, unknown>;
   path?: string;
+  /** 成片像素宽（上传/生成后写入，用于预览框比例） */
+  imageWidth?: number;
+  /** 成片像素高 */
+  imageHeight?: number;
   /** 工程素材库中的稳定 ID（与 path 双写，见 M1） */
   assetId?: string;
   /** 仅 videoNode：上传/生成元数据与草稿（`video.draft.prompt` 与展开面板、属性侧栏同步） */
@@ -95,10 +136,20 @@ export type FlowNodeData = {
   scriptTotalDurationSec?: number;
   /** 脚本节点：镜头条数，由执行器解析回填 */
   scriptShotCount?: number;
+  /** 节点运行状态（C.1：节点状态机） */
+  status?: NodeStatus;
 };
 
 export type CanvasFileV1 = {
   version: 1;
+  viewport: Viewport;
+  nodes: Node<FlowNodeData>[];
+  edges: Edge[];
+};
+
+/** v2 统一图片节点格式 */
+export type CanvasFileV2 = {
+  version: 2;
   viewport: Viewport;
   nodes: Node<FlowNodeData>[];
   edges: Edge[];

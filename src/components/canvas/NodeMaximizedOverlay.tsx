@@ -1,13 +1,11 @@
 import { useEffect } from "react";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
-import { ImageGenerationPanel } from "@/components/nodes/ImageGenerationPanel";
 import { AudioTtsPanel } from "@/components/nodes/AudioTtsPanel";
 import { TextNodeTextToVideoPanel } from "@/components/nodes/TextNodeWorkflowPanels";
 import { ScriptNodeWorkbench } from "@/components/ScriptNodeWorkbench";
 import { ScriptStoryboardSection } from "@/components/ScriptStoryboardSection";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
-import { getIncomingImageRefForNode } from "@/lib/incomingImageReference";
 
 /**
  * 右键双击节点：在当前画布内最大化展示节点对应 Agent 工作区，并与节点数据双向同步。
@@ -15,16 +13,31 @@ import { getIncomingImageRefForNode } from "@/lib/incomingImageReference";
 export function NodeMaximizedOverlay() {
   const maximizedNodeId = useCanvasUiStore((s) => s.maximizedNodeId);
   const setMaximizedNodeId = useCanvasUiStore((s) => s.setMaximizedNodeId);
-  const subjectListVersion = useCanvasUiStore((s) => s.subjectListVersion);
+  const setImageGenPanelExpandedNodeId = useCanvasUiStore((s) => s.setImageGenPanelExpandedNodeId);
+  const setVideoGenPanelExpandedNodeId = useCanvasUiStore((s) => s.setVideoGenPanelExpandedNodeId);
   const nodes = useProjectStore((s) => s.nodes);
-  const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
 
   const node = maximizedNodeId ? nodes.find((n) => n.id === maximizedNodeId) : undefined;
-  const incomingImageRef =
-    node?.type === "imageNode" && maximizedNodeId
-      ? getIncomingImageRefForNode(nodes, edges, maximizedNodeId)
-      : undefined;
+
+  useEffect(() => {
+    if (!maximizedNodeId) return;
+    if (node?.type === "imageNode") {
+      setImageGenPanelExpandedNodeId(maximizedNodeId);
+      setMaximizedNodeId(null);
+      return;
+    }
+    if (node?.type === "videoNode") {
+      setVideoGenPanelExpandedNodeId(maximizedNodeId);
+      setMaximizedNodeId(null);
+    }
+  }, [
+    maximizedNodeId,
+    node?.type,
+    setImageGenPanelExpandedNodeId,
+    setVideoGenPanelExpandedNodeId,
+    setMaximizedNodeId,
+  ]);
 
   useEffect(() => {
     if (!maximizedNodeId) return;
@@ -35,7 +48,9 @@ export function NodeMaximizedOverlay() {
     return () => window.removeEventListener("keydown", onKey);
   }, [maximizedNodeId, setMaximizedNodeId]);
 
-  if (!maximizedNodeId || !node) return null;
+  if (!maximizedNodeId || !node || node.type === "imageNode" || node.type === "videoNode") {
+    return null;
+  }
 
   return (
     <div
@@ -73,14 +88,7 @@ export function NodeMaximizedOverlay() {
           </button>
         </div>
         <div className="nodeMaxOverlayBody">
-          {node.type === "imageNode" ? (
-            <ImageGenerationPanel
-              nodeId={node.id}
-              referenceImagePath={incomingImageRef?.path}
-              referenceImageAssetId={incomingImageRef?.assetId}
-              subjectListVersion={subjectListVersion}
-            />
-          ) : node.type === "audioNode" ? (
+          {node.type === "audioNode" ? (
             <AudioTtsPanel nodeId={node.id} />
           ) : node.type === "videoNode" ? (
             <TextNodeTextToVideoPanel videoNodeId={node.id} />

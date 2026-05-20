@@ -4,6 +4,17 @@ import { NodeFrame } from "@/components/nodes/NodeFrame";
 import { MagneticNodeAnchors } from "@/components/nodes/MagneticNodeAnchors";
 import { FFmpegConcatPanel } from "@/components/nodes/FFmpegConcatPanel";
 
+/** 视频合成标题图标 */
+function FFmpegTitleIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="2" y="4" width="8" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="14" y="4" width="8" height="16" rx="1.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M10 10h4M10 14h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function FFmpegNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
   const inputs = Array.isArray(data.inputs) ? data.inputs : [];
   const splitExpanded = selected;
@@ -16,8 +27,10 @@ export function FFmpegNode({ id, data, selected, type }: NodeProps<Node<FlowNode
       label={data.label}
       nodeId={id}
       selected={selected}
-      tone="text"
+      tone="video"
+      icon={<FFmpegTitleIcon />}
       rootClassName={rootClass}
+      subtitle={splitExpanded ? undefined : `输入 ${inputs.length} 个片段`}
       upperBody={
         splitExpanded ? (
           <>

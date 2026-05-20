@@ -107,6 +107,8 @@ export function CanvasShortcutsOverlay({ onClose }: Props) {
           </Col>
 
           <Col title="缩放">
+            <Row label="聚焦选中节点" right={<Kbd>F</Kbd>} />
+            <Row label="适配全部节点" right={<Kbd>Z</Kbd>} />
             <Row
               label="滚轮"
               right={<span className="canvasShortcutHint">在画布上滚动</span>}

@@ -38,7 +38,7 @@ export function getIncomingExtraRows(anchorType: string | undefined): AnchorMenu
   if (anchorType === "audioNode") {
     return [{ key: "audioTts", label: "文字转语音面板" }];
   }
-  if (anchorType === "imageNode" || anchorType === "imageAsset") {
+  if (anchorType === "imageNode") {
     return [{ key: "imageI2iImport", label: "图生图" }];
   }
   return [];

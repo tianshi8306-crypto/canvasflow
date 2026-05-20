@@ -14,6 +14,8 @@ import { defaultVideoGenerationDraft, defaultVideoNodePersisted } from "@/lib/vi
 import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
 import { useProjectStore } from "@/store/projectStore";
 import { importMediaFiles } from "@/shared/api/assets";
+import { assessScriptComposeReadiness } from "@/lib/compose";
+import { batchGenerateVideosForStoryboard } from "@/lib/storyboard/batchGenerateVideos";
 
 type Props = {
   nodeId: string;
@@ -33,12 +35,16 @@ export function ScriptStoryboardSection({
 }: Props) {
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodes = useProjectStore((s) => s.nodes);
+  const edges = useProjectStore((s) => s.edges);
   const addNodesWithEdges = useProjectStore((s) => s.addNodesWithEdges);
   const setSelectedNodeIds = useProjectStore((s) => s.setSelectedNodeIds);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const setStatusText = useProjectStore((s) => s.setStatusText);
+  const exportScriptCompose = useProjectStore((s) => s.exportScriptCompose);
   const [sbView, setSbView] = useState<"grid" | "list">("grid");
   const [generating, setGenerating] = useState(false);
+  const [batchVideoRunning, setBatchVideoRunning] = useState(false);
+  const [composeExportRunning, setComposeExportRunning] = useState(false);
   const [detail, setDetail] = useState<StoryboardShot | null>(null);
   const storyboardImageInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -92,6 +98,11 @@ export function ScriptStoryboardSection({
       generatingCount: generatingShots.length,
     };
   }, [beatsNorm, shotByBeat, shots]);
+
+  const composeReadiness = useMemo(
+    () => assessScriptComposeReadiness(beatsNorm, shots ?? [], nodes, edges, nodeId),
+    [beatsNorm, shots, nodes, edges, nodeId],
+  );
 
   const runGenerate = async (targetBeats: ScriptBeat[]) => {
     setGenerating(true);
@@ -180,6 +191,42 @@ export function ScriptStoryboardSection({
   };
 
   /** 手动触发 Hermes 自动串联（为已生成分镜的镜头创建下游节点） */
+  const batchGenerateVideos = async () => {
+    if (!projectPath) {
+      setStatusText("请先打开工程");
+      return;
+    }
+    const selected = (scriptBeatSelection ?? []).filter((id) => beatsNorm.some((b) => b.id === id));
+    setBatchVideoRunning(true);
+    try {
+      await batchGenerateVideosForStoryboard({
+        scriptNodeId: nodeId,
+        shots: shots ?? [],
+        nodes,
+        edges,
+        projectPath,
+        updateNodeData,
+        setStatusText,
+        beatIds: selected.length > 0 ? selected : undefined,
+      });
+    } finally {
+      setBatchVideoRunning(false);
+    }
+  };
+
+  const handleExportScriptCompose = async () => {
+    if (!projectPath) {
+      setStatusText("请先打开工程");
+      return;
+    }
+    setComposeExportRunning(true);
+    try {
+      await exportScriptCompose(nodeId, { autoRender: true });
+    } finally {
+      setComposeExportRunning(false);
+    }
+  };
+
   const triggerHermesAutoChain = () => {
     const generatedShots = shots?.filter((s) => s.status === "generated" && s.visualPrompt?.trim()) ?? [];
     if (generatedShots.length === 0) {
@@ -479,9 +526,35 @@ export function ScriptStoryboardSection({
         >
           {generating ? "串联中…" : `Hermes 串联（${storyboardHealth.generatedCount}）`}
         </button>
+        <button
+          type="button"
+          className="btn btnPrimary"
+          disabled={batchVideoRunning || !projectPath || storyboardHealth.generatedCount === 0}
+          title="对已生成分镜图且已有视频节点的镜头批量提交视频生成"
+          onClick={() => void batchGenerateVideos()}
+        >
+          {batchVideoRunning ? "批量视频中…" : "批量生成视频"}
+        </button>
+        <button
+          type="button"
+          className="btn btnPrimary"
+          disabled={composeExportRunning || !projectPath || beatsNorm.length === 0}
+          title="按脚本镜号收集已出片视频、创建/更新合成节点并导出成片；缺失镜头不阻塞"
+          onClick={() => void handleExportScriptCompose()}
+        >
+          {composeExportRunning
+            ? "导出成片中…"
+            : `导出成片（${composeReadiness.readyCount}/${composeReadiness.totalBeats}）`}
+        </button>
       </div>
       <p className="storyboardHint">
         LLM 生成分镜文案；可在详情中从本机选择一张图导入工程并关联为「分镜图」（不出云端图生）。须已打开工程，桌面端选择文件。
+        {composeReadiness.missingCount > 0 ? (
+          <span className="storyboardComposeHint">
+            {" "}
+            导出成片时将跳过 {composeReadiness.missingCount} 个未出片或未关联视频节点的镜头。
+          </span>
+        ) : null}
       </p>
       {beatsNorm.length > 0 ? (
         <div className="storyboardHealthBar" role="status" aria-label="分镜一致性自检">

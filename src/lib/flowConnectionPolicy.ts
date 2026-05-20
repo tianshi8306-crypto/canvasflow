@@ -83,6 +83,74 @@ export function connectionRejectedReason(
   return null;
 }
 
+/** 旧版 SimpleAnchors 使用的 handle id，加载时归一化为 in/out */
+const LEGACY_SOURCE_HANDLES = new Set(["output"]);
+const LEGACY_TARGET_HANDLES = new Set(["input"]);
+
+export function normalizeSourceHandle(handle: string | null | undefined): string | null {
+  if (!handle) return null;
+  if (LEGACY_SOURCE_HANDLES.has(handle)) return "out";
+  return handle;
+}
+
+export function normalizeTargetHandle(handle: string | null | undefined): string | null {
+  if (!handle) return null;
+  if (LEGACY_TARGET_HANDLES.has(handle)) return "in";
+  return handle;
+}
+
+export function normalizeConnection(
+  connection: Pick<Connection, "source" | "target" | "sourceHandle" | "targetHandle">,
+): Pick<Connection, "source" | "target" | "sourceHandle" | "targetHandle"> {
+  return {
+    source: connection.source,
+    target: connection.target,
+    sourceHandle: normalizeSourceHandle(connection.sourceHandle ?? null),
+    targetHandle: normalizeTargetHandle(connection.targetHandle ?? null),
+  };
+}
+
+/** 仅允许单一 script 上游的目标节点类型 */
+const SINGLE_SCRIPT_UPSTREAM_TARGETS = new Set([
+  "imageNode",
+  "imageAsset",
+  "videoNode",
+  "textNode",
+  "audioNode",
+]);
+
+/** 统计指向 target 的启用 script 上游数量（可按 source 排除，用于校验新连线） */
+export function countIncomingScriptUpstreams(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  targetNodeId: string,
+  excludeSourceId?: string,
+): number {
+  const seen = new Set<string>();
+  for (const e of edges) {
+    if (isEdgeDisabled(e)) continue;
+    if (e.target !== targetNodeId) continue;
+    if (e.targetHandle && e.targetHandle !== "in") continue;
+    if (excludeSourceId && e.source === excludeSourceId) continue;
+    const n = nodes.find((x) => x.id === e.source);
+    if (n?.type === "scriptNode") seen.add(e.source);
+  }
+  return seen.size;
+}
+
+/** 是否已存在相同 source→target 的启用边 */
+export function hasParallelEdge(
+  edges: Edge[],
+  connection: Pick<Connection, "source" | "target">,
+): boolean {
+  return edges.some(
+    (e) =>
+      !isEdgeDisabled(e) &&
+      e.source === connection.source &&
+      e.target === connection.target,
+  );
+}
+
 function findPath(
   edges: Edge[],
   fromId: string,
@@ -129,7 +197,7 @@ export function validateConnection(
   nodes: Node<FlowNodeData>[],
   edges: Edge[],
 ): { ok: true } | { ok: false; reason: string } {
-  const { source, target, sourceHandle, targetHandle } = connection;
+  const { source, target, sourceHandle, targetHandle } = normalizeConnection(connection);
   if (!source || !target) return { ok: false, reason: "连线端点不完整" };
   if (source === target) return { ok: false, reason: "不允许连接到同一节点" };
   if (sourceHandle && sourceHandle !== "out") {
@@ -143,6 +211,17 @@ export function validateConnection(
   if (!sn || !tn) return { ok: false, reason: "无法识别节点信息" };
   const typeReason = connectionRejectedReason(sn.type, tn.type);
   if (typeReason) return { ok: false, reason: typeReason };
+  if (hasParallelEdge(edges, { source, target })) {
+    return { ok: false, reason: "相同节点之间已存在连线" };
+  }
+  if (
+    sn.type === "scriptNode" &&
+    tn.type &&
+    SINGLE_SCRIPT_UPSTREAM_TARGETS.has(tn.type) &&
+    countIncomingScriptUpstreams(nodes, edges, target) >= 1
+  ) {
+    return { ok: false, reason: "目标节点已有脚本上游，请勿连接第二个脚本节点" };
+  }
   const backPath = findPath(edges, target, source);
   if (backPath) {
     const cycle = [source, ...backPath].map((id) => id.slice(0, 6)).join(" -> ");
@@ -161,8 +240,14 @@ export function sanitizeCanvasEdges(
   const idType = new Map(nodes.map((n) => [n.id, n.type ?? null]));
   const kept: Edge[] = [];
   let dropped = 0;
+  const seenPair = new Set<string>();
   for (const e of edges) {
     if (e.source === e.target) {
+      dropped++;
+      continue;
+    }
+    const pairKey = `${e.source}\0${e.target}`;
+    if (seenPair.has(pairKey)) {
       dropped++;
       continue;
     }
@@ -181,8 +266,22 @@ export function sanitizeCanvasEdges(
       dropped++;
       continue;
     }
+    const normalized = normalizeConnection({
+      source: e.source,
+      target: e.target,
+      sourceHandle: e.sourceHandle ?? null,
+      targetHandle: e.targetHandle ?? null,
+    });
+    const verdict = validateConnection(normalized, nodes, kept);
+    if (!verdict.ok) {
+      dropped++;
+      continue;
+    }
+    seenPair.add(pairKey);
     kept.push({
       ...e,
+      sourceHandle: normalized.sourceHandle ?? "out",
+      targetHandle: normalized.targetHandle ?? "in",
       data: { ...(typeof e.data === "object" && e.data ? e.data : {}), payloadType },
     });
   }
