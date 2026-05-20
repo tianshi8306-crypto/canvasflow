@@ -30,6 +30,7 @@ import {
   sanitizeCanvasEdges,
   validateConnection,
 } from "@/lib/flowConnectionPolicy";
+import { applyTextWorkflowSyncToNodes } from "@/lib/textNodeWorkflowSync";
 import { makeFlowEdge } from "@/lib/flowEdge";
 import { edgeToggleStatusText, isEdgeDisabled } from "@/lib/edgeState";
 import {
@@ -150,7 +151,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
   onEdgesChange: (changes) => {
     scheduleHistoryBurst(get);
-    set((s) => ({ edges: applyEdgeChanges(changes, s.edges) }));
+    set((s) => {
+      const edges = applyEdgeChanges(changes, s.edges);
+      const nodes = applyTextWorkflowSyncToNodes(s.nodes, edges);
+      return { edges, nodes };
+    });
     if (get().projectPath) scheduleSave(get);
   },
   onConnect: (c) => {
@@ -170,8 +175,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (!sn) return;
     const payloadType = getOutputPortType(sn.type);
     recordBeforeDiscreteMutation(get);
-    set((s) => ({
-      edges: addEdge(
+    set((s) => {
+      const edges = addEdge(
         {
           ...normalized,
           sourceHandle: normalized.sourceHandle ?? "out",
@@ -182,19 +187,25 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           ...(payloadType ? { data: { payloadType } } : {}),
         },
         s.edges,
-      ),
-    }));
+      );
+      const nodes = applyTextWorkflowSyncToNodes(s.nodes, edges);
+      return { edges, nodes };
+    });
     if (get().projectPath) scheduleSave(get);
   },
 
   deleteEdge: (edgeId) => {
     recordBeforeDiscreteMutation(get);
-    set((s) => ({ edges: s.edges.filter((e) => e.id !== edgeId) }));
+    set((s) => {
+      const edges = s.edges.filter((e) => e.id !== edgeId);
+      const nodes = applyTextWorkflowSyncToNodes(s.nodes, edges);
+      return { edges, nodes };
+    });
     if (get().projectPath) scheduleSave(get);
   },
 
-  updateNodeData: (id, patch) => {
-    recordBeforeDiscreteMutation(get);
+  updateNodeData: (id, patch, opts) => {
+    if (!opts?.silent) recordBeforeDiscreteMutation(get);
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
     }));
@@ -1302,8 +1313,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   loadGraph: (nodes, edges, viewport) => {
     clearHistoryStacks();
     const { edges: cleanedEdges } = sanitizeCanvasEdges(nodes, edges);
+    const syncedNodes = applyTextWorkflowSyncToNodes(nodes, cleanedEdges);
     set({
-      nodes,
+      nodes: syncedNodes,
       edges: cleanedEdges,
       viewport,
       selectedNodeId: null,
@@ -1312,7 +1324,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       flowClipboardCount: getFlowClipboardCount(),
     });
     // 重建 Hermes shotNodeRegistry，确保切换 tab 时状态联动仍有效
-    rebuildShotNodeRegistry(nodes);
+    rebuildShotNodeRegistry(syncedNodes);
     if (get().projectPath) scheduleSave(get);
   },
 

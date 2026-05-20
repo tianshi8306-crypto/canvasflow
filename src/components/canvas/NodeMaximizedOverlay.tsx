@@ -2,7 +2,6 @@ import { useEffect } from "react";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { AudioTtsPanel } from "@/components/nodes/AudioTtsPanel";
-import { TextNodeTextToVideoPanel } from "@/components/nodes/TextNodeWorkflowPanels";
 import { ScriptNodeWorkbench } from "@/components/ScriptNodeWorkbench";
 import { ScriptStoryboardSection } from "@/components/ScriptStoryboardSection";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
@@ -90,8 +89,6 @@ export function NodeMaximizedOverlay() {
         <div className="nodeMaxOverlayBody">
           {node.type === "audioNode" ? (
             <AudioTtsPanel nodeId={node.id} />
-          ) : node.type === "videoNode" ? (
-            <TextNodeTextToVideoPanel videoNodeId={node.id} />
           ) : node.type === "textNode" ? (
             <div className="nodeMaxOverlayStack">
               <div className="nodeMaxOverlayHint">

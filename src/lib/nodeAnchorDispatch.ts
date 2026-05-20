@@ -190,7 +190,7 @@ export function dispatchAnchorMenuPick(opts: {
     if (direction === "incoming" && key === "imageNode") {
       if (hasIncomingOfType(edges, nodes, anchorNodeId, "imageNode")) {
         mergeTextWorkflow(anchorNodeId, "imageToPrompt");
-        get.setStatusText("已连接图片节点");
+        get.setStatusText("已连接图片节点；可在图片顶栏「反推提示词」写入文本");
         return;
       }
       const imgId = crypto.randomUUID();
@@ -203,7 +203,24 @@ export function dispatchAnchorMenuPick(opts: {
       get.addNodesWithEdges([node], [makeFlowEdge(imgId, anchorNodeId, "imageNode")]);
       mergeTextWorkflow(anchorNodeId, "imageToPrompt");
       get.setSelectedNodeIds([imgId]);
-      get.setStatusText("已添加图片节点并联线");
+      get.setStatusText("已添加图片节点；可在图片顶栏「反推提示词」写入下游文本");
+      return;
+    }
+    if (direction === "incoming" && key === "videoNode") {
+      if (hasIncomingOfType(edges, nodes, anchorNodeId, "videoNode")) {
+        get.setStatusText("已连接视频节点；可在视频顶栏「反推视频词」写入文本");
+        return;
+      }
+      const vidId = crypto.randomUUID();
+      const node: Node<FlowNodeData> = {
+        id: vidId,
+        type: "videoNode",
+        position: { x: x - PARTNER_GAP, y },
+        data: newNodeDataByType.videoNode(),
+      };
+      get.addNodesWithEdges([node], [makeFlowEdge(vidId, anchorNodeId, "videoNode")]);
+      get.setSelectedNodeIds([vidId]);
+      get.setStatusText("已添加视频节点；可在视频顶栏「反推视频词」写入下游文本");
       return;
     }
     if (direction === "incoming" && key === "scriptNode") {

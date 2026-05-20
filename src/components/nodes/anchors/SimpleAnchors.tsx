@@ -34,10 +34,20 @@ interface SimpleAnchorsProps {
   nodeType: string | undefined;
 }
 
-const INCOMING_MENU = [
+const INCOMING_MENU_DEFAULT = [
   { key: "textNode" as const, label: "文本" },
   { key: "imageNode" as const, label: "图片" },
 ];
+
+const INCOMING_MENU_TEXT_NODE = [
+  { key: "imageNode" as const, label: "图片" },
+  { key: "videoNode" as const, label: "视频" },
+  { key: "scriptNode" as const, label: "脚本" },
+];
+
+function incomingMenuFor(nodeType: string | undefined) {
+  return nodeType === "textNode" ? INCOMING_MENU_TEXT_NODE : INCOMING_MENU_DEFAULT;
+}
 
 const OUTGOING_MENU = [
   { key: "textNode" as const, label: "文本" },
@@ -264,7 +274,7 @@ export function SimpleAnchors({ nodeId, nodeType }: SimpleAnchorsProps) {
     [openAtCursor],
   );
 
-  const menuItems = open?.side === "incoming" ? INCOMING_MENU : OUTGOING_MENU;
+  const menuItems = open?.side === "incoming" ? incomingMenuFor(nodeType) : OUTGOING_MENU;
   const menuTitle = open?.side === "incoming" ? "添加上游输入" : "引出输出";
 
   return (

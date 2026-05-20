@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import type { WheelEvent as ReactWheelEvent } from "react";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
+import "./TextNodeChrome.css";
 
 type Props = {
   open: boolean;
@@ -34,7 +35,7 @@ export function TextNodeExpandEditModal({
       >
         <div className="textNodeExpandHead">
           <span className="textNodeExpandTitle">展开编辑</span>
-          <button type="button" className="btn" onClick={onClose}>
+          <button type="button" className="textNodeExpandBtn" onClick={onClose}>
             关闭
           </button>
         </div>
@@ -48,10 +49,10 @@ export function TextNodeExpandEditModal({
           onWheel={onWheel}
         />
         <div className="textNodeExpandFoot">
-          <button type="button" className="btn" onClick={onClose}>
+          <button type="button" className="textNodeExpandBtn" onClick={onClose}>
             取消
           </button>
-          <button type="button" className="btn btnPrimary" onClick={onCommit}>
+          <button type="button" className="textNodeExpandBtn textNodeExpandBtn--primary" onClick={onCommit}>
             保存
           </button>
         </div>

@@ -9,3 +9,6 @@ export const NODE_CHROME_VIDEO_PANEL_CLASS = `${NODE_CHROME_PANEL_CLASS} videoGe
 
 /** 文本底栏：模型对话 / 工作流面板 Portal */
 export const NODE_CHROME_TEXT_PANEL_CLASS = `${NODE_CHROME_PANEL_CLASS} textNodeChrome--minimal`;
+
+/** 音频底栏：文字转语音 ATP Portal */
+export const NODE_CHROME_AUDIO_PANEL_CLASS = `${NODE_CHROME_PANEL_CLASS} audioNodeChrome--minimal audioTtsPanel--chrome`;

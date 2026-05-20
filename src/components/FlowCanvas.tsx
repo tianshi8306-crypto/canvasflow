@@ -47,6 +47,9 @@ import { NodeSnapGuideOverlay } from "@/components/canvas/NodeSnapGuideOverlay";
 import { NodeMaximizedOverlay } from "@/components/canvas/NodeMaximizedOverlay";
 import { ImageGenerationPanelExpandedModal } from "@/components/nodes/ImageGenerationPanelExpandedModal";
 import { VideoGenerationPanelExpandedModal } from "@/components/nodes/VideoGenerationPanelExpandedModal";
+import { TextComposerPanelExpandedModal } from "@/components/nodes/TextComposerPanelExpandedModal";
+import { AudioTtsPanelExpandedModal } from "@/components/nodes/AudioTtsPanelExpandedModal";
+import { isPassiveAudioAsset } from "@/lib/audioNodeContainerMode";
 import { SubjectCreationPanel } from "@/components/SubjectCreationPanel";
 import { LeftAddDock } from "@/components/LeftAddDock";
 
@@ -102,6 +105,8 @@ function FlowCanvasInner() {
   const setNodeDragSuppressUi = useCanvasUiStore((s) => s.setNodeDragSuppressUi);
   const setMaximizedNodeId = useCanvasUiStore((s) => s.setMaximizedNodeId);
   const setAudioTtsPanelNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelNodeId);
+  const setAudioTtsPanelPinnedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelPinnedNodeId);
+  const setAudioTtsPanelExpandedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelExpandedNodeId);
   const setViewportInteracting = useCanvasUiStore((s) => s.setViewportInteracting);
   const minimapVisible = useCanvasUiStore((s) => s.minimapVisible);
   const nodeSnapVisual = useCanvasUiStore((s) => s.nodeSnapVisual);
@@ -471,6 +476,14 @@ function FlowCanvasInner() {
           setMenuState(null);
           if (node.type !== "audioNode") {
             setAudioTtsPanelNodeId(null);
+          } else {
+            const hasAsset = Boolean(node.data.path?.trim() || node.data.assetId?.trim());
+            if (!hasAsset) {
+              setAudioTtsPanelNodeId(node.id);
+            } else {
+              const opened = useCanvasUiStore.getState().audioTtsPanelNodeId;
+              if (opened && opened !== node.id) setAudioTtsPanelNodeId(null);
+            }
           }
         }}
         onNodeDoubleClick={(e, node) => {
@@ -491,6 +504,12 @@ function FlowCanvasInner() {
           }
           if (node.type === "imageNode" || node.type === "videoNode") {
             void focusMediaNodeViewport(node.id);
+          } else if (node.type === "audioNode") {
+            const passive = isPassiveAudioAsset(node.id, nodes, edges);
+            if (!passive) {
+              setAudioTtsPanelNodeId(node.id);
+            }
+            void fitViewToNode(node.id);
           } else {
             void fitViewToNode(node.id);
           }
@@ -525,6 +544,8 @@ function FlowCanvasInner() {
           setSelectedEdgeIds([]);
           setMenuState(null);
           setAudioTtsPanelNodeId(null);
+          setAudioTtsPanelPinnedNodeId(null);
+          setAudioTtsPanelExpandedNodeId(null);
           setLeftAddDockOpen(false);
         }}
         onPaneContextMenu={(ev) => {
@@ -719,6 +740,8 @@ function FlowCanvasInner() {
       <NodeMaximizedOverlay />
       <ImageGenerationPanelExpandedModal />
       <VideoGenerationPanelExpandedModal />
+      <TextComposerPanelExpandedModal />
+      <AudioTtsPanelExpandedModal />
       <SubjectCreationPanel
         open={subjectCreationNodeId !== null}
         nodeId={subjectCreationNodeId ?? ""}

@@ -14,6 +14,7 @@ import {
   type ImagePreviewToolbarAction,
 } from "@/lib/imagePreviewToolbarActions";
 import { IMAGE_GENERATION_PROMPT_MAX_CHARS } from "@/lib/promptLimits";
+import { MediaPromptReverseButton } from "@/components/nodes/MediaPromptReverseButton";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 
@@ -39,6 +40,7 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: P
   const node = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
   const localPrompt = (node?.data.prompt ?? "").trim();
   const mediaPath = node?.data.path?.trim();
+  const mediaAssetId = node?.data.assetId?.trim();
 
   const mergeParams = useCallback(
     (patch: Record<string, unknown>) => {
@@ -145,6 +147,16 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: P
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="imagePreviewToolbarScroll">
+        <div className="imagePreviewToolbarGroup">
+          <span className="imagePreviewToolbarGroupLabel">提示词</span>
+          <MediaPromptReverseButton
+            sourceNodeId={nodeId}
+            mediaKind="image"
+            mediaPath={mediaPath}
+            mediaAssetId={mediaAssetId}
+            hasLocalImage={hasLocalImage}
+          />
+        </div>
         {IMAGE_PREVIEW_TOOLBAR_GROUPS.map((group) => (
           <div key={group.id} className="imagePreviewToolbarGroup">
             <span className="imagePreviewToolbarGroupLabel">{group.label}</span>

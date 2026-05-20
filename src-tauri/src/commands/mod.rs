@@ -6,6 +6,7 @@ pub mod generic_api_cmd;
 pub mod graph_cmd;
 pub mod media_gen_cmd;
 pub mod project_cmd;
+pub mod prompt_reverse_cmd;
 pub mod runs_cmd;
 pub mod settings_cmd;
 pub mod timeline_cmd;

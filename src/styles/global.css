@@ -2353,21 +2353,25 @@ select {
 
 .textNodeReadOnly--chrome {
   position: relative;
-  resize: both;
-  min-width: 240px;
-  min-height: 100px;
+  flex: 1;
+  min-height: 80px;
+  max-height: calc(1.5em * 10 + 22px);
+  overflow: hidden;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 10;
+  line-clamp: 10;
 }
 
 .textNodeReadOnly--chrome::after {
   content: "";
   position: absolute;
-  right: 4px;
-  bottom: 4px;
-  width: 10px;
-  height: 10px;
-  border-right: 2px solid #475569;
-  border-bottom: 2px solid #475569;
-  opacity: 0.6;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24px;
+  background: linear-gradient(to bottom, transparent, var(--bg-node-preview, #1f1f1f));
   pointer-events: none;
 }
 
@@ -2466,67 +2470,7 @@ select {
   box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.35);
 }
 
-.textNodeExpandBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 90;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 24px;
-  background: rgba(0, 0, 0, 0.72);
-}
-
-.textNodeExpandPanel {
-  width: min(720px, 100%);
-  max-height: min(90vh, 900px);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 16px;
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: #121826;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
-}
-
-.textNodeExpandHead {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.textNodeExpandTitle {
-  font-weight: 650;
-  font-size: 14px;
-  color: #f1f5f9;
-}
-
-.textNodeExpandTextarea {
-  width: 100%;
-  flex: 1 1 auto;
-  min-height: 320px;
-  padding: 12px 14px;
-  border-radius: 10px;
-  border: 1px solid #334155;
-  background: #0a0e14;
-  color: var(--text);
-  font-size: 13px;
-  line-height: 1.5;
-  resize: vertical;
-  outline: none;
-}
-
-.textNodeExpandTextarea:focus {
-  border-color: #3b82f6;
-}
-
-.textNodeExpandFoot {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-}
+/* textNodeExpand* 样式已迁至 TextNodeChrome.css（与节点壳 #1f1f1f / #2b2b2b 一致） */
 
 .textNodeWriteSelfHost {
   display: flex;

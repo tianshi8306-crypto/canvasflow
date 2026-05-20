@@ -10,12 +10,16 @@ import {
   edgeToggleActionLabel,
   isEdgeDisabled,
 } from "@/lib/edgeState";
-import { addTextMaterial } from "@/lib/textMaterialStorage";
 import type { FlowCanvasMenuState } from "@/components/canvas/flowCanvasMenuState";
 import { FLOW_MENU, flowMenuWidth } from "@/components/canvas/menuConstants";
 import { getUndoRedoAvailability } from "@/store/projectStore";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import type { FlowNodeData } from "@/lib/types";
+import {
+  isPassiveTextContainer,
+  TEXT_PASSIVE_CONTAINER_STATUS,
+} from "@/lib/textNodeContainerMode";
 
 function canvasModHints(): { copy: string; paste: string; del: string; undo: string; redo: string } {
   const mac =
@@ -335,6 +339,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
   const flowClipboardCount = useProjectStore((s) => s.flowClipboardCount);
   const setStatusText = useProjectStore((s) => s.setStatusText);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
+  const setTextGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setTextGenPanelPinnedNodeId);
   const selectedEdgeIds = useProjectStore((s) => s.selectedEdgeIds);
   const toggleSelectedEdgesDisabled = useProjectStore((s) => s.toggleSelectedEdgesDisabled);
 
@@ -351,13 +356,6 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
   const selectedEdges = edges.filter((e) => selectedEdgeIds.includes(e.id));
   const selectedEdgeCount = selectedEdges.length;
   const allSelectedEdgesDisabled = selectedEdgeCount > 0 && selectedEdges.every((e) => isEdgeDisabled(e));
-  const textData = isTextNodeCtx && ctxNode ? (ctxNode.data as FlowNodeData) : null;
-  const textBody = Boolean((textData?.prompt ?? "").trim().length);
-  const textChromeOn = Boolean(
-    textData?.params &&
-      typeof textData.params === "object" &&
-      (textData.params as { textChrome?: boolean }).textChrome,
-  );
   const sk = canvasModHints();
   const [showAssetIds, setShowAssetIds] = useAssetIdVisibilityPreference();
 
@@ -557,39 +555,19 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
       ) : menuState.mode === "context-node" ? (
         isTextNodeCtx && ctxNode && menuState.nodeId ? (
           <div className="canvasPaneCtxMenu__shell" role="menu">
-            <CtxRow onClick={() => {
-              const content = (ctxNode.data as FlowNodeData).prompt ?? "";
-              if (content.trim()) {
-                addTextMaterial(content);
-                setStatusText("已保存到我的素材");
-              } else {
-                setStatusText("文本内容为空，无法保存");
-              }
-              onDismiss();
-            }}>
-              保存到我的素材
+            <CtxRow
+              onClick={() => {
+                if (isPassiveTextContainer(ctxNode.id, nodes, edges)) {
+                  setStatusText(TEXT_PASSIVE_CONTAINER_STATUS);
+                } else {
+                  setTextGenPanelPinnedNodeId(ctxNode.id);
+                  setStatusText("已打开模型对话面板");
+                }
+                onDismiss();
+              }}
+            >
+              打开模型对话
             </CtxRow>
-            <CtxRow onClick={() => { setStatusText("优化工作流布局（敬请期待）"); onDismiss(); }}>
-              优化工作流布局
-            </CtxRow>
-            {textBody ? (
-              <CtxRow
-                title="显示下载与缩放手柄"
-                onClick={() => {
-                  const base =
-                    ctxNode.data.params && typeof ctxNode.data.params === "object"
-                      ? { ...ctxNode.data.params }
-                      : {};
-                  updateNodeData(ctxNode.id, {
-                    params: { ...base, textChrome: !textChromeOn },
-                  });
-                  setStatusText(textChromeOn ? "已隐藏文本工具" : "已显示文本工具与下载");
-                  onDismiss();
-                }}
-              >
-                {textChromeOn ? "隐藏文本工具与下载" : "文本工具与下载"}
-              </CtxRow>
-            ) : null}
             <PaneSep />
             <CtxRow shortcut={sk.copy} onClick={() => { copySelection(); onDismiss(); }}>
               复制节点
@@ -610,6 +588,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
             </CtxRow>
             <PaneSep />
             <CtxRow
+              shortcut={sk.copy}
               onClick={() => {
                 const raw = (ctxNode.data as FlowNodeData).prompt ?? "";
                 void navigator.clipboard.writeText(raw).then(
@@ -618,7 +597,31 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
                 );
               }}
             >
-              复制到剪贴板
+              复制正文
+            </CtxRow>
+            <CtxRow
+              shortcut={sk.paste}
+              onClick={() => {
+                void (async () => {
+                  try {
+                    const clip = await navigator.clipboard.readText();
+                    if (!clip.trim()) {
+                      setStatusText("剪贴板为空");
+                      onDismiss();
+                      return;
+                    }
+                    const prev = (ctxNode.data as FlowNodeData).prompt ?? "";
+                    const merged = `${prev}${prev ? "\n" : ""}${clip}`;
+                    updateNodeData(ctxNode.id, { prompt: merged });
+                    setStatusText("已粘贴到正文");
+                  } catch {
+                    setStatusText("粘贴失败，请检查剪贴板权限");
+                  }
+                  onDismiss();
+                })();
+              }}
+            >
+              粘贴到正文
             </CtxRow>
           </div>
         ) : isImageNodeCtx && ctxNode && menuState.nodeId ? (

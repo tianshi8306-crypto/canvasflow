@@ -1381,6 +1381,17 @@
   flex-shrink: 0;
 }
 
+.videoPreviewToolbar-item--textBtn {
+  min-width: auto;
+  padding: 0 10px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.videoPreviewToolbar-itemWrap--reverse {
+  flex-shrink: 0;
+}
+
 .videoPreviewToolbar-item.is-open {
   background: var(--bg-button-active, #444444);
 }

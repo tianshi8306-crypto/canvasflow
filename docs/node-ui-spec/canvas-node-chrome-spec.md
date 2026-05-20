@@ -323,6 +323,20 @@ x = clamp(x, chromeW/2 + 8, window.innerWidth - chromeW/2 - 8)
 - **Agent**：`runNodeTaskAgent` → `node-agent-event` → `useNodeStatusListener` → `data.status`。  
 - **image_edit**：顶栏编辑类 action → `resolveImageGenerationContext` → `imageGenerationAgent`。
 
+### 6.12 文本 Composer 底栏（`textGenPanel--chrome`）
+
+| 项 | 约定 |
+|----|------|
+| 容器 | `TextComposerPanel` + `TextNodeBottomPortal`；类名 `textGenPanel--chrome`（外层 `textNodeChrome--minimal`） |
+| 宽度 | **500px**（`NODE_CHROME_TEXT_PANEL_CLASS`） |
+| 输入 | `MentionInput`（`/` 预设、`@` 引用）；**无外描边**，与面板 `#1A1A1A` 一体 |
+| 字数 | `tgp-prompt-wrap` + 右下角 `tgp-prompt-counter` |
+| 模型 | `TextProviderPicker` Portal 菜单；pill 单行文案（默认「默认模型」） |
+| 生成钮 | `igp-generate-btn tgp-generate-btn` 三态（`--tgp-cta-*`） |
+| 底栏 | `tgp-bottom-bar` 横排：模型 pill（左）+ CTA（右，`margin-left: auto`） |
+| Token | `--tgp-control-*`、`--tgp-cta-*` 定义于 `.textGenPanel--chrome`（`TextNodeChrome.css`） |
+| 展开 | `TextComposerPanelExpandedModal` + `tgp-layout-expanded`，与 Portal 同构仅增高输入区 |
+
 ### 6.11 视频底栏生成面板（`videoGenPanel--chrome`）
 
 | 项 | 约定 |

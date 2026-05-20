@@ -1,0 +1,433 @@
+/* 音频节点 Chrome：壳、顶栏、ATP（对齐 LibTV 参考与 textGenPanel--chrome token） */
+
+.minimal-audio-node.nodeChrome-shell {
+  border-radius: 8px;
+}
+
+.minimal-audio-preview.nodeChrome-preview {
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+  overflow: hidden;
+}
+
+.minimal-audio-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  color: var(--text-placeholder, #616161);
+}
+
+.minimal-audio-placeholder svg {
+  opacity: 0.85;
+}
+
+.minimal-audio-placeholder-hint {
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.minimal-audio-content.nodeMediaAudio {
+  width: 100%;
+  height: 100%;
+}
+
+.minimal-audio-refBadge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.88);
+  pointer-events: none;
+}
+
+.audioPreviewToolbarChrome {
+  max-width: min(92vw, 520px);
+}
+
+.audioPreviewToolbarScroll {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  overflow-x: auto;
+}
+
+.audioPreviewToolbar-hint {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.72);
+  white-space: nowrap;
+  padding: 0 4px;
+}
+
+.audioPreviewToolbar-focusBtn {
+  flex-shrink: 0;
+}
+
+.audioPreviewToolbar-iconBtn {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 4px 8px;
+}
+
+.minimal-audio-inner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* ── ATP Portal 外壳（宽由行内 style 绑定预览壳，默认与文本节点 300px 一致）── */
+.audioNodeChrome--minimal {
+  width: 100%;
+  max-width: calc(100vw - 24px);
+  padding: 8px 12px 8px;
+  box-sizing: border-box;
+  font-size: 13px;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.nodeChrome--panel.audioNodeChrome--minimal:has(.audioTtsPanel--v2) {
+  padding: 8px 12px 8px;
+}
+
+.audioTtsPanel--chrome .audioTtsPanel {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  margin-top: 0;
+}
+
+/* ── ATP v2 四区布局 ── */
+.audioTtsPanel--chrome {
+  --atp-control-h: 36px;
+  --atp-control-radius-pill: 999px;
+  --atp-control-radius-square: 8px;
+  --atp-control-border: 1px solid var(--border-button, #4d4d4d);
+  --atp-control-bg: var(--bg-button, #2b2b2b);
+  --atp-control-bg-hover: var(--bg-button-active, #444444);
+  --atp-control-text: rgba(255, 255, 255, 0.88);
+  --atp-control-text-muted: #9e9e9e;
+  --atp-cta-bg-ready: #ffffff;
+  --atp-cta-bg-ready-hover: #f2f2f2;
+  --atp-cta-border-ready: rgba(255, 255, 255, 0.28);
+  --atp-cta-fg-ready: #121212;
+  --atp-cta-bg-disabled: #2b2b2b;
+  --atp-cta-fg-disabled: #616161;
+}
+
+.audioTtsPanel--v2 {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.audioTtsPanel--v2 .atp-v2-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.audioTtsPanel--v2 .atp-v2-zone-a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  flex-shrink: 0;
+}
+
+.audioTtsPanel--v2 .atp-v2-zone-a--hintOnly {
+  justify-content: flex-start;
+}
+
+.audioTtsPanel--v2 .atp-v2-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-placeholder, #616161);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audioTtsPanel--v2 .atp-v2-zone-a-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.audioTtsPanel--v2 .atp-v2-zone-b {
+  position: relative;
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.audioTtsPanel--v2 .atp-v2-textarea,
+.audioTtsPanel--chrome .audioTtsPanel--v2 .audioTtsPanelTextarea {
+  width: 100%;
+  min-height: 72px;
+  max-height: 120px;
+  resize: vertical;
+  margin: 0;
+  padding: 4px 2px 18px 2px;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  color: var(--text-primary, #e0e0e0);
+  font-size: 13px;
+  line-height: 1.45;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.audioTtsPanel--v2 .atp-v2-textarea::placeholder {
+  color: var(--text-placeholder, #616161);
+  opacity: 1;
+}
+
+.audioTtsPanel--v2 .atp-v2-textarea:focus,
+.audioTtsPanel--v2 .atp-v2-textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.audioTtsPanel--v2 .atp-v2-zone-c {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.audioTtsPanel--v2 .atp-v2-chip {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--atp-control-radius-pill);
+  border: var(--atp-control-border);
+  background: var(--atp-control-bg);
+  color: var(--atp-control-text);
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  font-family: inherit;
+}
+
+.audioTtsPanel--v2 .atp-v2-chip:hover:not(:disabled) {
+  background: var(--atp-control-bg-hover);
+}
+
+.audioTtsPanel--v2 .atp-v2-chip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.audioTtsPanel--v2 .atp-v2-chip--select {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 4px;
+  cursor: default;
+}
+
+.audioTtsPanel--v2 .atp-v2-chipLabel {
+  font-size: 11px;
+  color: var(--atp-control-text-muted);
+}
+
+.audioTtsPanel--v2 .atp-v2-chipSelect {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--atp-control-text);
+  font-size: 11px;
+  max-width: 120px;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 0 14px 0 0;
+}
+
+.audioTtsPanel--v2 .atp-v2-zone-d {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--atp-control-h);
+  margin-top: 0;
+  flex-wrap: nowrap;
+}
+
+.audioTtsPanel--v2 .atp-v2-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 48%;
+  height: var(--atp-control-h);
+  padding: 0 28px 0 10px;
+  border-radius: var(--atp-control-radius-pill);
+  border: var(--atp-control-border);
+  background: var(--atp-control-bg);
+  box-sizing: border-box;
+}
+
+.audioTtsPanel--v2 .atp-v2-pill--model {
+  flex: 1 1 auto;
+  max-width: none;
+}
+
+.audioTtsPanel--v2 .atp-v2-pill--voice {
+  flex: 0 1 96px;
+  max-width: 112px;
+  padding-left: 8px;
+}
+
+.audioTtsPanel--v2 .atp-v2-pillIcon {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--atp-control-text-muted);
+  line-height: 1;
+}
+
+.audioTtsPanel--v2 .atp-v2-pillSelect {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--atp-control-text);
+  font-size: 12px;
+  width: 100%;
+  min-width: 0;
+  cursor: pointer;
+  font-family: inherit;
+  outline: none;
+}
+
+.audioTtsPanel--v2 .atp-v2-pillChevron {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -2px;
+  border-right: 1.5px solid var(--atp-control-text-muted);
+  border-bottom: 1.5px solid var(--atp-control-text-muted);
+  transform: translateY(-50%) rotate(45deg);
+  pointer-events: none;
+}
+
+.audioTtsPanel--v2 .atp-v2-counter {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--atp-control-text-muted);
+}
+
+.audioTtsPanel--v2 .atp-v2-generate,
+.audioTtsPanel--chrome .audioTtsPanel--v2 .audioTtsPanelSend {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--atp-control-h);
+  height: var(--atp-control-h);
+  min-height: var(--atp-control-h);
+  margin: 0;
+  padding: 0;
+  border-radius: var(--atp-control-radius-square);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 0;
+}
+
+.audioTtsPanel--v2 .atp-v2-generate:not(:disabled):not(.generating),
+.audioTtsPanel--chrome .audioTtsPanel--v2 .audioTtsPanelSend:not(:disabled):not(.generating) {
+  background: var(--atp-cta-bg-ready);
+  border-color: var(--atp-cta-border-ready);
+  color: var(--atp-cta-fg-ready);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 2px 12px rgba(0, 0, 0, 0.5);
+}
+
+.audioTtsPanel--v2 .atp-v2-generate:not(:disabled):not(.generating):hover {
+  background: var(--atp-cta-bg-ready-hover);
+}
+
+.audioTtsPanel--v2 .atp-v2-generate:disabled:not(.generating),
+.audioTtsPanel--chrome .audioTtsPanel--v2 .audioTtsPanelSend:disabled:not(.generating) {
+  background: var(--atp-cta-bg-disabled);
+  border-color: var(--atp-control-border);
+  color: var(--atp-cta-fg-disabled);
+  cursor: not-allowed;
+}
+
+.audioTtsPanel--v2 .atp-v2-generate svg {
+  width: 18px;
+  height: 18px;
+}
+
+.audioTtsPanel--v2 .atp-v2-generate:not(:disabled):not(.generating) svg {
+  color: var(--atp-cta-fg-ready);
+}
+
+.atp-layout-expanded .audioTtsPanel--v2 .atp-v2-textarea {
+  min-height: 160px;
+  max-height: min(360px, calc(100vh - 220px));
+}
+
+/* ── ATP 展开 Modal ── */
+.igp-expanded-card.atp-expanded-card.audioNodeChrome--minimal {
+  width: var(--atp-shell-width, 300px);
+  max-width: calc(100vw - 24px);
+  min-height: min(420px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--bg-node-preview, #1f1f1f);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 13px;
+}
+
+.igp-expanded-card.atp-expanded-card .igp-expanded-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.igp-expanded-card.atp-expanded-card .audioTtsPanel--v2 {
+  flex: 1;
+  min-height: 0;
+}
+
+.igp-expanded-card.atp-expanded-card {
+  --atp-control-h: 40px;
+}

@@ -1,7 +1,7 @@
 # 当前进度与下一步规划（异地协作）
 
 > **固定入口**：本文档为「进度 + 规划 + 代码索引」的**主文档**，请在异地开发时优先阅读本文。  
-> 更新日期：**2026-05-18**  
+> 更新日期：**2026-05-20**  
 > 仓库：**vibevideo**（Tauri + React + React Flow）  
 > 历史同名快照：`REMOTE_DEV_HANDOFF_2026-04-28.md`（内容与本文同步后仅作锚点，见该文件说明）。
 
@@ -83,13 +83,20 @@
 - `ScriptBeatsEditorTable` 中 `TableColKey` 与 `ScriptBeatStringKey` 混用导致的 TS 报错，已通过 `fieldKey` 收窄修复。  
 - 文件：`src/components/ScriptBeatsEditorTable.tsx`。
 
-### 4.5 画布左键 / 右键添加菜单
+### 4.5 文本节点 Chrome（S1–S7 状态机，2026-05-20）
+
+- **真源**：[`docs/design/text-node-states-spec.md`](../design/text-node-states-spec.md)（显隐矩阵 + 附录对照表）。  
+- **实现**：`TextNode.tsx` — 壳内双击编辑、外置 Composer、workflow 连线静默同步、顶栏格式+图标工具、关联节点定位（`useFocusLinkedPartnerNode`）。  
+- **快捷键**：`Ctrl+Shift+G` 钉住模型对话；见 [`docs/product/SHORTCUTS.md`](../product/SHORTCUTS.md)。  
+- **历史方案**：`text-node-chrome-optimization.md`（C1–C4）§5.2 显隐表已废止，勿按四 Chip / 顶栏文档组实现。
+
+### 4.6 画布左键 / 右键添加菜单
 
 - **左键双击空白**打开的「添加」面板，已与**空白处右键 → 添加节点**二级菜单对齐：同一 `canvasPaneCtxMenuRoot` + `PaneAddRow`（含图标）、宽度与右键二级一致（`contextPaneL2` / 图库页 `gallery`）。  
 - 曾尝试「左键菜单去图标 + 紧凑尺寸」，已按产品要求**撤销**，当前即上述对齐版。  
 - 文件：`src/components/canvas/CanvasContextMenus.tsx`、`src/components/canvas/menuConstants.ts`、`src/components/FlowCanvas.tsx`。
 
-### 4.6 依赖与清理
+### 4.7 依赖与清理
 
 - 已移除不再使用的 **`mammoth`**（曾用于文档导入后删除该能力）。
 

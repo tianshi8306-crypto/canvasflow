@@ -36,6 +36,7 @@ function getAgentLabel(agentName: string): string {
   if (agentName.includes("图片")) return "图片";
   if (agentName.includes("音频")) return "音频";
   if (agentName.includes("TTS")) return "TTS";
+  if (agentName.includes("文本")) return "文本";
   return agentName.slice(0, 4);
 }
 

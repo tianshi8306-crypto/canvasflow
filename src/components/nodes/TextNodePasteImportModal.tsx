@@ -1,6 +1,7 @@
 import { createPortal } from "react-dom";
 import type { WheelEvent as ReactWheelEvent } from "react";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
+import "./TextNodeChrome.css";
 
 type Props = {
   open: boolean;
@@ -54,14 +55,14 @@ export function TextNodePasteImportModal({
           onWheel={onWheel}
         />
         <div className="textNodeExpandFoot" style={{ justifyContent: "space-between" }}>
-          <button type="button" className="btn" onClick={onReadClipboard}>
+          <button type="button" className="textNodeExpandBtn" onClick={onReadClipboard}>
             读取剪贴板
           </button>
           <div style={{ display: "flex", gap: 8 }}>
-            <button type="button" className="btn" onClick={onClose}>
+            <button type="button" className="textNodeExpandBtn" onClick={onClose}>
               取消
             </button>
-            <button type="button" className="btn btnPrimary" onClick={onCommit}>
+            <button type="button" className="textNodeExpandBtn textNodeExpandBtn--primary" onClick={onCommit}>
               导入并追加
             </button>
           </div>

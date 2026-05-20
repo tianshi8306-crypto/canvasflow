@@ -8,7 +8,16 @@ import { ScriptNodeFullscreenOverlay } from "@/components/ScriptNodeFullscreenOv
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
 import { useProjectStore } from "@/store/projectStore";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { initHermesAutoChain } from "@/lib/hermes";
+import {
+  isPassiveAudioAsset,
+  AUDIO_PASSIVE_REFERENCE_STATUS,
+} from "@/lib/audioNodeContainerMode";
+import {
+  isPassiveTextContainer,
+  TEXT_PASSIVE_CONTAINER_STATUS,
+} from "@/lib/textNodeContainerMode";
 import { useNodeStatusListener } from "@/hooks/useNodeStatus";
 
 export default function App() {
@@ -24,6 +33,10 @@ export default function App() {
   const deleteSelection = useProjectStore((s) => s.deleteSelection);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
+  const setTextGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setTextGenPanelPinnedNodeId);
+  const setAudioTtsPanelPinnedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelPinnedNodeId);
+  const setAudioTtsPanelNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelNodeId);
+  const setStatusText = useProjectStore((s) => s.setStatusText);
 
   useEffect(() => {
     const onKeydown = (ev: KeyboardEvent) => {
@@ -34,7 +47,7 @@ export default function App() {
           [
             ".textNodeCard--editing",
             ".textNodeWriteSelfEditable:focus",
-            ".textNodeEditable:focus",
+            ".textNodeEditable--integrated:focus",
             ".textNodeExpandPanel textarea:focus",
             ".scriptGenComposerInput:focus",
           ].join(","),
@@ -75,6 +88,7 @@ export default function App() {
       const isCopy = mod && key === "c";
       const isPaste = mod && key === "v";
       const isDelete = ev.key === "Delete" || ev.key === "Backspace";
+      const isOpenTextComposer = mod && ev.shiftKey && key === "g";
       const shouldBlockCanvasShortcut = editingInput || textNodeEditingMode;
       if (isGroup) {
         if (!shouldBlockCanvasShortcut) {
@@ -102,11 +116,49 @@ export default function App() {
           ev.preventDefault();
           deleteSelection();
         }
+        return;
+      }
+      if (isOpenTextComposer && !shouldBlockCanvasShortcut) {
+        const { selectedNodeIds, nodes, edges: allEdges } = useProjectStore.getState();
+        if (selectedNodeIds.length === 1) {
+          const selected = nodes.find((n) => n.id === selectedNodeIds[0]);
+          if (selected?.type === "textNode") {
+            ev.preventDefault();
+            if (isPassiveTextContainer(selected.id, nodes, allEdges)) {
+              setStatusText(TEXT_PASSIVE_CONTAINER_STATUS);
+              return;
+            }
+            setTextGenPanelPinnedNodeId(selected.id);
+            setStatusText("已打开模型对话面板（Ctrl+Shift+G）");
+            return;
+          }
+          if (selected?.type === "audioNode") {
+            ev.preventDefault();
+            if (isPassiveAudioAsset(selected.id, nodes, allEdges)) {
+              setStatusText(AUDIO_PASSIVE_REFERENCE_STATUS);
+              return;
+            }
+            setAudioTtsPanelPinnedNodeId(selected.id);
+            setAudioTtsPanelNodeId(selected.id);
+            setStatusText("已打开文字转语音面板（Ctrl+Shift+G）");
+          }
+        }
       }
     };
     window.addEventListener("keydown", onKeydown);
     return () => window.removeEventListener("keydown", onKeydown);
-  }, [copySelection, deleteSelection, groupSelectedNodes, pasteSelection, redo, undo]);
+  }, [
+    copySelection,
+    deleteSelection,
+    groupSelectedNodes,
+    pasteSelection,
+    redo,
+    setStatusText,
+    setAudioTtsPanelNodeId,
+    setAudioTtsPanelPinnedNodeId,
+    setTextGenPanelPinnedNodeId,
+    undo,
+  ]);
 
   useEffect(() => {
     const onAgentEvent = (ev: Event) => {

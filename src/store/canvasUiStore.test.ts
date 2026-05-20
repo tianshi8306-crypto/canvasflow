@@ -221,12 +221,19 @@ describe("canvasUiStore — confirmDialog", () => {
 describe("canvasUiStore — transient UI", () => {
   beforeEach(resetStore);
 
-  it("clearTransientUi resets audioTtsPanelNodeId and imageI2iTargetNodeId", () => {
-    useCanvasUiStore.setState({ audioTtsPanelNodeId: "node-1", imageI2iTargetNodeId: "node-2" });
+  it("clearTransientUi resets audio TTS UI and imageI2iTargetNodeId", () => {
+    useCanvasUiStore.setState({
+      audioTtsPanelNodeId: "node-1",
+      audioTtsPanelPinnedNodeId: "node-1",
+      audioTtsPanelExpandedNodeId: "node-1",
+      imageI2iTargetNodeId: "node-2",
+    });
 
     useCanvasUiStore.getState().clearTransientUi();
 
     expect(useCanvasUiStore.getState().audioTtsPanelNodeId).toBeNull();
+    expect(useCanvasUiStore.getState().audioTtsPanelPinnedNodeId).toBeNull();
+    expect(useCanvasUiStore.getState().audioTtsPanelExpandedNodeId).toBeNull();
     expect(useCanvasUiStore.getState().imageI2iTargetNodeId).toBeNull();
   });
 });

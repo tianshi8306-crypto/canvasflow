@@ -5,6 +5,8 @@
 | 文档 | 版本 | 说明 |
 |------|------|------|
 | **[canvas-node-chrome-spec.md](./canvas-node-chrome-spec.md)** | **1.3** | **LibTV 极简节点 Chrome 体系**（图片/视频已接入，迁移音频等必读） |
+| **[../design/text-node-states-spec.md](../design/text-node-states-spec.md)** | **1.1** | **文本节点 S1–S7 状态机、显隐矩阵、实现对照附录** |
+| **[../design/audio-node-states-spec.md](../design/audio-node-states-spec.md)** | **1.0** | **音频节点 S0–S6 状态机、TTS / 视频声音参考、Chrome 迁移规划** |
 | 下文 React Flow 通用约定 | 3.0 | Handle、暗色、CSS 变量等底层约定 |
 
 > 做节点 UI 迁移时：**先读 Chrome Spec**，再对照本文的 React Flow 基础项。

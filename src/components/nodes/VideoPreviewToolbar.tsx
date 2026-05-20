@@ -7,6 +7,7 @@ import {
   type VideoPreviewToolbarItem,
   type VideoPreviewToolbarMenuOption,
 } from "@/lib/videoPreviewToolbarActions";
+import { MediaPromptReverseButton } from "@/components/nodes/MediaPromptReverseButton";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 
@@ -147,10 +148,10 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
 
-  const mediaPath = useMemo(
-    () => nodes.find((n) => n.id === nodeId)?.data.path?.trim(),
-    [nodes, nodeId],
-  );
+  const mediaNode = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
+  const mediaPath = mediaNode?.data.path?.trim();
+  const mediaAssetId = mediaNode?.data.assetId?.trim();
+  const hasVideo = Boolean(mediaPath || mediaAssetId);
 
   useEffect(() => {
     if (!openMenuId) return;
@@ -309,6 +310,16 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
             </div>
           );
         })}
+      </div>
+      <div className="videoPreviewToolbar-itemWrap videoPreviewToolbar-itemWrap--reverse">
+        <MediaPromptReverseButton
+          sourceNodeId={nodeId}
+          mediaKind="video"
+          mediaPath={mediaPath}
+          mediaAssetId={mediaAssetId}
+          hasMedia={hasVideo}
+          className="videoPreviewToolbar-item videoPreviewToolbar-item--textBtn"
+        />
       </div>
       <div className="videoPreviewToolbar-divider" aria-hidden />
       <div className="videoPreviewToolbar-utils">

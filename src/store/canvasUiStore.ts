@@ -80,6 +80,14 @@ type CanvasUiState = {
   videoGenPanelPinnedNodeId: string | null;
   setVideoGenPanelPinnedNodeId: (id: string | null) => void;
 
+  /** 文本节点：钉住模型对话底栏 */
+  textGenPanelPinnedNodeId: string | null;
+  setTextGenPanelPinnedNodeId: (id: string | null) => void;
+
+  /** 文本节点：模型对话面板放大态 */
+  textGenPanelExpandedNodeId: string | null;
+  setTextGenPanelExpandedNodeId: (id: string | null) => void;
+
   /** 视频节点：预览区内单段裁剪编辑态 */
   videoTrimEditingNodeId: string | null;
   setVideoTrimEditingNodeId: (id: string | null) => void;
@@ -88,9 +96,17 @@ type CanvasUiState = {
   videoSubtitleRegionEditingNodeId: string | null;
   setVideoSubtitleRegionEditingNodeId: (id: string | null) => void;
 
-  /** 音频节点：右键一次展开文字转语音面板 */
+  /** 音频节点：用户打开 TTS 底栏（双击/右键/定位） */
   audioTtsPanelNodeId: string | null;
   setAudioTtsPanelNodeId: (id: string | null) => void;
+
+  /** 音频节点：钉住 TTS 底栏 */
+  audioTtsPanelPinnedNodeId: string | null;
+  setAudioTtsPanelPinnedNodeId: (id: string | null) => void;
+
+  /** 音频节点：TTS 面板放大态 */
+  audioTtsPanelExpandedNodeId: string | null;
+  setAudioTtsPanelExpandedNodeId: (id: string | null) => void;
 
   /** 图片节点：从左锚点菜单触发「图生图」时，由目标节点拉起本机选图 */
   imageI2iTargetNodeId: string | null;
@@ -253,6 +269,12 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   videoGenPanelPinnedNodeId: null,
   setVideoGenPanelPinnedNodeId: (id) => set({ videoGenPanelPinnedNodeId: id }),
 
+  textGenPanelPinnedNodeId: null,
+  setTextGenPanelPinnedNodeId: (id) => set({ textGenPanelPinnedNodeId: id }),
+
+  textGenPanelExpandedNodeId: null,
+  setTextGenPanelExpandedNodeId: (id) => set({ textGenPanelExpandedNodeId: id }),
+
   videoTrimEditingNodeId: null,
   setVideoTrimEditingNodeId: (id) => set({ videoTrimEditingNodeId: id }),
 
@@ -261,6 +283,12 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
 
   audioTtsPanelNodeId: null,
   setAudioTtsPanelNodeId: (id) => set({ audioTtsPanelNodeId: id }),
+
+  audioTtsPanelPinnedNodeId: null,
+  setAudioTtsPanelPinnedNodeId: (id) => set({ audioTtsPanelPinnedNodeId: id }),
+
+  audioTtsPanelExpandedNodeId: null,
+  setAudioTtsPanelExpandedNodeId: (id) => set({ audioTtsPanelExpandedNodeId: id }),
 
   imageI2iTargetNodeId: null,
   setImageI2iTargetNodeId: (id) => set({ imageI2iTargetNodeId: id }),
@@ -411,11 +439,15 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   clearTransientUi: () =>
     set({
       audioTtsPanelNodeId: null,
+      audioTtsPanelPinnedNodeId: null,
+      audioTtsPanelExpandedNodeId: null,
       imageI2iTargetNodeId: null,
       imageGenPanelExpandedNodeId: null,
       imageGenPanelPinnedNodeId: null,
       videoGenPanelExpandedNodeId: null,
       videoGenPanelPinnedNodeId: null,
+      textGenPanelPinnedNodeId: null,
+      textGenPanelExpandedNodeId: null,
       videoTrimEditingNodeId: null,
       videoSubtitleRegionEditingNodeId: null,
       nodeSnapVisual: null,

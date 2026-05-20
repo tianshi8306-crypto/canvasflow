@@ -9,6 +9,8 @@ import {
 type Props = {
   anchorRef: RefObject<HTMLElement | null>;
   active: boolean;
+  /** 与预览壳同宽（默认 300px），勿用图片节点 500px */
+  panelWidth: number;
   panelRef?: RefObject<HTMLDivElement | null>;
   children: ReactNode;
 };
@@ -17,10 +19,14 @@ type Props = {
 export function TextNodeBottomPortal({
   anchorRef,
   active,
+  panelWidth,
   panelRef: externalPanelRef,
   children,
 }: Props) {
-  const { pos, panelRef: innerPanelRef } = useNodeGenerationChrome(anchorRef, { active });
+  const { pos, panelRef: innerPanelRef } = useNodeGenerationChrome(anchorRef, {
+    active,
+    panelWidth,
+  });
 
   const setPanelRef = useCallback(
     (el: HTMLDivElement | null) => {
@@ -42,6 +48,8 @@ export function TextNodeBottomPortal({
         position: "fixed",
         left: `${pos.x}px`,
         top: `${pos.y}px`,
+        width: `${panelWidth}px`,
+        maxWidth: "calc(100vw - 24px)",
         transform: "translateX(-50%)",
         zIndex: GEN_PANEL_CHROME_Z,
       }}

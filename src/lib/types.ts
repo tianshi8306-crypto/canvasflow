@@ -88,7 +88,15 @@ export type StoryboardShot = {
 };
 
 /** 文本节点「尝试」入口进入的工作流（存于 params.textWorkflow） */
-export type TextWorkflowKind = "writeSelf" | "textToVideo" | "imageToPrompt" | "textToMusic" | "scriptToText";
+export type TextWorkflowKind =
+  | "writeSelf"
+  | "textToVideo"
+  | "textToScript"
+  | "textToImage"
+  | "imageToPrompt"
+  | "videoToPrompt"
+  | "textToMusic"
+  | "scriptToText";
 
 /** 节点运行状态（C.1：节点状态机） */
 export type NodeExecutionStatus = "idle" | "pending" | "running" | "succeeded" | "failed" | "skipped";

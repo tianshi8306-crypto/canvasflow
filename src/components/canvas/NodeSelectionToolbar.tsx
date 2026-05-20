@@ -26,7 +26,10 @@ export function NodeSelectionToolbar() {
   // 判断是否是图片节点
   const selectedNode = visible ? nodes.find((n) => n.id === selectedNodeIds[0]) : null;
   const usesNodeChrome =
-    selectedNode?.type === "imageNode" || selectedNode?.type === "videoNode";
+    selectedNode?.type === "imageNode" ||
+    selectedNode?.type === "videoNode" ||
+    selectedNode?.type === "textNode" ||
+    selectedNode?.type === "audioNode";
 
   const updatePos = useCallback(() => {
     if (selectedNodeIds.length !== 1) {

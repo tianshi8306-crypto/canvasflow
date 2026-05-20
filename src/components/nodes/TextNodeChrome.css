@@ -41,7 +41,7 @@
 }
 
 .textNodeChrome--minimal {
-  width: 500px;
+  width: 100%;
   max-width: calc(100vw - 24px);
   padding: 12px 14px 14px;
   box-sizing: border-box;
@@ -49,12 +49,549 @@
   color: var(--text-primary, #e0e0e0);
 }
 
-.textNodeChrome--minimal .scriptGenComposer {
+/* 仅底栏生成参数 Portal：更扁；不影响节点正文预览壳 */
+.nodeChrome--panel.textNodeChrome--minimal:has(.textGenPanel--chrome) {
+  padding: 8px 12px 8px;
+}
+
+.textNodeChrome--minimal .scriptGenComposer,
+.textGenPanel--chrome.scriptGenComposer {
   margin-top: 0;
   padding-top: 0;
   border-top: none;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
 }
 
+/* ── 文本 Composer 底栏（textGenPanel--chrome，对齐图/视频 Chrome P0）── */
+.textGenPanel--chrome.scriptGenComposer {
+  --tgp-control-h: 36px;
+  --tgp-control-radius-pill: 999px;
+  --tgp-control-radius-square: 8px;
+  --tgp-control-border: 1px solid var(--border-button, #4d4d4d);
+  --tgp-control-bg: var(--bg-button, #2b2b2b);
+  --tgp-control-bg-hover: var(--bg-button-active, #444444);
+  --tgp-control-text: rgba(255, 255, 255, 0.88);
+  --tgp-control-text-muted: #9e9e9e;
+  --tgp-cta-bg-ready: #ffffff;
+  --tgp-cta-bg-ready-hover: #f2f2f2;
+  --tgp-cta-border-ready: rgba(255, 255, 255, 0.28);
+  --tgp-cta-shadow-ready: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 2px 12px rgba(0, 0, 0, 0.5);
+  --tgp-cta-fg-ready: #121212;
+  --tgp-cta-bg-disabled: #2b2b2b;
+  --tgp-cta-fg-disabled: #616161;
+  --tgp-cta-bg-generating: #ffffff;
+  --tgp-cta-fg-generating: #121212;
+  --tgp-cta-border-generating: var(--border-button, #4d4d4d);
+}
+
+.textGenPanel--chrome.imageGenPanel--minimal-inner {
+  flex: 0 1 auto;
+  height: auto;
+  min-height: 0;
+  gap: 2px;
+}
+
+.textGenPanel--chrome.tgp-layout-default {
+  min-height: 0;
+  gap: 2px;
+}
+
+/* ── Composer v2：四区（A 提示+图标 / B 输入 / C Chip / D 底栏）── */
+.textGenPanel--chrome.textGenPanel--v2 {
+  gap: 6px;
+}
+
+.textGenPanel--v2 .tgp-v2-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+}
+
+.textGenPanel--v2 .tgp-v2-zone-a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+  flex-shrink: 0;
+}
+
+.textGenPanel--v2 .tgp-v2-hint {
+  flex: 1;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text-placeholder, #616161);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.textGenPanel--v2 .tgp-v2-zone-a-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.textGenPanel--v2.tgp-layout-default .tgp-v2-zone-b .mention-input-wrapper {
+  min-height: 72px;
+  max-height: 120px;
+}
+
+.textGenPanel--v2.tgp-layout-default .tgp-v2-zone-b .mention-textarea {
+  min-height: 64px;
+  max-height: 112px;
+}
+
+.textGenPanel--v2 .tgp-v2-zone-c {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  flex-shrink: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.textGenPanel--v2 .tgp-v2-zone-c::-webkit-scrollbar {
+  height: 4px;
+}
+
+.textGenPanel--v2 .tgp-v2-chip {
+  flex-shrink: 0;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--tgp-control-radius-pill, 999px);
+  border: var(--tgp-control-border, 1px solid #4d4d4d);
+  background: var(--tgp-control-bg, #2b2b2b);
+  color: var(--tgp-control-text, rgba(255, 255, 255, 0.88));
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.textGenPanel--v2 .tgp-v2-chip:hover {
+  background: var(--tgp-control-bg-hover, #444444);
+}
+
+.textGenPanel--v2 .tgp-v2-zone-c--i2p .tgp-i2p-thumb {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.textGenPanel--v2 .tgp-v2-zone-d {
+  margin-top: 0;
+}
+
+.textGenPanel--chrome.tgp-layout-default .tgp-prompt-wrap {
+  flex: 0 1 auto;
+  min-height: 0;
+}
+
+.textGenPanel--chrome .tgp-prompt-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.textGenPanel--chrome.tgp-layout-expanded .tgp-prompt-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.textGenPanel--chrome .tgp-prompt-wrap .mention-input-wrapper {
+  flex: 0 1 auto;
+  min-height: 36px;
+  width: 100%;
+}
+
+.textGenPanel--chrome.tgp-layout-expanded .tgp-prompt-wrap .mention-input-wrapper {
+  flex: 1;
+  min-height: 160px;
+}
+
+.textGenPanel--chrome .tgp-prompt-wrap .mention-textarea {
+  padding-bottom: 12px;
+}
+
+.textGenPanel--chrome .tgp-prompt-counter {
+  position: absolute;
+  right: 0;
+  bottom: 2px;
+  z-index: 3;
+  font-size: 11px;
+  color: var(--tgp-control-text-muted, #9e9e9e);
+  font-family: ui-monospace, monospace;
+  line-height: 1;
+  pointer-events: none;
+  text-align: right;
+}
+
+/* 输入区：与面板同色，无框中框（覆盖 global .imageGenPanelTextarea） */
+.textGenPanel--chrome .mention-overlay {
+  color: var(--text-primary, #e0e0e0);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.textGenPanel--chrome .mention-input-wrapper.imageGenPanelTextarea,
+.textGenPanel--chrome .mention-input-wrapper.imageGenPanelTextarea--minimal,
+.textGenPanel--chrome .mention-input-wrapper.imageGenPanelTextarea--expanded {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0;
+}
+
+.textGenPanel--chrome .mention-input-wrapper.imageGenPanelTextarea:focus-within {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.textGenPanel--chrome .mention-textarea {
+  background: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  font-size: 13px;
+  color: transparent !important;
+  caret-color: var(--text-primary, #e0e0e0);
+  padding: 0;
+  border-radius: 0;
+  min-height: 32px;
+  max-height: 72px;
+  overflow-y: auto;
+  line-height: 1.45;
+}
+
+.textGenPanel--chrome .mention-textarea:focus,
+.textGenPanel--chrome .mention-textarea:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.textGenPanel--chrome .mention-textarea::placeholder {
+  color: var(--text-placeholder, #616161);
+}
+
+/* 底栏：模型 pill + 生成 CTA */
+.textGenPanel--chrome .tgp-bottom-bar,
+.textGenPanel--chrome .igp-bottom-bar.tgp-bottom-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+  width: 100%;
+  padding: 0;
+  position: relative;
+}
+
+.textGenPanel--chrome .tgp-bottom-bar .tgp-model-picker,
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-picker {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  max-width: min(220px, 42vw);
+  min-height: var(--tgp-control-h);
+  padding: 6px 24px 6px 10px;
+  border-radius: var(--tgp-control-radius-pill);
+  border: var(--tgp-control-border);
+  background: var(--tgp-control-bg);
+  color: var(--tgp-control-text);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger:hover:not(:disabled),
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger.open {
+  background: var(--tgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger-label {
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #f0f0f0;
+}
+
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger-chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: #9e9e9e;
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
+}
+
+.textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger.open .igp-model-trigger-chevron {
+  transform: rotate(0deg);
+}
+
+.textGenPanel--chrome .tgp-generate-btn,
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tgp-control-h);
+  height: var(--tgp-control-h);
+  min-height: var(--tgp-control-h);
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--tgp-control-radius-square);
+  cursor: pointer;
+  opacity: 1;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.textGenPanel--chrome .tgp-generate-btn:not(:disabled):not(.generating),
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn:not(:disabled):not(.generating) {
+  background: var(--tgp-cta-bg-ready);
+  border-color: var(--tgp-cta-border-ready);
+  color: var(--tgp-cta-fg-ready);
+  box-shadow: var(--tgp-cta-shadow-ready);
+}
+
+.textGenPanel--chrome .tgp-generate-btn:not(:disabled):not(.generating):hover,
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn:not(:disabled):not(.generating):hover {
+  background: var(--tgp-cta-bg-ready-hover);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.1) inset,
+    0 3px 14px rgba(0, 0, 0, 0.55);
+}
+
+.textGenPanel--chrome .tgp-generate-btn:disabled:not(.generating),
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn:disabled:not(.generating) {
+  background: var(--tgp-cta-bg-disabled);
+  border-color: rgba(255, 255, 255, 0.06);
+  color: var(--tgp-cta-fg-disabled);
+  box-shadow: none;
+  opacity: 0.72;
+  cursor: not-allowed;
+}
+
+.textGenPanel--chrome .tgp-generate-btn.generating,
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn.generating {
+  background: var(--tgp-cta-bg-generating);
+  border-color: var(--tgp-cta-border-generating);
+  color: var(--tgp-cta-fg-generating);
+}
+
+.textGenPanel--chrome .tgp-generate-btn.generating:hover,
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn.generating:hover {
+  background: var(--tgp-cta-bg-ready-hover);
+}
+
+.textGenPanel--chrome .tgp-generate-btn svg,
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn svg {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+
+.textGenPanel--chrome .tgp-generate-btn:not(:disabled):not(.generating) svg,
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn:not(:disabled):not(.generating) svg {
+  color: var(--tgp-cta-fg-ready);
+}
+
+.textGenPanel--chrome .tgp-generate-btn:disabled:not(.generating) svg,
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn:disabled:not(.generating) svg {
+  color: var(--tgp-cta-fg-disabled);
+}
+
+.textGenPanel--chrome .tgp-generate-btn.generating svg,
+.textGenPanel--chrome .igp-generate-btn.tgp-generate-btn.generating svg {
+  fill: currentColor;
+  color: var(--tgp-cta-fg-generating);
+}
+
+/* Provider 菜单 Portal */
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome {
+  box-sizing: border-box;
+  min-width: 280px;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-menu-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #e8e8e8;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-item:hover:not(:disabled),
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-item.selected {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-item.disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #3d3d3d, #252525);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #f5f5f5;
+  flex-shrink: 0;
+}
+
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-item-body {
+  min-width: 0;
+  flex: 1;
+}
+
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.igp-model-menu.tgp-model-menu--portal.textGenPanel--chrome .igp-model-item-subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  color: #9e9e9e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tgpChromeHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.tgpChromeHeadTitle {
+  font-size: 12px;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.tgpChromeHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.tgpChromeIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: #bdbdbd;
+  cursor: pointer;
+}
+
+.tgpChromeIconBtn:hover {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+  color: #f0f0f0;
+}
+
+.tgp-paste-btn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 12px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.tgp-paste-btn:hover {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+}
+
+/* 内嵌 scriptGen 输入（非 Portal Composer） */
 .textNodeChrome--minimal .scriptGenComposerInput {
   border-radius: var(--radius-sm, 6px);
   border: 1px solid var(--border-node, #4d4d4d);
@@ -109,7 +646,42 @@
 .textNodeChrome .textNodeReadOnly {
   flex: 1;
   min-height: 80px;
+  overflow: hidden;
+}
+
+.textNodeChrome .textNodeEditChrome--shellOnly {
+  flex: 1;
+  min-height: 0;
+}
+
+.textNodeChrome .textNodeEditChrome--shellOnly .textNodeEditable {
+  flex: 1;
+  min-height: 120px;
+  max-height: 100%;
   overflow: auto;
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline {
+  display: inline-flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 2px;
+  padding: 0;
+  margin: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  font-size: 10px;
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtSep {
+  margin: 0 2px;
 }
 
 .textNodeChrome .textNodeFormatBar {
@@ -158,4 +730,754 @@
 .textNodeChrome .textNodeTtvPanel,
 .textNodeChrome .textNodeTtmPanel {
   border-color: var(--border-node, #4d4d4d);
+}
+
+.minimal-text-placeholder.textNodeChromePlaceholder {
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.minimal-text-placeholder.textNodeChromePlaceholder svg {
+  width: clamp(48px, 18%, 72px);
+  height: clamp(48px, 18%, 72px);
+  opacity: 0.22;
+}
+
+.textNodeChromeEmptyHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-secondary, #9e9e9e);
+  text-align: center;
+  line-height: 1.45;
+}
+
+.textNodeComposerDockHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.textNodeComposerDockTitle {
+  font-size: 12px;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.textNodeComposerDockUnpin {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 8px;
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: #bdbdbd;
+  cursor: pointer;
+}
+
+.textNodeComposerDockUnpin:hover {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+  color: #f0f0f0;
+}
+
+.textSnippetLibraryBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.55);
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.textSnippetLibraryPanel {
+  width: min(440px, calc(100vw - 48px));
+  max-height: min(360px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 16px 18px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-panel, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+}
+
+.textSnippetLibraryHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.textSnippetLibraryTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.textSnippetLibraryEmpty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.textSnippetLibraryLead {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.textSnippetLibraryHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.textSnippetLibraryHint code {
+  font-size: 11px;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.textSnippetLibraryHint--muted {
+  opacity: 0.85;
+}
+
+/* ── 工作流底栏（C3）── */
+.textNodeWorkflowStub {
+  padding: 12px 4px;
+  text-align: center;
+}
+
+.textNodeWorkflowStubLead {
+  margin: 0 0 6px;
+  font-size: 13px;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.textNodeWorkflowStubHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.textNodeTtvChromeWrap {
+  width: 100%;
+}
+
+.textNodeTtvChromeWrap .videoGenPanel--chrome {
+  width: 100%;
+  max-width: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  background: transparent;
+}
+
+.textNodeTtmChromeWrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.textNodeTtmChromeHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.textNodeTtmChromeWrap .audioTtsPanel {
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.textNodeScriptSyncPanel.textGenPanel--chrome {
+  width: 100%;
+  padding: 4px 2px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.textNodeScriptSyncHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+/* —— 图一：壳内正文 + 底栏 —— */
+.textNodeChrome--integrated .textNodeChrome-inner--integrated {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.textNodeChrome-body--integrated {
+  flex: 1;
+  min-height: 0;
+  padding: 14px 14px 8px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.textNodeChrome-body--integrated:has(.textNodeEmptyShell) {
+  padding: 12px;
+}
+
+.textNodePlaceholder--integrated {
+  flex: 1;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-placeholder, #616161);
+  cursor: text;
+  white-space: pre-wrap;
+}
+
+.textNodeReadOnly--integrated {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  position: relative;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 10;
+  line-clamp: 10;
+}
+
+.textNodeChrome--userSized .textNodeReadOnly--integrated {
+  display: block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+  overflow: auto;
+  max-height: none;
+}
+
+.textNodeReadOnly--integrated::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 24px;
+  background: linear-gradient(to bottom, transparent, var(--bg-node-preview, #1f1f1f));
+  pointer-events: none;
+}
+
+.textNodeChrome--userSized .textNodeReadOnly--integrated::after {
+  display: none;
+}
+
+.tgp-layout-imageToPrompt .tgp-i2p-refRow,
+.textGenPanel--v2.tgp-layout-imageToPrompt .tgp-v2-zone-c--i2p {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 4px 2px 0;
+}
+
+.tgp-i2p-thumb {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.tgp-i2p-thumb .nodeMediaClip {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tgp-i2p-thumbBadge {
+  position: absolute;
+  left: 4px;
+  top: 4px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 4px;
+  font-size: 10px;
+  line-height: 16px;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+}
+
+.tgp-i2p-missing {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.tgp-layout-textToMusic .tgp-ttm-refRow {
+  padding: 4px 2px 0;
+}
+
+.tgp-ttm-linked,
+.tgp-ttm-missing {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.tgp-ttm-linked {
+  color: var(--text-muted, #b8b8b8);
+}
+
+.tgp-ttm-refRowInner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+}
+
+.tgp-partner-focusBtn,
+.tgp-ttm-focusBtn {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-secondary, #c8c8c8);
+  font-size: 11px;
+  line-height: 1.3;
+  cursor: pointer;
+}
+
+.tgp-partner-focusBtn:hover,
+.tgp-ttm-focusBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #e8e8e8);
+}
+
+.tgp-i2p-refRowInner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tgp-partner-linkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px 4px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.tgp-partner-linkRow--video {
+  margin-bottom: 2px;
+}
+
+.tgp-partner-linkHint {
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.textNodeScriptSyncRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.textNodeScriptSyncActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.textNodeChrome--integrated .textNodeEditable--integrated,
+.textNodeChrome--integrated.textNodeChrome--editing .textNodeEditable--integrated {
+  flex: 1;
+  min-height: 80px;
+  border: none !important;
+  background: transparent !important;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--text-primary, #e0e0e0);
+  outline: none !important;
+  box-shadow: none !important;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.textNodeChrome--integrated .textNodeEditable--integrated:focus,
+.textNodeChrome--integrated .textNodeEditable--integrated:focus-visible {
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.textNodeEditable--integrated:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-placeholder, #616161);
+  pointer-events: none;
+}
+
+.textNodeShellFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  flex-shrink: 0;
+}
+
+.textNodeShellFooter .igp-model-trigger {
+  max-width: 55%;
+}
+
+.textNodeShellFooterActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.textNodeShellSendBtn {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  padding: 0;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.textNodeResizeHandle {
+  position: absolute;
+  right: 2px;
+  bottom: 2px;
+  width: 18px;
+  height: 18px;
+  cursor: nwse-resize;
+  z-index: 4;
+  opacity: 0.55;
+  background:
+    linear-gradient(135deg, transparent 50%, rgba(255, 255, 255, 0.35) 50%),
+    linear-gradient(135deg, transparent 62%, rgba(255, 255, 255, 0.2) 62%);
+  background-size: 100% 100%;
+  border-radius: 0 0 6px 0;
+}
+
+.textNodeResizeHandle:hover {
+  opacity: 0.9;
+}
+
+.textNodeChrome-inner--integrated {
+  position: relative;
+}
+
+/* 顶栏 Portal：单层胶囊（去掉 nodeChrome--panel 双底板） */
+.textPreviewToolbarChrome.nodeChrome--top {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  height: auto;
+  min-height: 0;
+}
+
+.textPreviewToolbarChrome .textPreviewToolbar {
+  max-width: min(520px, 92vw);
+  background: rgba(26, 26, 26, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 999px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  padding: 3px 6px;
+}
+
+.textPreviewToolbarScroll {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.textPreviewToolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 20px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+}
+
+.textPreviewToolbar-utils {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.textPreviewToolbar-iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-secondary, #b0b0b0);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.textPreviewToolbar-iconBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-primary, #e8e8e8);
+}
+
+.textPreviewToolbar-iconBtn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* 空态：图标 + 单行提示，整体居中 */
+.textNodeEmptyShell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  box-sizing: border-box;
+  cursor: text;
+}
+
+.textNodeEmptyShellIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-placeholder, #616161);
+  opacity: 0.25;
+}
+
+.textNodeEmptyShellIcon svg {
+  width: clamp(40px, 18%, 56px);
+  height: clamp(40px, 18%, 56px);
+}
+
+.textNodeEmptyShellLabel {
+  margin: 0;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-secondary, #9e9e9e);
+  text-align: center;
+}
+
+.textNodeChrome--integrated.selected .textNodeEmptyShellIcon,
+.minimal-text-node.selected .textNodeEmptyShellIcon {
+  opacity: 0.32;
+}
+
+/* ── 展开编辑 / 粘贴 Modal（与节点壳同色，不用 global 蓝灰 .btn）── */
+.textNodeExpandBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 32px;
+  box-sizing: border-box;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+}
+
+.textNodeExpandPanel {
+  width: min(720px, 100%);
+  max-height: min(90vh, 900px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px 14px 14px;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-node, #4d4d4d);
+  background: var(--bg-node-preview, #1f1f1f);
+  color: var(--text-primary, #e0e0e0);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  box-sizing: border-box;
+}
+
+.textNodeExpandHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.textNodeExpandTitle {
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.textNodeExpandTextarea {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 320px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm, 6px);
+  border: 1px solid var(--border-button, #4d4d4d);
+  background: var(--bg-node, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+  outline: none;
+  font-family: inherit;
+}
+
+.textNodeExpandTextarea::placeholder {
+  color: var(--text-placeholder, #616161);
+}
+
+.textNodeExpandTextarea:focus,
+.textNodeExpandTextarea:focus-visible {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: none;
+}
+
+.textNodeExpandFoot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.textNodeExpandBtn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-sm, 8px);
+  border: 1px solid var(--border-button, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 12px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.textNodeExpandBtn:hover {
+  background: var(--bg-button-active, #444444);
+}
+
+.textNodeExpandBtn--primary {
+  background: var(--tgp-cta-bg-ready, #ffffff);
+  border-color: var(--tgp-cta-border-ready, rgba(255, 255, 255, 0.28));
+  color: var(--tgp-cta-fg-ready, #121212);
+  box-shadow: var(--tgp-cta-shadow-ready, 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 2px 12px rgba(0, 0, 0, 0.5));
+}
+
+.textNodeExpandBtn--primary:hover {
+  background: var(--tgp-cta-bg-ready-hover, #f2f2f2);
+}
+
+/* ── 模型对话展开 Modal（与底栏 textGenPanel--chrome 同构）── */
+.igp-expanded-card.tgp-expanded-shell.textNodeChrome--minimal {
+  width: var(--tgp-shell-width, 300px);
+  max-width: calc(100vw - 24px);
+  min-height: min(420px, calc(100vh - 48px));
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  overflow: hidden;
+  background: var(--bg-node-preview, #1f1f1f);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 13px;
+}
+
+.igp-expanded-card.tgp-expanded-shell .igp-expanded-modal-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.igp-expanded-card.tgp-expanded-shell .textGenPanel--chrome.scriptGenComposer {
+  flex: 1;
+  min-height: 0;
+  gap: 10px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+  --tgp-control-h: 40px;
+}
+
+.igp-expanded-card.tgp-expanded-shell .textGenPanel--chrome.tgp-layout-expanded .tgp-prompt-wrap {
+  flex: 1;
+  min-height: 0;
+}
+
+.igp-expanded-card.tgp-expanded-shell .textGenPanel--chrome .tgp-prompt-wrap .mention-input-wrapper {
+  flex: 1;
+  min-height: 160px;
+}
+
+.igp-expanded-card.tgp-expanded-shell .textGenPanel--chrome .tgp-prompt-wrap .mention-textarea {
+  flex: 1;
+  min-height: 140px;
+  max-height: min(360px, calc(100vh - 220px));
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.igp-expanded-card.tgp-expanded-shell .textGenPanel--chrome .tgp-prompt-counter {
+  color: var(--tgp-control-text-muted, #9e9e9e);
+}
+
+.igp-expanded-card.tgp-expanded-shell .textGenPanel--chrome .tgp-bottom-bar .igp-model-trigger {
+  min-height: var(--tgp-control-h);
+  font-size: 12px;
+}
+
+.igp-expanded-card.tgp-expanded-shell .textGenPanel--chrome .tgp-generate-btn,
+.igp-expanded-card.tgp-expanded-shell .textGenPanel--chrome .igp-generate-btn.tgp-generate-btn {
+  width: var(--tgp-control-h);
+  height: var(--tgp-control-h);
+  min-height: var(--tgp-control-h);
 }

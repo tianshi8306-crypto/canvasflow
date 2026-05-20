@@ -79,6 +79,7 @@ pub fn run() {
             commands::graph_cmd::execute_subgraph,
             commands::graph_cmd::execute_subgraph_with_patch,
             commands::graph_cmd::llm_complete_text,
+            commands::prompt_reverse_cmd::reverse_prompt_from_media,
             commands::media_gen_cmd::generate_image_asset,
             commands::media_gen_cmd::generate_tts_asset,
             commands::media_gen_cmd::test_image_model_connection,

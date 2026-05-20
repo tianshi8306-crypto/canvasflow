@@ -14,7 +14,8 @@ export type FlowEdgePayload = {
 
 const TARGET_ACCEPTS: Record<string, readonly PortType[]> = {
   llm: ["text", "script"],
-  textNode: ["text", "script"],
+  /** 图/视频反推提示词、脚本同步等写入文本正文 */
+  textNode: ["text", "script", "image", "video"],
   /** 脚本输出可作为上游绑定（如按 scriptBeatId 驱动首帧/参考） */
   imageNode: ["image", "text", "script"],
   imageAsset: ["image", "text", "script"],

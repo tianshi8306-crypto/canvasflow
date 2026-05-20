@@ -75,7 +75,11 @@ export type ProjectState = {
   /** 删除指定连线 */
   deleteEdge: (edgeId: string) => void;
 
-  updateNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
+  updateNodeData: (
+    id: string,
+    patch: Partial<FlowNodeData>,
+    opts?: { silent?: boolean },
+  ) => void;
 
   newProject: () => Promise<void>;
   openProject: () => Promise<void>;

@@ -44,9 +44,11 @@
   line-height: 1.45;
 }
 
-.igp-expanded-card.igp-layout-expanded .mention-input-wrapper.imageGenPanelTextarea,
-.igp-expanded-card.igp-layout-expanded .mention-input-wrapper.imageGenPanelTextarea--minimal,
-.igp-expanded-card.igp-layout-expanded .mention-input-wrapper.imageGenPanelTextarea--expanded {
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell) .mention-input-wrapper.imageGenPanelTextarea,
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell)
+  .mention-input-wrapper.imageGenPanelTextarea--minimal,
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell)
+  .mention-input-wrapper.imageGenPanelTextarea--expanded {
   flex: 1;
   min-height: 160px;
   display: flex;
@@ -58,7 +60,7 @@
   padding: 0 !important;
 }
 
-.igp-expanded-card.igp-layout-expanded .mention-textarea {
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell) .mention-textarea {
   flex: 1;
   min-height: 140px;
   max-height: min(360px, calc(100vh - 220px));
@@ -68,8 +70,8 @@
   background: transparent !important;
 }
 
-.igp-expanded-card.igp-layout-expanded .mention-textarea:focus,
-.igp-expanded-card.igp-layout-expanded .mention-textarea:focus-visible {
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell) .mention-textarea:focus,
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell) .mention-textarea:focus-visible {
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
@@ -151,3 +153,5 @@
   height: var(--vgp-control-h);
   min-height: var(--vgp-control-h);
 }
+
+/* 文本 Composer 展开态见 TextNodeChrome.css（与底栏 Portal 同款 token，勿用图片 igp 配色） */

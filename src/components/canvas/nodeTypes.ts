@@ -6,7 +6,7 @@ import { MediaImportNode } from "@/components/nodes/MediaImportNode";
 import { TextNode } from "@/components/nodes/TextNode";
 import { ScriptNode } from "@/components/nodes/ScriptNode";
 import { VideoAssetNode } from "@/components/nodes/VideoAssetNode";
-import { AudioAssetNode } from "@/components/nodes/AudioAssetNode";
+import { MinimalAudioNode } from "@/components/nodes/MinimalAudioNode";
 import { GroupNode } from "@/components/nodes/GroupNode";
 
 export const nodeTypes = {
@@ -17,6 +17,6 @@ export const nodeTypes = {
   textNode: TextNode,
   scriptNode: ScriptNode,
   videoNode: VideoAssetNode,
-  audioNode: AudioAssetNode,
+  audioNode: MinimalAudioNode,
   group: GroupNode,
 } satisfies NodeTypes;
