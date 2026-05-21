@@ -828,6 +828,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       nodes: state.nodes,
       edges: state.edges,
       projectPath,
+      beatIds: opts?.beatIds,
     });
 
     const scriptLabel = scriptNode.data.label?.trim() || "脚本";

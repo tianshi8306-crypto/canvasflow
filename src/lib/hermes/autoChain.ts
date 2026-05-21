@@ -10,12 +10,23 @@ import { useProjectStore } from "@/store/projectStore";
 import { makeFlowEdge } from "@/lib/flowEdge";
 import { normalizeSourceHandle } from "@/lib/flowConnectionPolicy";
 import { createShotNodePair } from "./shotNodeFactory";
+import {
+  evaluateHermesAutoChainTrigger,
+  HERMES_STORYBOARD_AGENT_NAME,
+  loadHermesAutoChainSettings,
+  readHermesNodeOverride,
+  resolveHermesBatchSplitSettings,
+  resolveHermesEnabled,
+} from "./hermesAutoChainPolicy";
 import type { HermesAutoChainResult, HermesShotNodeGroup } from "./types";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
 import type { Node } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
+import { getScriptBeatIdFromParams } from "@/lib/incomingScriptBinding";
+import { batchGenerateImagesForStoryboard } from "@/lib/storyboard/batchGenerateImages";
+import { patchStoryboardShot } from "@/lib/storyboard/patchStoryboardShot";
 
-const SCRIPT_NODE_AGENT_NAME = "脚本调度 Agent";
+const IMAGE_AGENT_NAME = "图片 Agent";
 const VIDEO_AGENT_NAME = "视频 Agent";
 const VIDEO_ASYNC_AGENT_NAME = "视频异步任务 Agent";
 const BASE_X_OFFSET = 500;
@@ -75,7 +86,16 @@ export function rebuildShotNodeRegistry(nodes: Node<FlowNodeData>[]): void {
 /**
  * 处理 scriptNode 完成事件，创建下游节点
  */
-export function handleScriptNodeCompleted(scriptNodeId: string): HermesAutoChainResult {
+export type HandleScriptNodeCompletedOptions = {
+  beatIds?: string[];
+  /** 建链后按镜头顺序提交图片生成（需已打开工程） */
+  submitImageGeneration?: boolean;
+};
+
+export function handleScriptNodeCompleted(
+  scriptNodeId: string,
+  opts?: HandleScriptNodeCompletedOptions,
+): HermesAutoChainResult {
   const state = useProjectStore.getState();
   const scriptNode = state.nodes.find((n) => n.id === scriptNodeId && n.type === "scriptNode");
 
@@ -83,11 +103,28 @@ export function handleScriptNodeCompleted(scriptNodeId: string): HermesAutoChain
     return { total: 0, succeeded: 0, failed: 0, groups: [] };
   }
 
-  const shots = scriptNode.data.storyboardShots ?? [];
+  const beatFilter =
+    opts?.beatIds?.length && opts.beatIds.length > 0 ? new Set(opts.beatIds) : null;
+  const shots = (scriptNode.data.storyboardShots ?? []).filter(
+    (s) => !beatFilter || beatFilter.has(s.scriptBeatId),
+  );
   const beats = scriptNode.data.scriptBeats ?? [];
 
   if (shots.length === 0) {
     return { total: 0, succeeded: 0, failed: 0, groups: [] };
+  }
+
+  const existingVideo = new Set<string>();
+  for (const n of state.nodes) {
+    if (n.type !== "videoNode") continue;
+    const bid = n.data.params?.scriptBeatId;
+    if (typeof bid === "string" && bid.trim()) existingVideo.add(bid.trim());
+  }
+  const existingImage = new Set<string>();
+  for (const n of state.nodes) {
+    if (n.type !== "imageNode") continue;
+    const bid = n.data.params?.scriptBeatId;
+    if (typeof bid === "string" && bid.trim()) existingImage.add(bid.trim());
   }
 
   const results: HermesShotNodeGroup[] = [];
@@ -103,6 +140,9 @@ export function handleScriptNodeCompleted(scriptNodeId: string): HermesAutoChain
   for (let idx = 0; idx < shots.length; idx++) {
     const shot = shots[idx];
     const beat = beats.find((b) => b.id === shot.scriptBeatId);
+    if (existingImage.has(shot.scriptBeatId) && existingVideo.has(shot.scriptBeatId)) {
+      continue;
+    }
 
     try {
       const { nodes, group } = createShotNodePair(shot, beat, { x: baseX, y: baseY }, idx);
@@ -132,7 +172,61 @@ export function handleScriptNodeCompleted(scriptNodeId: string): HermesAutoChain
     state.addNodesWithEdges(flatNodes, newEdges);
   }
 
+  if (opts?.submitImageGeneration && results.length > 0 && state.projectPath?.trim()) {
+    const beatIds = results.map((g) => g.scriptBeatId);
+    const nodeParams =
+      scriptNode.data.params && typeof scriptNode.data.params === "object"
+        ? (scriptNode.data.params as Record<string, unknown>)
+        : undefined;
+    const split = resolveHermesBatchSplitSettings(loadHermesAutoChainSettings(), nodeParams);
+    void batchGenerateImagesForStoryboard({
+      scriptNodeId,
+      nodes: useProjectStore.getState().nodes,
+      edges: useProjectStore.getState().edges,
+      projectPath: state.projectPath.trim(),
+      updateNodeData: state.updateNodeData,
+      setStatusText: state.setStatusText,
+      beatIds,
+      hermesBatch: {
+        strategy: split.batchSplitStrategy,
+        packImageCount: split.packImageCount,
+        beats: scriptNode.data.scriptBeats ?? [],
+        shots: scriptNode.data.storyboardShots,
+      },
+    });
+  }
+
   return { total: shots.length, succeeded, failed, groups: results };
+}
+
+/**
+ * 图片生成失败时回写分镜镜头状态（成功路径由 imageGenerationAgent commit + writeback 处理）。
+ */
+function syncImageNodeStatusToStoryboard(
+  imageNodeId: string,
+  phase: "error",
+  error?: string,
+): void {
+  const state = useProjectStore.getState();
+  const imageNode = state.nodes.find((n) => n.id === imageNodeId && n.type === "imageNode");
+  const beatId = imageNode ? getScriptBeatIdFromParams(imageNode.data) : undefined;
+  if (!beatId) return;
+
+  const scriptIds = state.edges
+    .filter((e) => e.target === imageNodeId)
+    .map((e) => e.source)
+    .map((id) => state.nodes.find((n) => n.id === id))
+    .filter((n) => n?.type === "scriptNode")
+    .map((n) => n!.id);
+  const scriptNodeId = scriptIds[0];
+  if (!scriptNodeId) return;
+
+  patchStoryboardShot(
+    scriptNodeId,
+    beatId,
+    { status: "failed", error: error ?? "图片生成失败" },
+    state.updateNodeData,
+  );
 }
 
 /**
@@ -182,30 +276,77 @@ function syncVideoNodeStatusToStoryboard(
 /**
  * 监听 node-agent-event 事件，触发自动串联和状态联动
  */
+function tryHermesAutoChainAfterStoryboard(scriptNodeId: string): void {
+  const state = useProjectStore.getState();
+  const scriptNode = state.nodes.find((n) => n.id === scriptNodeId && n.type === "scriptNode");
+  if (!scriptNode) return;
+
+  const nodeParams =
+    scriptNode.data.params && typeof scriptNode.data.params === "object"
+      ? (scriptNode.data.params as Record<string, unknown>)
+      : undefined;
+
+  const decision = evaluateHermesAutoChainTrigger({
+    globalSettings: loadHermesAutoChainSettings(),
+    nodeParams,
+    beats: scriptNode.data.scriptBeats ?? [],
+    shots: scriptNode.data.storyboardShots,
+    scriptBeatSelection: scriptNode.data.scriptBeatSelection,
+  });
+
+  if (!decision.shouldRun) {
+    const global = loadHermesAutoChainSettings();
+    if (resolveHermesEnabled(global, readHermesNodeOverride(nodeParams))) {
+      state.setStatusText(decision.reason);
+    }
+    return;
+  }
+
+  const split = resolveHermesBatchSplitSettings(
+    loadHermesAutoChainSettings(),
+    nodeParams,
+  );
+  const result = handleScriptNodeCompleted(scriptNodeId, {
+    beatIds: decision.beatIds,
+    submitImageGeneration: Boolean(state.projectPath?.trim()),
+  });
+  if (result.succeeded > 0) {
+    let statusMsg = `Hermes 自动建链（${decision.scopeLabel}）：${result.succeeded} 组成功`;
+    if (result.failed > 0) statusMsg += `，${result.failed} 组失败`;
+    if (state.projectPath?.trim()) {
+      statusMsg +=
+        split.batchSplitStrategy === "pack_forward"
+          ? `；图片已按打包拆镜 ${split.packImageCount} 张排队`
+          : "；图片已按镜头逐张排队";
+    }
+    state.setStatusText(statusMsg);
+  } else if (result.total > 0) {
+    state.setStatusText(`Hermes：${decision.scopeLabel}，节点均已存在，未新建`);
+  }
+}
+
 export function setupNodeEventListener(): () => void {
   const handler = (evt: CustomEvent<NodeAgentRuntimeEvent>) => {
     const { nodeId, agentName, phase, error } = evt.detail;
 
-    // scriptNode 完成 -> 触发自动串联
-    if (phase === "end" && agentName === SCRIPT_NODE_AGENT_NAME) {
-      setTimeout(() => {
-        const result = handleScriptNodeCompleted(nodeId);
+    // 分镜文案生成完成 -> 按策略自动建链（不再在「脚本解析」完成时建链）
+    if (phase === "end" && agentName === HERMES_STORYBOARD_AGENT_NAME) {
+      setTimeout(() => tryHermesAutoChainAfterStoryboard(nodeId), 0);
+      return;
+    }
 
-        if (result.total > 0) {
-          const { succeeded, failed } = result;
-          let statusMsg = `Shot 节点创建完成：${succeeded} 个成功`;
-          if (failed > 0) {
-            statusMsg += `，${failed} 个失败`;
-          }
-          useProjectStore.getState().setStatusText(statusMsg);
-        }
+    if (phase === "error" && agentName === IMAGE_AGENT_NAME) {
+      setTimeout(() => {
+        syncImageNodeStatusToStoryboard(nodeId, "error", error);
       }, 0);
       return;
     }
 
     // videoNode 完成 -> 联动更新 storyboardShot 状态
-    if ((phase === "end" || phase === "error") &&
-        (agentName === VIDEO_AGENT_NAME || agentName === VIDEO_ASYNC_AGENT_NAME)) {
+    if (
+      (phase === "end" || phase === "error") &&
+      (agentName === VIDEO_AGENT_NAME || agentName === VIDEO_ASYNC_AGENT_NAME)
+    ) {
       setTimeout(() => {
         syncVideoNodeStatusToStoryboard(nodeId, phase, error);
       }, 0);

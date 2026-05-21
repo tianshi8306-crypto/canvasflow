@@ -130,7 +130,7 @@ export type ProjectState = {
   /** 按脚本镜号准备合成节点并可选自动 FFmpeg 导出成片 */
   exportScriptCompose: (
     scriptNodeId: string,
-    opts?: { autoRender?: boolean },
+    opts?: { autoRender?: boolean; beatIds?: string[] },
   ) => Promise<ScriptComposeExportResult | null>;
   /** 顶栏「解析 / 高清 / 去字幕」：预填生成草稿并选中节点 */
   openVideoToolbarWorkflow: (

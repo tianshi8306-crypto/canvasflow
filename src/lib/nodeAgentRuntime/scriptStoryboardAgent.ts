@@ -59,16 +59,23 @@ function setShotsStatus(
   );
 }
 
+type StoryboardLlmParams = {
+  providerId?: string;
+  model?: string;
+};
+
 type StoryboardGenerateInput = {
   targetBeats: ScriptBeat[];
   themePrompt: string;
   prevShots: StoryboardShot[] | undefined;
+  llmParams?: StoryboardLlmParams;
 };
 
 type StoryboardGenerateSensed = {
   payload: ScriptBeat[];
   theme: string;
   prevShots: StoryboardShot[] | undefined;
+  llmParams: StoryboardLlmParams;
 };
 
 type StoryboardGenerateExecuted = {
@@ -91,15 +98,15 @@ export const scriptStoryboardGenerateAgentRuntime: NodeTaskAgentRuntime<
   StoryboardGenerateCommitted
 > = {
   agentName: "分镜生成 Agent",
-  sense: ({ targetBeats, themePrompt, prevShots }) => {
+  sense: ({ targetBeats, themePrompt, prevShots, llmParams }) => {
     if (targetBeats.length === 0) {
       throw new Error("没有可生成分镜的脚本条目");
     }
     const payload = targetBeats.map((b) => normalizeScriptBeat(b));
     const theme = themePrompt.trim() || "（未填主题）";
-    return { payload, theme, prevShots };
+    return { payload, theme, prevShots, llmParams: llmParams ?? {} };
   },
-  execute: async ({ payload, theme, prevShots }, ctx) => {
+  execute: async ({ payload, theme, prevShots, llmParams }, ctx) => {
     const targetIds = payload.map((b) => b.id);
     ctx.setStatusText(`正在请求 LLM 生成分镜文案（${payload.length} 条）…`);
     // Mark targets as generating before LLM call
@@ -111,6 +118,7 @@ export const scriptStoryboardGenerateAgentRuntime: NodeTaskAgentRuntime<
       const raw = await invoke<string>("llm_complete_text", {
         systemPrompt: SB_SYSTEM,
         userPrompt: user,
+        ...llmParams,
       });
       const parsed = extractJsonArray<ParsedRow>(raw) ?? [];
       return { parsed, prevShots };

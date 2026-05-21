@@ -1,21 +1,40 @@
-import { useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import type { Node } from "@xyflow/react";
 import type { FlowNodeData, ScriptBeat, StoryboardShot } from "@/lib/types";
 import { normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
 import { formatUserError } from "@/lib/errors";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { scriptStoryboardGenerateAgentRuntime } from "@/lib/nodeAgentRuntime/scriptStoryboardAgent";
 import { handleScriptNodeCompleted } from "@/lib/hermes/autoChain";
+import {
+  hermesAutoChainSettingsHint,
+  loadHermesAutoChainSettings,
+  resolveHermesBatchSplitSettings,
+} from "@/lib/hermes/hermesAutoChainPolicy";
 import { pickImagePathsForImport } from "@/lib/tauriMediaPaths";
 import { resolveProjectAssetSrc } from "@/lib/projectMediaUrl";
-import { makeFlowEdge } from "@/lib/flowEdge";
-import { defaultVideoGenerationDraft, defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
-import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
 import { useProjectStore } from "@/store/projectStore";
-import { importMediaFiles } from "@/shared/api/assets";
-import { assessScriptComposeReadiness } from "@/lib/compose";
+import { importStoryboardImageForBeat } from "@/lib/scriptStoryboardImageImport";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
+import { batchGenerateImagesForStoryboard } from "@/lib/storyboard/batchGenerateImages";
 import { batchGenerateVideosForStoryboard } from "@/lib/storyboard/batchGenerateVideos";
+import {
+  assessBatchVideoReadiness,
+  assessComposeExportScope,
+  formatBatchVideoReadinessHint,
+  formatComposeExportReadinessHint,
+  listFailedVideoBeatIds,
+} from "@/lib/storyboard/scriptProductionExport";
+import {
+  resolveStoryboardBeatScope,
+  storyboardChainScopeHint,
+} from "@/lib/scriptStoryboardScope";
+import {
+  buildScriptBeatChain,
+  formatChainBuildStatus,
+  type ChainMediaKind,
+} from "@/lib/scriptBeatChainBuild";
+import { preflightScriptNodeLlm, scriptNodeLlmInvokeParams } from "@/lib/scriptNodeLlmParams";
 
 type Props = {
   nodeId: string;
@@ -47,6 +66,15 @@ export function ScriptStoryboardSection({
   const [composeExportRunning, setComposeExportRunning] = useState(false);
   const [detail, setDetail] = useState<StoryboardShot | null>(null);
   const storyboardImageInputRef = useRef<HTMLInputElement | null>(null);
+  const inspectorStoryboardFocus = useCanvasUiStore((s) => s.inspectorStoryboardFocus);
+  const setInspectorStoryboardFocus = useCanvasUiStore((s) => s.setInspectorStoryboardFocus);
+
+  const scriptNode = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
+  const nodeParams =
+    scriptNode?.data.params && typeof scriptNode.data.params === "object"
+      ? (scriptNode.data.params as Record<string, unknown>)
+      : undefined;
+  const llmParams = useMemo(() => scriptNodeLlmInvokeParams(nodeParams), [nodeParams]);
 
   const shotByBeat = useMemo(() => {
     const m = new Map<string, StoryboardShot>();
@@ -62,6 +90,37 @@ export function ScriptStoryboardSection({
       shot: shotByBeat.get(b.id),
     }));
   }, [beatsNorm, shotByBeat]);
+
+  useEffect(() => {
+    if (!inspectorStoryboardFocus || inspectorStoryboardFocus.scriptNodeId !== nodeId) return;
+    const beatId = inspectorStoryboardFocus.beatId;
+    const beat = beatsNorm.find((b) => b.id === beatId);
+    if (!beat) {
+      setInspectorStoryboardFocus(null);
+      return;
+    }
+    const shot = shotByBeat.get(beatId);
+    setDetail(
+      shot ?? {
+        scriptBeatId: beatId,
+        visualPrompt: "",
+        status: "idle",
+      },
+    );
+    setSbView("grid");
+    requestAnimationFrame(() => {
+      document
+        .querySelector(`[data-storyboard-focus-beat="${beatId}"]`)
+        ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    });
+    setInspectorStoryboardFocus(null);
+  }, [
+    beatsNorm,
+    inspectorStoryboardFocus,
+    nodeId,
+    setInspectorStoryboardFocus,
+    shotByBeat,
+  ]);
 
   const storyboardHealth = useMemo(() => {
     const beatIds = new Set(beatsNorm.map((b) => b.id));
@@ -99,9 +158,53 @@ export function ScriptStoryboardSection({
     };
   }, [beatsNorm, shotByBeat, shots]);
 
-  const composeReadiness = useMemo(
-    () => assessScriptComposeReadiness(beatsNorm, shots ?? [], nodes, edges, nodeId),
-    [beatsNorm, shots, nodes, edges, nodeId],
+  const chainScopeResult = useMemo(
+    () => resolveStoryboardBeatScope(beatsNorm, scriptBeatSelection),
+    [beatsNorm, scriptBeatSelection],
+  );
+
+  const batchVideoReadiness = useMemo(
+    () =>
+      assessBatchVideoReadiness({
+        scriptNodeId: nodeId,
+        beats: beatsNorm,
+        shots,
+        nodes,
+        edges,
+        scriptBeatSelection,
+      }),
+    [beatsNorm, shots, nodes, edges, nodeId, scriptBeatSelection],
+  );
+  const batchVideoOk = "canStart" in batchVideoReadiness;
+  const batchVideoHint = batchVideoOk
+    ? formatBatchVideoReadinessHint(batchVideoReadiness)
+    : batchVideoReadiness.message;
+
+  const composeExportReadiness = useMemo(
+    () =>
+      assessComposeExportScope({
+        scriptNodeId: nodeId,
+        beats: beatsNorm,
+        shots,
+        nodes,
+        edges,
+        scriptBeatSelection,
+      }),
+    [beatsNorm, shots, nodes, edges, nodeId, scriptBeatSelection],
+  );
+  const composeExportOk = "canExport" in composeExportReadiness;
+  const composeExportHint = composeExportOk
+    ? formatComposeExportReadinessHint(composeExportReadiness)
+    : composeExportReadiness.message;
+
+  const failedVideoBeatIdsInScope = useMemo(() => {
+    if (!chainScopeResult.ok) return [];
+    const scopeIds = new Set(chainScopeResult.scope.beats.map((b) => b.id));
+    return listFailedVideoBeatIds(shots).filter((id) => scopeIds.has(id));
+  }, [shots, chainScopeResult]);
+  const hermesPolicyHint = useMemo(
+    () => hermesAutoChainSettingsHint(loadHermesAutoChainSettings()),
+    [],
   );
 
   const runGenerate = async (targetBeats: ScriptBeat[]) => {
@@ -111,12 +214,14 @@ export function ScriptStoryboardSection({
         setStatusText("请先打开工程后再生成分镜");
         return;
       }
+      if (!(await preflightScriptNodeLlm(nodeParams, setStatusText))) return;
       await runNodeTaskAgent(
         scriptStoryboardGenerateAgentRuntime,
         {
           targetBeats,
           themePrompt,
           prevShots: shots,
+          llmParams,
         },
         {
           nodeId,
@@ -196,18 +301,60 @@ export function ScriptStoryboardSection({
       setStatusText("请先打开工程");
       return;
     }
-    const selected = (scriptBeatSelection ?? []).filter((id) => beatsNorm.some((b) => b.id === id));
+    if (!batchVideoOk) {
+      setStatusText(
+        "canStart" in batchVideoReadiness
+          ? batchVideoReadiness.blockMessage
+          : batchVideoReadiness.message,
+      );
+      return;
+    }
+    const beatIds = batchVideoReadiness.scope.beats.map((b) => b.id);
     setBatchVideoRunning(true);
     try {
       await batchGenerateVideosForStoryboard({
         scriptNodeId: nodeId,
+        beats: beatsNorm,
         shots: shots ?? [],
         nodes,
         edges,
         projectPath,
         updateNodeData,
         setStatusText,
-        beatIds: selected.length > 0 ? selected : undefined,
+        beatIds,
+        onProgress: (current, total, shotNumber) => {
+          setStatusText(`批量视频：${current}/${total} 镜 ${shotNumber}…`);
+        },
+      });
+    } finally {
+      setBatchVideoRunning(false);
+    }
+  };
+
+  const retryFailedVideos = async () => {
+    if (!projectPath) {
+      setStatusText("请先打开工程");
+      return;
+    }
+    if (failedVideoBeatIdsInScope.length === 0) {
+      setStatusText("范围内没有失败的视频镜头");
+      return;
+    }
+    setBatchVideoRunning(true);
+    try {
+      await batchGenerateVideosForStoryboard({
+        scriptNodeId: nodeId,
+        beats: beatsNorm,
+        shots: shots ?? [],
+        nodes,
+        edges,
+        projectPath,
+        updateNodeData,
+        setStatusText,
+        beatIds: failedVideoBeatIdsInScope,
+        onProgress: (current, total, shotNumber) => {
+          setStatusText(`重试视频：${current}/${total} 镜 ${shotNumber}…`);
+        },
       });
     } finally {
       setBatchVideoRunning(false);
@@ -219,9 +366,18 @@ export function ScriptStoryboardSection({
       setStatusText("请先打开工程");
       return;
     }
+    if (!composeExportOk) {
+      setStatusText(
+        "canExport" in composeExportReadiness
+          ? composeExportReadiness.blockMessage
+          : composeExportReadiness.message,
+      );
+      return;
+    }
+    const beatIds = composeExportReadiness.scope.beats.map((b) => b.id);
     setComposeExportRunning(true);
     try {
-      await exportScriptCompose(nodeId, { autoRender: true });
+      await exportScriptCompose(nodeId, { autoRender: true, beatIds });
     } finally {
       setComposeExportRunning(false);
     }
@@ -233,23 +389,102 @@ export function ScriptStoryboardSection({
       setStatusText("当前没有已生成分镜的镜头，请先生成分镜");
       return;
     }
-    const result = handleScriptNodeCompleted(nodeId);
+    const beatIds =
+      chainScopeResult.ok && chainScopeResult.scope.mode === "selected"
+        ? chainScopeResult.scope.beats.map((b) => b.id)
+        : undefined;
+    const result = handleScriptNodeCompleted(nodeId, {
+      beatIds,
+      submitImageGeneration: Boolean(projectPath?.trim()),
+    });
     if (result.total === 0) {
-      setStatusText("Hermes 串联：未找到可创建的下游节点");
+      setStatusText("Hermes 串联：未找到可创建的下游节点（可能已建链）");
     } else {
-      setStatusText(`Hermes 串联完成：${result.succeeded} 个节点组已创建` + (result.failed > 0 ? `，${result.failed} 个失败` : ""));
+      const scriptNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
+      const nodeParams =
+        scriptNode?.data.params && typeof scriptNode.data.params === "object"
+          ? (scriptNode.data.params as Record<string, unknown>)
+          : undefined;
+      const split = resolveHermesBatchSplitSettings(loadHermesAutoChainSettings(), nodeParams);
+      const tail =
+        projectPath?.trim() && result.succeeded > 0
+          ? split.batchSplitStrategy === "pack_forward"
+            ? `；图片已按打包拆镜 ${split.packImageCount} 张排队`
+            : "；图片已按镜头逐张排队"
+          : "";
+      setStatusText(
+        `Hermes 串联完成：${result.succeeded} 个节点组已创建` +
+          (result.failed > 0 ? `，${result.failed} 个失败` : "") +
+          tail,
+      );
+    }
+  };
+
+  const runChainBuild = (
+    kinds: ChainMediaKind[],
+    opts?: { submitImageGeneration?: boolean },
+  ) => {
+    const anchor = nodes.find((n) => n.id === nodeId);
+    if (!anchor) {
+      setStatusText("找不到脚本节点，无法创建链路");
+      return;
+    }
+    const result = buildScriptBeatChain({
+      scriptNodeId: nodeId,
+      anchor,
+      beats: beatsNorm,
+      scriptBeatSelection,
+      shots,
+      nodes,
+      edges,
+      kinds,
+      skipExisting: true,
+    });
+    if ("message" in result) {
+      setStatusText(result.message);
+      return;
+    }
+    if (result.newNodes.length > 0) {
+      addNodesWithEdges(result.newNodes, result.newEdges);
+      setSelectedNodeIds(result.newNodes.map((n) => n.id));
+    }
+    setStatusText(formatChainBuildStatus(result));
+    if (
+      opts?.submitImageGeneration &&
+      result.created.image > 0 &&
+      projectPath?.trim()
+    ) {
+      const scriptNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
+      const nodeParams =
+        scriptNode?.data.params && typeof scriptNode.data.params === "object"
+          ? (scriptNode.data.params as Record<string, unknown>)
+          : undefined;
+      const split = resolveHermesBatchSplitSettings(loadHermesAutoChainSettings(), nodeParams);
+      void batchGenerateImagesForStoryboard({
+        scriptNodeId: nodeId,
+        nodes: useProjectStore.getState().nodes,
+        edges: useProjectStore.getState().edges,
+        projectPath: projectPath.trim(),
+        updateNodeData,
+        setStatusText,
+        beatIds: result.scope.beats.map((b) => b.id),
+        hermesBatch: {
+          strategy: split.batchSplitStrategy,
+          packImageCount: split.packImageCount,
+          beats: beatsNorm,
+          shots,
+        },
+      });
     }
   };
 
   const generateSelected = () => {
-    const sel = scriptBeatSelection ?? [];
-    const valid = sel.filter((id) => beatsNorm.some((b) => b.id === id));
-    const picked = valid.length > 0 ? beatsNorm.filter((b) => valid.includes(b.id)) : beatsNorm;
-    if (valid.length === 0 && beatsNorm.length > 0 && sel.length > 0) {
-      setStatusText("所选脚本条目已不存在，请重新勾选");
+    const scopeResult = resolveStoryboardBeatScope(beatsNorm, scriptBeatSelection);
+    if (!scopeResult.ok) {
+      setStatusText(scopeResult.message);
       return;
     }
-    void runGenerate(picked);
+    void runGenerate(scopeResult.scope.beats);
   };
 
   const generateAll = () => {
@@ -272,12 +507,16 @@ export function ScriptStoryboardSection({
     const beatId = detail.scriptBeatId;
     void (async () => {
       try {
-        const imported = await importMediaFiles(projectPath, paths.slice(0, 1));
-        const item = imported[0];
-        if (!item) return;
-        persistShotPatch(beatId, { imagePath: item.relPath, imageAssetId: item.assetId });
-        setDetail((d) => (d ? { ...d, imagePath: item.relPath } : null));
-        setStatusText(`已关联分镜图：${item.relPath}`);
+        const result = await importStoryboardImageForBeat(
+          projectPath,
+          paths,
+          shots,
+          beatId,
+        );
+        if (!result) return;
+        updateNodeData(nodeId, { storyboardShots: result.shots });
+        setDetail((d) => (d ? { ...d, imagePath: result.relPath } : null));
+        setStatusText(`已关联分镜图：${result.relPath}`);
       } catch (e) {
         setStatusText(`导入分镜图失败：${formatUserError(e)}`);
       }
@@ -315,156 +554,39 @@ export function ScriptStoryboardSection({
     runStoryboardImportFromPaths(paths);
   };
 
-  const createVideoNodesFromSelection = () => {
-    const anchor = nodes.find((n) => n.id === nodeId);
-    if (!anchor) {
-      setStatusText("找不到脚本节点，无法创建视频链路");
+  const createImageVideoChain = () => {
+    if (!projectPath?.trim()) {
+      setStatusText("请先打开工程后再建链并提交图片生成");
       return;
     }
-    const selected = (scriptBeatSelection ?? []).filter((id) => beatsNorm.some((b) => b.id === id));
-    const picked = selected.length > 0 ? beatsNorm.filter((b) => selected.includes(b.id)) : beatsNorm;
-    if (picked.length === 0) {
-      setStatusText("请先添加或勾选脚本镜头");
-      return;
-    }
-    const shotMap = new Map((shots ?? []).map((s) => [s.scriptBeatId, s]));
-    const gapX = 420;
-    const gapY = 230;
-    const startY = anchor.position.y - ((picked.length - 1) * gapY) / 2;
-
-    const newNodes: Node<FlowNodeData>[] = [];
-    const newEdges = [];
-    for (const [i, beat] of picked.entries()) {
-      const sid = beat.id;
-      const shot = shotMap.get(sid);
-      const shotNo = (beat.shotNumber || "").trim() || String(i + 1);
-      const promptParts = [
-        shot?.visualPrompt?.trim() || beat.description?.trim() || "",
-        beat.videoMotionPrompt?.trim() ? `运镜：${beat.videoMotionPrompt.trim()}` : "",
-      ].filter(Boolean);
-      const prompt = promptParts.join("\n");
-      const videoId = crypto.randomUUID();
-      const data = newNodeDataByType.videoNode();
-      data.label = `镜头 ${shotNo} 视频`;
-      data.video = {
-        ...defaultVideoNodePersisted(),
-        draft: {
-          ...defaultVideoGenerationDraft(),
-          ...data.video?.draft,
-          workflow: "text_to_video",
-          prompt,
-        },
-      };
-      data.params = {
-        ...(data.params && typeof data.params === "object" ? data.params : {}),
-        scriptBeatId: sid,
-        shotNumber: shotNo,
-      };
-      newNodes.push({
-        id: videoId,
-        type: "videoNode",
-        position: { x: anchor.position.x + gapX, y: startY + i * gapY },
-        data,
-      });
-      newEdges.push(makeFlowEdge(nodeId, videoId, "scriptNode"));
-    }
-    addNodesWithEdges(newNodes, newEdges);
-    setSelectedNodeIds(newNodes.map((n) => n.id));
-    setStatusText(`已创建 ${newNodes.length} 条「脚本镜头→视频节点」试点链路`);
+    runChainBuild(["image", "video"], { submitImageGeneration: true });
   };
 
   const createImageNodesFromSelection = () => {
-    const anchor = nodes.find((n) => n.id === nodeId);
-    if (!anchor) {
-      setStatusText("找不到脚本节点，无法创建图片链路");
+    if (!projectPath?.trim()) {
+      setStatusText("请先打开工程后再批量生成图片");
       return;
     }
-    const selected = (scriptBeatSelection ?? []).filter((id) => beatsNorm.some((b) => b.id === id));
-    const picked = selected.length > 0 ? beatsNorm.filter((b) => selected.includes(b.id)) : beatsNorm;
-    if (picked.length === 0) {
-      setStatusText("请先添加或勾选脚本镜头");
-      return;
-    }
-    const shotMap = new Map((shots ?? []).map((s) => [s.scriptBeatId, s]));
-    const gapX = 420;
-    const gapY = 230;
-    const startY = anchor.position.y - ((picked.length - 1) * gapY) / 2;
+    runChainBuild(["image"], { submitImageGeneration: true });
+  };
 
-    const newNodes: Node<FlowNodeData>[] = [];
-    const newEdges = [];
-    for (const [i, beat] of picked.entries()) {
-      const sid = beat.id;
-      const shot = shotMap.get(sid);
-      const shotNo = (beat.shotNumber || "").trim() || String(i + 1);
-      const promptParts = [shot?.visualPrompt?.trim() || beat.description?.trim() || ""].filter(Boolean);
-      const imageId = crypto.randomUUID();
-      const data = newNodeDataByType.imageNode();
-      data.label = `镜头 ${shotNo} 图`;
-      if (promptParts.length) data.prompt = promptParts.join("\n");
-      data.params = {
-        ...(typeof data.params === "object" && data.params ? data.params : {}),
-        scriptBeatId: sid,
-        shotNumber: shotNo,
-      };
-      newNodes.push({
-        id: imageId,
-        type: "imageNode",
-        position: { x: anchor.position.x + gapX, y: startY + i * gapY },
-        data,
-      });
-      newEdges.push(makeFlowEdge(nodeId, imageId, "scriptNode"));
-    }
-    addNodesWithEdges(newNodes, newEdges);
-    setSelectedNodeIds(newNodes.map((n) => n.id));
-    setStatusText(`已创建 ${newNodes.length} 条「脚本镜头→图片节点」试点链路`);
+  const createVideoNodesFromSelection = () => {
+    runChainBuild(["video"]);
   };
 
   const createAudioNodesFromSelection = () => {
-    const anchor = nodes.find((n) => n.id === nodeId);
-    if (!anchor) {
-      setStatusText("找不到脚本节点，无法创建音频链路");
-      return;
-    }
-    const selected = (scriptBeatSelection ?? []).filter((id) => beatsNorm.some((b) => b.id === id));
-    const picked = selected.length > 0 ? beatsNorm.filter((b) => selected.includes(b.id)) : beatsNorm;
-    if (picked.length === 0) {
-      setStatusText("请先添加或勾选脚本镜头");
-      return;
-    }
-    const gapX = 420;
-    const gapY = 230;
-    const startY = anchor.position.y - ((picked.length - 1) * gapY) / 2;
-
-    const newNodes: Node<FlowNodeData>[] = [];
-    const newEdges = [];
-    for (const [i, beat] of picked.entries()) {
-      const sid = beat.id;
-      const shotNo = (beat.shotNumber || "").trim() || String(i + 1);
-      const hint = [beat.dialogue?.trim(), beat.soundEffect?.trim()].filter(Boolean).join("\n");
-      const audioId = crypto.randomUUID();
-      const data = newNodeDataByType.audioNode();
-      data.label = `镜头 ${shotNo} 音频`;
-      if (hint) data.prompt = hint;
-      data.params = {
-        ...(typeof data.params === "object" && data.params ? data.params : {}),
-        scriptBeatId: sid,
-        shotNumber: shotNo,
-      };
-      newNodes.push({
-        id: audioId,
-        type: "audioNode",
-        position: { x: anchor.position.x + gapX, y: startY + i * gapY },
-        data,
-      });
-      newEdges.push(makeFlowEdge(nodeId, audioId, "scriptNode"));
-    }
-    addNodesWithEdges(newNodes, newEdges);
-    setSelectedNodeIds(newNodes.map((n) => n.id));
-    setStatusText(`已创建 ${newNodes.length} 条「脚本镜头→音频节点」试点链路`);
+    runChainBuild(["audio"]);
   };
 
   return (
     <div id={`script-storyboard-anchor-${nodeId}`} className="storyboardSection">
+      {chainScopeResult.ok ? (
+        <p className="storyboardChainScopeHint" role="status">
+          {storyboardChainScopeHint(chainScopeResult.scope)}
+          <span className="storyboardChainScopeHint-sep"> · </span>
+          {hermesPolicyHint}
+        </p>
+      ) : null}
       <div className="storyboardToolbar">
         <span className="storyboardTitle">分镜（文案 + 本地图）</span>
         <button type="button" className="btn" disabled={sbView === "grid"} onClick={() => setSbView("grid")}>
@@ -494,65 +616,106 @@ export function ScriptStoryboardSection({
           type="button"
           className="btn btnPrimary"
           disabled={beatsNorm.length === 0}
-          title="M5 试点：按勾选镜头一键创建视频节点并连线"
-          onClick={createVideoNodesFromSelection}
+          title="按勾选范围创建图片+视频节点（脚本→图→视频），写入 params.scriptBeatId；已存在则跳过"
+          onClick={createImageVideoChain}
         >
-          生成视频链路（试点）
+          一键建链（图+视频）
         </button>
         <button
           type="button"
-          className="btn btnPrimary"
+          className="btn"
           disabled={beatsNorm.length === 0}
-          title="按勾选镜头创建图片节点并写入 params.scriptBeatId"
+          title="仅创建图片节点并提交生成"
           onClick={createImageNodesFromSelection}
         >
-          生成图片链路（试点）
+          仅图片
         </button>
         <button
           type="button"
-          className="btn btnPrimary"
+          className="btn"
           disabled={beatsNorm.length === 0}
-          title="按勾选镜头创建音频节点并写入 params.scriptBeatId"
+          title="仅创建视频节点"
+          onClick={createVideoNodesFromSelection}
+        >
+          仅视频
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={beatsNorm.length === 0}
+          title="仅创建音频节点"
           onClick={createAudioNodesFromSelection}
         >
-          生成音频链路（试点）
+          仅音频
         </button>
         <button
           type="button"
           className="btn btnPrimary"
           disabled={generating || storyboardHealth.generatedCount === 0}
-          title="为已生成分镜的镜头自动创建下游图片+视频节点链路"
+          title="手动触发 Hermes：为已生成分镜的镜头创建图+视频节点（受 Inspector 策略与勾选范围约束）"
           onClick={triggerHermesAutoChain}
         >
-          {generating ? "串联中…" : `Hermes 串联（${storyboardHealth.generatedCount}）`}
+          {generating ? "串联中…" : `Hermes 手动串联（${storyboardHealth.generatedCount}）`}
         </button>
         <button
           type="button"
           className="btn btnPrimary"
-          disabled={batchVideoRunning || !projectPath || storyboardHealth.generatedCount === 0}
-          title="对已生成分镜图且已有视频节点的镜头批量提交视频生成"
+          disabled={batchVideoRunning || !projectPath || !batchVideoOk}
+          title={
+            batchVideoOk
+              ? batchVideoHint
+              : "canStart" in batchVideoReadiness
+                ? batchVideoReadiness.blockMessage
+                : batchVideoReadiness.message
+          }
           onClick={() => void batchGenerateVideos()}
         >
           {batchVideoRunning ? "批量视频中…" : "批量生成视频"}
         </button>
         <button
           type="button"
+          className="btn"
+          disabled={
+            batchVideoRunning || !projectPath || failedVideoBeatIdsInScope.length === 0
+          }
+          title="仅重试范围内 videoStatus=failed 的镜头"
+          onClick={() => void retryFailedVideos()}
+        >
+          重试失败视频（{failedVideoBeatIdsInScope.length}）
+        </button>
+        <button
+          type="button"
           className="btn btnPrimary"
-          disabled={composeExportRunning || !projectPath || beatsNorm.length === 0}
-          title="按脚本镜号收集已出片视频、创建/更新合成节点并导出成片；缺失镜头不阻塞"
+          disabled={composeExportRunning || !projectPath || !composeExportOk}
+          title={
+            composeExportOk
+              ? composeExportHint
+              : "canExport" in composeExportReadiness
+                ? composeExportReadiness.blockMessage
+                : composeExportReadiness.message
+          }
           onClick={() => void handleExportScriptCompose()}
         >
           {composeExportRunning
             ? "导出成片中…"
-            : `导出成片（${composeReadiness.readyCount}/${composeReadiness.totalBeats}）`}
+            : composeExportOk
+              ? `导出成片（${composeExportReadiness.readyCount}/${composeExportReadiness.totalInScope}）`
+              : "导出成片"}
         </button>
       </div>
+      {(batchVideoOk || composeExportOk) && (
+        <p className="storyboardProductionHint mono" role="status">
+          {batchVideoOk ? batchVideoHint : null}
+          {batchVideoOk && composeExportOk ? " · " : null}
+          {composeExportOk ? composeExportHint : null}
+        </p>
+      )}
       <p className="storyboardHint">
         LLM 生成分镜文案；可在详情中从本机选择一张图导入工程并关联为「分镜图」（不出云端图生）。须已打开工程，桌面端选择文件。
-        {composeReadiness.missingCount > 0 ? (
+        {composeExportOk && composeExportReadiness.missingCount > 0 ? (
           <span className="storyboardComposeHint">
             {" "}
-            导出成片时将跳过 {composeReadiness.missingCount} 个未出片或未关联视频节点的镜头。
+            导出时将跳过 {composeExportReadiness.missingCount} 个未出片或未关联视频节点的镜头。
           </span>
         ) : null}
       </p>
@@ -654,7 +817,8 @@ export function ScriptStoryboardSection({
               <button
                 key={beat.id}
                 type="button"
-                className={`storyboardCard${isGenerating ? " storyboardCard--generating" : ""}${isFailed ? " storyboardCard--failed" : ""}${isGenerated ? " storyboardCard--generated" : ""}`}
+                data-storyboard-focus-beat={beat.id}
+                className={`storyboardCard${isGenerating ? " storyboardCard--generating" : ""}${isFailed ? " storyboardCard--failed" : ""}${isGenerated ? " storyboardCard--generated" : ""}${detail?.scriptBeatId === beat.id ? " storyboardCard--focused" : ""}`}
                 onClick={() =>
                   setDetail(
                     shot ?? {
@@ -833,9 +997,15 @@ export function ScriptStoryboardSection({
                     void (async () => {
                       setGenerating(true);
                       try {
+                        if (!(await preflightScriptNodeLlm(nodeParams, setStatusText))) return;
                         await runNodeTaskAgent(
                           scriptStoryboardGenerateAgentRuntime,
-                          { targetBeats: [beat], themePrompt, prevShots: shots },
+                          {
+                            targetBeats: [beat],
+                            themePrompt,
+                            prevShots: shots,
+                            llmParams,
+                          },
                           { nodeId, projectPath, updateNodeData, setStatusText },
                         );
                       } finally {

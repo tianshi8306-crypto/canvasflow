@@ -88,6 +88,14 @@ type CanvasUiState = {
   textGenPanelExpandedNodeId: string | null;
   setTextGenPanelExpandedNodeId: (id: string | null) => void;
 
+  /** 脚本节点：钉住主题/生成底栏 */
+  scriptGenPanelPinnedNodeId: string | null;
+  setScriptGenPanelPinnedNodeId: (id: string | null) => void;
+
+  /** 脚本节点：主题编辑面板放大态 */
+  scriptGenPanelExpandedNodeId: string | null;
+  setScriptGenPanelExpandedNodeId: (id: string | null) => void;
+
   /** 视频节点：预览区内单段裁剪编辑态 */
   videoTrimEditingNodeId: string | null;
   setVideoTrimEditingNodeId: (id: string | null) => void;
@@ -115,6 +123,10 @@ type CanvasUiState = {
   /** 标记的节点 id（用于画布导航：点击「返回节点」时定位到该节点） */
   markedNodeId: string | null;
   setMarkedNodeId: (id: string | null) => void;
+
+  /** Inspector 分镜区：创意视图等跳转后要展开的镜头 */
+  inspectorStoryboardFocus: { scriptNodeId: string; beatId: string } | null;
+  setInspectorStoryboardFocus: (v: { scriptNodeId: string; beatId: string } | null) => void;
 
   /** 小地图显隐 */
   minimapVisible: boolean;
@@ -275,6 +287,12 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   textGenPanelExpandedNodeId: null,
   setTextGenPanelExpandedNodeId: (id) => set({ textGenPanelExpandedNodeId: id }),
 
+  scriptGenPanelPinnedNodeId: null,
+  setScriptGenPanelPinnedNodeId: (id) => set({ scriptGenPanelPinnedNodeId: id }),
+
+  scriptGenPanelExpandedNodeId: null,
+  setScriptGenPanelExpandedNodeId: (id) => set({ scriptGenPanelExpandedNodeId: id }),
+
   videoTrimEditingNodeId: null,
   setVideoTrimEditingNodeId: (id) => set({ videoTrimEditingNodeId: id }),
 
@@ -295,6 +313,9 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
 
   markedNodeId: null,
   setMarkedNodeId: (id) => set({ markedNodeId: id }),
+
+  inspectorStoryboardFocus: null,
+  setInspectorStoryboardFocus: (v) => set({ inspectorStoryboardFocus: v }),
 
   minimapVisible: true,
   setMinimapVisible: (v) => set({ minimapVisible: v }),
@@ -448,6 +469,8 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
       videoGenPanelPinnedNodeId: null,
       textGenPanelPinnedNodeId: null,
       textGenPanelExpandedNodeId: null,
+      scriptGenPanelPinnedNodeId: null,
+      scriptGenPanelExpandedNodeId: null,
       videoTrimEditingNodeId: null,
       videoSubtitleRegionEditingNodeId: null,
       nodeSnapVisual: null,

@@ -1,7 +1,7 @@
 # 当前进度与下一步规划（异地协作）
 
 > **固定入口**：本文档为「进度 + 规划 + 代码索引」的**主文档**，请在异地开发时优先阅读本文。  
-> 更新日期：**2026-05-20**  
+> 更新日期：**2026-05-21**  
 > 仓库：**vibevideo**（Tauri + React + React Flow）  
 > 历史同名快照：`REMOTE_DEV_HANDOFF_2026-04-28.md`（内容与本文同步后仅作锚点，见该文件说明）。
 
@@ -45,7 +45,7 @@
 |------|------|------|
 | R1 工程与保存 | 基本具备 | 工程 JSON、撤销重做、顶栏状态等。 |
 | R2 五类节点画布体验 | 持续迭代 | 小地图、`F`/`Z` 视口、整理画布确认、图片浮层生成；无底部 Dock。 |
-| R3 脚本工作台 | **主体可用** | 全屏表、批量操作、模板（localStorage）、角色列与缩略图上传等。 |
+| R3 脚本工作台 | **主体可用** | Inspector 工作台 + 全屏表（`iteration-03/06`）；画布为 `MinimalScriptNode` Chrome（`iteration-08`）；体验对齐见 §4.2。 |
 | R4 分镜 | **产品化完成** | `storyboardShots`、`ScriptStoryboardSection` + Hermes 自动串联、失败重试。 |
 | R5 多模态输入 | **UI 已实现** | `VideoMultimodalInputPanel` 多模态输入面板，参数分组待完善。 |
 | R6 时间线合成 | **基础实现** | `FFmpegConcatPanel` FFmpeg 拼接面板，时间轴编辑能力待完善。 |
@@ -68,10 +68,63 @@
 - **参考视频**：除前端连线外，**执行器从图结构读取** `videoNode.data.path`，与上游文本并存时追加「参考视频」块。  
 - 关键文件：`src-tauri/src/executor.rs`（`run_script_node`、`incoming_reference_video_paths_ordered` 等）。
 
-### 4.2 脚本节点前端（React）
+### 4.2 脚本节点前端（React：MinimalScriptNode + 基线）
 
-- 解析按钮禁用逻辑与空状态提示已按「文本 / 视频 / 合写」调整。  
-- 文件：`src/components/nodes/ScriptNode.tsx`。
+> **功能真源**：[`脚本节点功能说明.md`](../product/脚本节点功能说明.md)  
+> **基线与排期（§0 视为已完成，勿重做工作台/全屏）**：[`脚本节点开发顺序.md`](../product/脚本节点开发顺序.md)
+
+#### 画布节点（Chrome，`iteration-08` P0–P2 已完成）
+
+| 项 | 说明 |
+|----|------|
+| **注册入口** | `nodeTypes.scriptNode` → `MinimalScriptNode.tsx`（**非**旧卡内 `ScriptNode.tsx`；后者文件仍在仓库，**未**挂 `nodeTypes`） |
+| **壳** | `NodeChromeShell` + 迷你表（最多 3 行）；**单击预览区** → `openScriptFullscreen`（`script-10-1A`） |
+| **底栏 Portal** | `ScriptComposerPanel` — 主题、`@` / `/`、`ScriptModelPicker`、**AI 解析镜头**；钉住 / 展开主题 Modal |
+| **顶栏 Portal** | 有镜头且单选：**重新解析 \| 生成分镜 \| 全屏表格 \| 编辑主题 \| 下载** |
+| **双击节点** | 画布 zoom 200% 居中（`useFocusScriptNodeViewport`），**不**直接开全屏 |
+| **空态** | `ScriptNodeUpstreamTextFloat`「从文本同步」；壳内一行入口指引（底栏主题 → 解析后进全屏） |
+
+执行单：[`iteration-08-script-node-chrome.md`](iteration-08-script-node-chrome.md)、入口收敛 [`iteration-10-script-entry-converge.md`](iteration-10-script-entry-converge.md)。
+
+#### 四处编辑界面（职责固定，后续迭代只「修补」不「重做」）
+
+| 界面 | 主要文件 | 职责 |
+|------|----------|------|
+| 画布壳 + Portal | `MinimalScriptNode`、`ScriptComposerPanel*`、`ScriptPreviewToolbar*` | 摘要、解析/分镜快捷、主题与全屏入口 |
+| Inspector 工作台 | `ScriptNodeWorkbench` + `ScriptWorkbench*` | **主编辑**：表/卡、批量、模板、镜号工具、「全屏表格」钮 |
+| 全屏 Overlay | `ScriptNodeFullscreenOverlay`、`ScriptBeatsEditorTable` | Lib 宽表 + **创意视图** Tab（`ScriptCreativeViewGrid`） |
+| 节点最大化 | `NodeMaximizedOverlay` | 嵌工作台 + 分镜区（画布右键双击脚本节点） |
+
+#### 已完成基线（与开发顺序 §0 一致）
+
+| 能力 | 参考 |
+|------|------|
+| 工作台 v1（表/卡、勾选持久化、批量、模板 localStorage） | R3、`iteration-03-script-workbench.md` |
+| 全屏表（字段显隐/筛选/键盘流、角色图·参考媒体入 `assets/`） | `iteration-06-script-fullscreen-table.md` |
+| 分镜文案 LLM、侧栏分镜区、Hermes / 批量视频 | R4、本文 §4.8 |
+| DAG 解析、上游文本 / 参考视频路径 | 本文 §4.1、`src-tauri/.../script_node.rs` |
+| 画布 Chrome（壳 / 顶底 Portal / pin·expand） | `iteration-08` |
+| `scriptBeatId` 下游绑定、粘贴 beatId 重映射 | Inspector、`pasteScriptBeatRemap` |
+
+#### 近期体验对齐（2026-05-21，在基线上增量）
+
+| 迭代 ID | 内容 | 关键文件 |
+|---------|------|----------|
+| script-09-0A | 画布顶栏 / 全屏 / 侧栏「生成分镜」勾选规则统一 | `scriptStoryboardScope.ts` |
+| script-09-0B | 快速草案 vs **AI 解析** 文案；解析/分镜 `preflight` + `llmParams` | `scriptNodeActionLabels.ts`、`scriptNodeLlmParams.ts` |
+| script-10-1A | 顶栏恢复全屏/主题；壳内点击进全屏；Inspector/最大化入口说明 | `scriptNodeCanvasEntries.ts` |
+| script-10-1B | busy/失败/0 条引导；创意视图定位失败镜头 | `scriptNodeFeedback.ts`、`useScriptNodeTaskState.ts` |
+| script-11-2A | 上游文本节点剧本导入（非 txt 文件） | `scriptUpstreamText.ts`、`ScriptUpstreamTextBanner` |
+| script-11-2B | 参考视频可发现 | `scriptReferenceVideo.ts`、`ScriptReferenceVideoBanner` |
+| script-12-3A | 创意视图 ↔ 分镜资产（勾选/选图/分镜区） | `ScriptCreativeViewGrid`、`scriptStoryboardImageImport` |
+| script-12-3B | 角色/卡片视图与表格联动 | `ScriptBeatRolesEditor`、`applyCharactersToBeat` |
+
+| script-13-4A | 勾选驱动批量建链（图/视频/音频） | `scriptBeatChainBuild.ts` |
+| script-13-4B | Hermes 自动建链策略 | `hermesAutoChainPolicy.ts` |
+| script-14-4C | 批量视频/合成导出稳态 | `scriptProductionExport.ts`、`ScriptStoryboardSection` |
+
+**脚本子集建议下一步**（见开发顺序 §10）：阶段 4 收尾或阶段 5 Epic 排期。  
+**明确非目标**：重做 `ScriptNodeWorkbench` / 全屏表 / 分镜区核心逻辑。
 
 ### 4.3 侧栏 Inspector：镜头绑定
 
@@ -318,7 +371,12 @@ CSS 样式新增：`.nodeStatus*` 系列类名，动画效果
 
 ### P1 — 脚本工作台与体验
 
-1. **Workbench 可维护性**
+0. **脚本节点 Chrome + 体验一致（已完成）**  
+   - Chrome：`iteration-08`（`MinimalScriptNode` + Portal）。  
+   - 对齐：`script-09-0A/0B`、`script-10-1A/1B`（见本文 §4.2 表）。  
+   - **当前推荐开工**：阶段 5 Epic 或 R5/R6 深化，见 [`脚本节点开发顺序.md`](../product/脚本节点开发顺序.md) §10。
+
+1. **Workbench 可维护性**（非功能阻断）
    - 拆分 `ScriptNodeWorkbench.tsx` 或提取批量/模板逻辑到 `src/lib/`。
 
 2. **样式拆分**
@@ -347,10 +405,13 @@ CSS 样式新增：`.nodeStatus*` 系列类名，动画效果
 | 画布与菜单 | `src/components/FlowCanvas.tsx`、`src/components/canvas/CanvasContextMenus.tsx`、`src/components/canvas/menuConstants.ts` |
 | 工程状态 | `src/store/projectStore.ts` |
 | 类型与序列化 | `src/lib/types.ts`（含 `NodeExecutionStatus`、`NodeStatus`）、`src/lib/serialization.ts` |
-| 脚本分镜数据 | `src/lib/scriptBeatHelpers.ts`、`src/lib/incomingScriptBinding.ts` |
-| 脚本节点 UI | `src/components/nodes/ScriptNode.tsx`、全屏 `ScriptNodeFullscreenOverlay.tsx`（若存在） |
-| 脚本工作台 | `src/components/ScriptNodeWorkbench.tsx`、`src/components/ScriptBeatsEditorTable.tsx` |
+| 脚本分镜数据 | `src/lib/scriptBeatHelpers.ts`、`src/lib/incomingScriptBinding.ts`、`src/lib/scriptStoryboardScope.ts` |
+| 脚本画布 Chrome | `src/components/nodes/MinimalScriptNode.tsx`、`ScriptComposerPanel*.tsx`、`ScriptPreviewToolbar*.tsx`、`src/lib/scriptNodeCanvasEntries.ts` |
+| 脚本全屏 / 表 | `src/components/ScriptNodeFullscreenOverlay.tsx`、`src/components/ScriptBeatsEditorTable.tsx` |
+| 脚本工作台 | `src/components/ScriptNodeWorkbench.tsx`、`src/components/ScriptWorkbench*.tsx` |
+| 脚本 Agent / Provider | `src/lib/nodeAgentRuntime/scriptWorkbenchAgent.ts`、`dagnodeDispatchAgents.ts`、`scriptStoryboardAgent.ts`、`src/lib/scriptNodeLlmParams.ts` |
 | 分镜网格 | `src/components/ScriptStoryboardSection.tsx`（R4 产品化） |
+| 旧卡内 UI（未注册） | `src/components/nodes/ScriptNode.tsx`（仅历史参考，勿按此实现） |
 | 节点状态 | `src/hooks/useNodeStatus.ts`（C.1）、`src/components/nodes/NodeStatusBadge.tsx` |
 | Hermes 自动串联 | `src/lib/hermes/index.ts`、`src/lib/hermes/autoChain.ts`、`src/lib/hermes/shotNodeFactory.ts` |
 | 侧栏 | `src/components/Inspector.tsx` |

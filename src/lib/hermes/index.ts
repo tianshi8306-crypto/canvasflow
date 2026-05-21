@@ -36,3 +36,13 @@ export { rebuildShotNodeRegistry };
 export { handleScriptNodeCompleted } from "./autoChain";
 
 export type { HermesShotNodeGroup, HermesAutoChainResult } from "./types";
+export {
+  loadHermesAutoChainSettings,
+  saveHermesAutoChainSettings,
+  hermesAutoChainSettingsHint,
+  HERMES_STORYBOARD_AGENT_NAME,
+  type HermesAutoChainSettings,
+  type HermesBatchSplitStrategy,
+  type HermesNodeOverride,
+} from "./hermesAutoChainPolicy";
+export { planHermesBatchImageJobs } from "./hermesBatchSplitStrategy";

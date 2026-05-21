@@ -68,8 +68,13 @@ export function assessScriptComposeReadiness(
   nodes: Node<FlowNodeData>[],
   edges: Edge[],
   scriptNodeId: string,
+  beatIds?: string[],
 ): { readyCount: number; missingCount: number; totalBeats: number } {
-  const beatsNorm = normalizeScriptBeats(beats);
+  let beatsNorm = normalizeScriptBeats(beats);
+  if (beatIds?.length) {
+    const set = new Set(beatIds);
+    beatsNorm = beatsNorm.filter((b) => set.has(b.id));
+  }
   const videoByBeat = mapVideoNodesByScriptBeat(scriptNodeId, nodes, edges, shots);
   const shotByBeat = new Map(shots.map((s) => [s.scriptBeatId, s]));
 
@@ -107,9 +112,14 @@ export async function buildComposeClipsFromScript(opts: {
   nodes: Node<FlowNodeData>[];
   edges: Edge[];
   projectPath: string;
+  beatIds?: string[];
 }): Promise<ScriptComposeBuildResult> {
-  const { scriptNodeId, beats, shots, nodes, edges, projectPath } = opts;
-  const beatsNorm = normalizeScriptBeats(beats);
+  const { scriptNodeId, beats, shots, nodes, edges, projectPath, beatIds } = opts;
+  let beatsNorm = normalizeScriptBeats(beats);
+  if (beatIds?.length) {
+    const set = new Set(beatIds);
+    beatsNorm = beatsNorm.filter((b) => set.has(b.id));
+  }
   const videoByBeat = mapVideoNodesByScriptBeat(scriptNodeId, nodes, edges, shots);
   const shotByBeat = new Map(shots.map((s) => [s.scriptBeatId, s]));
 
