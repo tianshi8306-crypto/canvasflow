@@ -18,8 +18,9 @@ vi.mock("@tauri-apps/api/core", () => ({
 
 describe("textNodeProviders", () => {
   const providers: TextNodeProviderOption[] = [
-    { id: "p2", label: "P2", model: "m2", enabled: true, priority: 20 },
-    { id: "p1", label: "P1", model: "m1", enabled: true, priority: 10 },
+    { id: "openai", label: "OpenAI", model: "gpt-4o-mini", enabled: true, priority: 20 },
+    { id: "ppio", label: "PPIO", model: "qwen", enabled: true, priority: 10 },
+    { id: "dreamina", label: "即梦", model: "dreamina/text2image", enabled: true, priority: 5 },
     { id: "p3", label: "P3", model: "m3", enabled: false, priority: 1 },
   ];
 
@@ -30,7 +31,7 @@ describe("textNodeProviders", () => {
 
   it("toEnabledProviderOptions filters disabled and sorts by priority", () => {
     const result = toEnabledProviderOptions(providers);
-    expect(result.map((p) => p.id)).toEqual(["p1", "p2"]);
+    expect(result.map((p) => p.id)).toEqual(["ppio", "openai"]);
   });
 
   it("loadEnabledProviderOptions returns empty when not tauri", async () => {
@@ -45,7 +46,12 @@ describe("textNodeProviders", () => {
     mockInvoke.mockResolvedValue({ providers });
     const result = await loadEnabledProviderOptions();
     expect(mockInvoke).toHaveBeenCalledWith("load_settings");
-    expect(result.map((p) => p.id)).toEqual(["p1", "p2"]);
+    expect(result.map((p) => p.id)).toEqual(["ppio", "openai"]);
+  });
+
+  it("excludes non-chat providers such as dreamina", () => {
+    const result = toEnabledProviderOptions(providers);
+    expect(result.some((p) => p.id === "dreamina")).toBe(false);
   });
 
   it("loadEnabledProviderOptions returns empty when invoke fails", async () => {
@@ -62,9 +68,9 @@ describe("textNodeProviders", () => {
   });
 
   it("getProviderSelectionPatch returns chosen model when provider exists", () => {
-    expect(getProviderSelectionPatch("p1", providers)).toEqual({
-      providerId: "p1",
-      model: "m1",
+    expect(getProviderSelectionPatch("ppio", providers)).toEqual({
+      providerId: "ppio",
+      model: "qwen",
     });
   });
 

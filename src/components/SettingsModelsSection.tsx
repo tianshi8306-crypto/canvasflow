@@ -8,7 +8,7 @@
  * 适配层：读取 settings.providers（已有结构）+ keys（已有结构），
  * 转换为 ProviderCard 需要的格式。
  */
-import { useState, useCallback, useMemo } from "react";
+import { memo, useState, useCallback, useMemo } from "react";
 import { ProviderCard } from "@/components/ProviderCard";
 import { testProviderConnections } from "@/lib/connectionTestApi";
 import {
@@ -44,7 +44,7 @@ type Props = {
   onNotice?: (msg: string) => void;
 };
 
-export function SettingsModelsSection({
+export const SettingsModelsSection = memo(function SettingsModelsSection({
   settings,
   keys,
   hasKeyMap,
@@ -163,15 +163,15 @@ export function SettingsModelsSection({
 
   return (
     <div className="settingsSection">
-      <div className="settingsSectionTitle">API 配置</div>
-      <div className="settings-desc settings-desc-lead">
-        为每个厂商单独配置接口地址和密钥，节点会根据所选模型自动路由。
-      </div>
+      <div className="settingsSectionTitle">API 与服务</div>
+      <p className="settings-desc settings-desc-lead">
+        按服务商配置接口地址与密钥；画布节点将按所选模型自动路由请求。
+      </p>
 
       {/* 已保存密钥预览 */}
       {Object.keys(hasKeyMap).length > 0 && (
         <div className="settingsKeyPreviews">
-          <div className="settingsKeyPreviewsTitle">已保存密钥（脱敏）</div>
+          <div className="settingsKeyPreviewsTitle">已保存的密钥（脱敏显示）</div>
           <div className="settingsKeyPreviewsList">
             {Object.entries(hasKeyMap).map(([id, saved]) =>
               saved ? (
@@ -230,9 +230,9 @@ export function SettingsModelsSection({
             <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
             <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
           </svg>
-          {testingAll ? "测试中..." : "测试连接"}
+          {testingAll ? "测试中…" : "测试全部连接"}
         </button>
       </div>
     </div>
   );
-}
+});

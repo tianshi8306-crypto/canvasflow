@@ -61,6 +61,12 @@ export function useVideoModels() {
     void reload();
   }, [reload]);
 
+  useEffect(() => {
+    const onSaved = () => void reload();
+    window.addEventListener("canvasflow-settings-saved", onSaved);
+    return () => window.removeEventListener("canvasflow-settings-saved", onSaved);
+  }, [reload]);
+
   /** 第一个启用且有值的模型 */
   const defaultModel = models.find((m) => m.enabled && m.id) ?? null;
 

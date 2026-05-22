@@ -2,6 +2,7 @@ import type { Dispatch, SetStateAction } from "react";
 import type { AppSettings, ImageModelConfig } from "@/lib/settingsPanelTypes";
 import { newAudioModelTemplate } from "@/lib/settingsModelTemplates";
 import { SettingsFormField } from "@/components/SettingsFormField";
+import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
 type Props = {
   settings: AppSettings;
@@ -21,40 +22,37 @@ export function SettingsAudioModelsSection({
   const audioModels = settings.audioModels ?? [];
 
   return (
-    <>
-      <div style={{ height: 12 }} />
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <div style={{ fontWeight: 650 }}>语音（TTS）模型</div>
-        <button
-          type="button"
-          className="btn"
-          onClick={() =>
-            setSettings((prev) =>
-              prev ? { ...prev, audioModels: [...(prev.audioModels ?? []), newAudioModelTemplate()] } : prev,
-            )
-          }
-        >
-          + 添加模型
-        </button>
-      </div>
-      <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 10, lineHeight: 1.45 }}>
-        需 OpenAI 兼容接口 <span className="mono">POST …/v1/audio/speech</span>；Base URL 请包含{" "}
-        <span className="mono">/v1</span>（与图片模型习惯一致）。保存后可在音频节点「模型」下拉里选择带「自定义」的条目。
-      </div>
+    <div className="settingsSection settingsSection--sub">
+      <SettingsSectionHeader
+        title="语音模型"
+        description="需 OpenAI 兼容 TTS 接口（POST …/v1/audio/speech）；Base URL 请包含 /v1。保存后可在音频节点模型列表中选择。"
+        action={
+          <button
+            type="button"
+            className="btn btn--secondary"
+            onClick={() =>
+              setSettings((prev) =>
+                prev ? { ...prev, audioModels: [...(prev.audioModels ?? []), newAudioModelTemplate()] } : prev,
+              )
+            }
+          >
+            添加模型
+          </button>
+        }
+      />
 
       {audioModels.length === 0 ? (
-        <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 10 }}>
-          暂无语音模型；未配置时 TTS 走上方默认 Provider 的 Key 与所选 <span className="mono">tts-1</span> /{" "}
-          <span className="mono">tts-1-hd</span>。
-        </div>
+        <p className="settings-desc">
+          尚未配置语音模型；未配置时将使用默认 Provider 的密钥与内置 TTS 模型。
+        </p>
       ) : null}
 
       {audioModels.map((m) => (
-        <div key={m.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 10 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
-            <div style={{ fontWeight: 650 }}>{m.label?.trim() || m.model || "TTS 模型"}</div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
+        <div key={m.id} className="settingsModelCard">
+          <div className="settingsModelCardHead">
+            <div className="settingsModelCardTitle">{m.label?.trim() || m.model || "TTS 模型"}</div>
+            <div className="settingsModelCardFlags">
+              <label className="settingsModelCardFlag">
                 <input
                   type="checkbox"
                   checked={m.enabled}
@@ -108,8 +106,6 @@ export function SettingsAudioModelsSection({
               </button>
             </div>
           </div>
-
-          <div style={{ height: 10 }} />
 
           <SettingsFormField label="显示名称（可选）">
             <input
@@ -197,6 +193,6 @@ export function SettingsAudioModelsSection({
           </SettingsFormField>
         </div>
       ))}
-    </>
+    </div>
   );
 }

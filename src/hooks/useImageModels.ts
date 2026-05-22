@@ -1,12 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { IMAGE_MODEL_OPTIONS } from "@/lib/imageGeneration/catalog";
-import type { AppSettings, ImageModelConfig } from "@/lib/settingsPanelTypes";
 import {
-  imageModelEstimateLabel,
-  imageModelIconLetter,
-  imageModelSubtitle,
-} from "@/lib/imageGeneration/imageModelDisplay";
+  buildBuiltinImageModels,
+  normalizeImageModelsFromSettings,
+} from "@/lib/imageGeneration/imageModelOptions";
+import type { AppSettings } from "@/lib/settingsPanelTypes";
 
 export type ImageModelOption = {
   /** 唯一标识：custom:${id} 表示自定义模型 */
@@ -33,42 +31,6 @@ export type ImageModelOption = {
   supportsImageEdit: boolean;
 };
 
-function buildBuiltinImageModels(): ImageModelOption[] {
-  return IMAGE_MODEL_OPTIONS.map((m, sortIndex) => ({
-    id: m.id,
-    label: m.label,
-    subtitle: undefined,
-    estimateLabel: "30s",
-    iconLetter: (m.label.trim() || m.id).charAt(0).toUpperCase(),
-    sortIndex,
-    settingsId: null,
-    model: m.id,
-    priority: 0,
-    enabled: true,
-    supportsMultiRefFusion: true,
-    maxReferenceImages: 4,
-    supportsImageEdit: true,
-  }));
-}
-
-function normalizeImageModels(configs: ImageModelConfig[]): ImageModelOption[] {
-  return (configs ?? []).map((m, sortIndex) => ({
-    id: `custom:${m.id}`,
-    label: m.label?.trim() || m.model?.trim() || m.id,
-    subtitle: imageModelSubtitle(m),
-    estimateLabel: imageModelEstimateLabel(m),
-    iconLetter: imageModelIconLetter(m),
-    sortIndex: sortIndex + IMAGE_MODEL_OPTIONS.length,
-    settingsId: m.id,
-    model: m.model,
-    priority: m.priority,
-    enabled: m.enabled,
-    supportsMultiRefFusion: m.supportsMultiRefFusion !== false,
-    maxReferenceImages: Math.min(4, Math.max(1, m.maxReferenceImages ?? 4)),
-    supportsImageEdit: m.supportsImageEdit !== false,
-  }));
-}
-
 /**
  * 动态读取图片模型（含内置 + 用户在设置中配置的自定义模型）
  */
@@ -90,7 +52,7 @@ export function useImageModels() {
     setLoading(true);
     try {
       const raw = await invoke<AppSettings>("load_settings");
-      mergeModels(normalizeImageModels(raw.imageModels ?? []));
+      mergeModels(normalizeImageModelsFromSettings(raw.imageModels ?? []));
     } catch {
       mergeModels([]);
     } finally {
@@ -100,6 +62,12 @@ export function useImageModels() {
 
   useEffect(() => {
     void reload();
+  }, [reload]);
+
+  useEffect(() => {
+    const onSaved = () => void reload();
+    window.addEventListener("canvasflow-settings-saved", onSaved);
+    return () => window.removeEventListener("canvasflow-settings-saved", onSaved);
   }, [reload]);
 
   /** 第一个启用且有值的模型 */
