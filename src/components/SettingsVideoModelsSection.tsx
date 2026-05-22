@@ -2,7 +2,6 @@ import type { Dispatch, SetStateAction } from "react";
 import type { AppSettings } from "@/lib/settingsPanelTypes";
 import { newVideoModelTemplate } from "@/lib/settingsModelTemplates";
 import { SettingsFormField } from "@/components/SettingsFormField";
-import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
 type Props = {
   settings: AppSettings;
@@ -22,33 +21,33 @@ export function SettingsVideoModelsSection({
   const videoModels = settings.videoModels ?? [];
 
   return (
-    <div className="settingsSection settingsSection--sub">
-      <SettingsSectionHeader
-        title="视频模型"
-        description="供视频节点用于文生视频、图生视频等 API 对接。"
-        action={
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() =>
-              setSettings((prev) =>
-                prev ? { ...prev, videoModels: [...(prev.videoModels ?? []), newVideoModelTemplate()] } : prev,
-              )
-            }
-          >
-            添加模型
-          </button>
-        }
-      />
+    <>
+      <div style={{ height: 12 }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ fontWeight: 650 }}>视频模型（视频节点）</div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() =>
+            setSettings((prev) =>
+              prev ? { ...prev, videoModels: [...(prev.videoModels ?? []), newVideoModelTemplate()] } : prev,
+            )
+          }
+        >
+          + 添加模型
+        </button>
+      </div>
       {videoModels.length === 0 ? (
-        <p className="settings-desc">尚未配置视频模型；添加后可在视频节点中选择。</p>
+        <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 10 }}>
+          暂无视频模型；配置后用于视频节点（文生视频/图生视频）API 对接。
+        </div>
       ) : null}
       {videoModels.map((m) => (
-        <div key={m.id} className="settingsModelCard">
-          <div className="settingsModelCardHead">
-            <div className="settingsModelCardTitle">{m.label?.trim() || m.model || "视频模型"}</div>
-            <div className="settingsModelCardFlags">
-              <label className="settingsModelCardFlag">
+        <div key={m.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+            <div style={{ fontWeight: 650 }}>{m.label?.trim() || m.model || "视频模型"}</div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
                 <input
                   type="checkbox"
                   checked={m.enabled}
@@ -147,6 +146,6 @@ export function SettingsVideoModelsSection({
           </SettingsFormField>
         </div>
       ))}
-    </div>
+    </>
   );
 }

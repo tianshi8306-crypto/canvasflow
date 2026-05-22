@@ -164,7 +164,7 @@ export function TextProviderPicker({
                 <span className="igp-model-item-subtitle">使用设置中优先级最高的 Provider</span>
               </span>
             </button>
-            {enabled.map((p) => {
+            {ordered.map((p) => {
               const isSelected = p.id === value;
               return (
                 <button

@@ -46,7 +46,7 @@ export function normalizeLoadedSettings(s: AppSettings): AppSettings {
     selectionRelatedHighlightColor: s.selectionRelatedHighlightColor ?? "white",
     snapGuidesEnabled: s.snapGuidesEnabled ?? true,
     connectionLinesVisible: s.connectionLinesVisible ?? true,
-    snapGridEnabled: s.snapGridEnabled ?? false,
+    snapGridEnabled: s.snapGridEnabled ?? true,
     alignFeatureTriggerMode: s.alignFeatureTriggerMode ?? "click",
     alignDistributeGap: s.alignDistributeGap ?? 40,
     // 素材
@@ -111,33 +111,23 @@ export function mergeImportedSettings(prev: AppSettings, parsed: Partial<AppSett
 }
 
 async function readHasKeyMaps(settings: AppSettings): Promise<HasKeyMaps> {
-  const providerEntries = await Promise.all(
-    settings.providers.map(async (p) => [p.id, await invoke<boolean>("has_api_key", { providerId: p.id })] as const),
-  );
-  const imageEntries = await Promise.all(
-    settings.imageModels.map(
-      async (m) =>
-        [m.id, await invoke<boolean>("has_api_key", { providerId: `image-model:${m.id}` })] as const,
-    ),
-  );
-  const videoEntries = await Promise.all(
-    (settings.videoModels ?? []).map(
-      async (m) =>
-        [m.id, await invoke<boolean>("has_api_key", { providerId: `video-model:${m.id}` })] as const,
-    ),
-  );
-  const audioEntries = await Promise.all(
-    (settings.audioModels ?? []).map(
-      async (m) =>
-        [m.id, await invoke<boolean>("has_api_key", { providerId: `audio-model:${m.id}` })] as const,
-    ),
-  );
-  return {
-    hasKey: Object.fromEntries(providerEntries),
-    hasImageModelKey: Object.fromEntries(imageEntries),
-    hasVideoModelKey: Object.fromEntries(videoEntries),
-    hasAudioModelKey: Object.fromEntries(audioEntries),
-  };
+  const hasKey: Record<string, boolean> = {};
+  for (const p of settings.providers) {
+    hasKey[p.id] = await invoke<boolean>("has_api_key", { providerId: p.id });
+  }
+  const hasImageModelKey: Record<string, boolean> = {};
+  for (const m of settings.imageModels) {
+    hasImageModelKey[m.id] = await invoke<boolean>("has_api_key", { providerId: `image-model:${m.id}` });
+  }
+  const hasVideoModelKey: Record<string, boolean> = {};
+  for (const m of settings.videoModels ?? []) {
+    hasVideoModelKey[m.id] = await invoke<boolean>("has_api_key", { providerId: `video-model:${m.id}` });
+  }
+  const hasAudioModelKey: Record<string, boolean> = {};
+  for (const m of settings.audioModels ?? []) {
+    hasAudioModelKey[m.id] = await invoke<boolean>("has_api_key", { providerId: `audio-model:${m.id}` });
+  }
+  return { hasKey, hasImageModelKey, hasAudioModelKey, hasVideoModelKey };
 }
 
 export async function loadSettingsPanelData(): Promise<

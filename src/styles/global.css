@@ -1474,6 +1474,104 @@ select {
   font-size: 12px;
 }
 
+/* ── Settings Panel ── */
+.settings-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: grid;
+  place-items: center;
+  z-index: 50;
+}
+
+.settings-modal {
+  width: min(920px, calc(100vw - 24px));
+  max-height: min(720px, calc(100vh - 24px));
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--panel);
+  padding: 14px;
+}
+
+.settings-loading { color: var(--muted); }
+.settings-notice { color: #22c55e; margin-bottom: 10px; }
+.settings-error { color: var(--danger); margin-bottom: 10px; line-height: 1.5; white-space: pre-wrap; }
+
+.settings-key-previews {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  margin-bottom: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.settings-key-previews__title { font-weight: 600; margin-bottom: 6px; }
+.settings-key-previews__list { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.settings-key-previews__item { display: flex; justify-content: space-between; gap: 8px; }
+
+.settings-checkbox-row { margin-bottom: 10px; }
+.settings-checkbox-row label { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.settings-checkbox-row input { margin-top: 3px; }
+.settings-checkbox-row span { line-height: 1.45; }
+
+.settings-sections { display: flex; flex-direction: column; gap: 0; }
+
+.settingsSection { margin-bottom: 20px; }
+.settingsSectionTitle { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--text); }
+.settings-desc { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 12px; }
+.settings-desc-lead { margin-bottom: 16px; }
+.settings-desc-tight { margin-top: 8px; margin-bottom: 0; }
+.settingsField { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.settingsFieldLabel { font-size: 12px; color: var(--muted); }
+.settingsInput { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); font-size: 13px; }
+.settings-test-error { font-size: 12px; color: var(--danger); margin: 8px 0; line-height: 1.45; }
+
+.settings-card {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.settings-card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.settings-card-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px;
+  background: rgba(99, 102, 241, 0.2); color: #a5b4fc; font-size: 11px; font-weight: 700;
+}
+.settings-card-title { font-weight: 600; font-size: 14px; flex: 1; }
+.settings-getkey { font-size: 12px; color: var(--accent, #60a5fa); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+.settings-getkey--muted { color: var(--muted); cursor: default; }
+.settings-provider-status { font-size: 11px; margin-left: auto; }
+.settings-provider-status--pass { color: #4ade80; }
+.settings-provider-status--fail { color: #f87171; }
+.settings-provider-status--testing { color: var(--muted); display: inline-flex; align-items: center; gap: 4px; }
+
+.settings-dreamina-section { display: flex; flex-direction: column; gap: 10px; }
+.settings-dreamina-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.settings-dreamina-actions--footer { margin-top: 4px; }
+.dreamina-settings-status { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.dreamina-settings-status-text { font-weight: 500; }
+.dreamina-settings-credit { font-size: 12px; color: var(--muted); }
+.dreamina-login-progress {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--border);
+  background: rgba(255,255,255,0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+}
+.dreamina-login-message { margin: 0; font-size: 12px; line-height: 1.5; color: var(--text); }
+.dreamina-login-usercode { margin: 0; font-size: 12px; color: #fbbf24; font-family: ui-monospace, monospace; }
+.dreamina-qr-wrap { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 100%; }
+.dreamina-qr-image { width: 180px; height: 180px; border-radius: 8px; background: #fff; padding: 8px; }
+.dreamina-qr-hint { margin: 0; font-size: 11px; color: var(--muted); text-align: center; }
+
+.settingsProviderList { display: flex; flex-direction: column; gap: 0; }
+.settingsApiActions { margin-top: 12px; display: flex; gap: 8px; }
+
 /* 统一节点尺寸 864×682 */
 .nodeCard {
   position: relative;

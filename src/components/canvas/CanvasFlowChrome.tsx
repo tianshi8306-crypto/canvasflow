@@ -6,20 +6,6 @@ import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import "./ZoomMenu.css";
 import { CanvasShortcutsOverlay } from "@/components/canvas/CanvasShortcutsOverlay";
-import { TidyCanvasConfirmBar } from "@/components/canvas/TidyCanvasConfirmBar";
-import {
-  FloatMenuDivider,
-  FloatMenuItem,
-  FloatMenuSection,
-  FloatMenuShell,
-} from "@/components/canvas/CanvasFloatMenu";
-import {
-  IconFitScreen,
-  IconZoomIn,
-  IconZoomOut,
-  IconZoomPreset,
-} from "@/components/canvas/workspaceMenuIcons";
-import { anchorMenuAboveTrigger } from "@/lib/clampFloatingUi";
 
 const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3;
@@ -53,6 +39,25 @@ function IconTidy() {
   );
 }
 
+/** 还原图标 - 逆时针箭头 */
+function IconUndo() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M3 10h10a5 5 0 0 1 5 5v0a5 5 0 0 1-5 5H8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M7 6L3 10l4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+/** 确认图标 - 勾 */
+function IconCheck() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M5 12l5 5L20 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 /** 对齐吸附图标 - 横纵对齐线 */
 function IconSnap() {
   return (
@@ -79,22 +84,15 @@ export function CanvasFlowChrome() {
   const setMinimapVisible = useCanvasUiStore((s) => s.setMinimapVisible);
   const nodeSnapAlignmentEnabled = useCanvasUiStore((s) => s.nodeSnapAlignmentEnabled);
   const setNodeSnapAlignmentEnabled = useCanvasUiStore((s) => s.setNodeSnapAlignmentEnabled);
-  const setSnapGridEnabled = useCanvasUiStore((s) => s.setSnapGridEnabled);
   const shortcutsOverlayOpen = useCanvasUiStore((s) => s.shortcutsOverlayOpen);
   const setShortcutsOverlayOpen = useCanvasUiStore((s) => s.setShortcutsOverlayOpen);
 
-  const { fitView, getViewport, setViewport } = useReactFlow();
+  const { fitView, getViewport, setViewport, getNodes, setNodes, getEdges, setEdges } = useReactFlow();
   const commitViewport = useProjectStore((s) => s.commitViewport);
-  const tidyCanvasLayout = useProjectStore((s) => s.tidyCanvasLayout);
-  const nodes = useProjectStore((s) => s.nodes);
-  const edges = useProjectStore((s) => s.edges);
   const selectedNodeIds = useProjectStore((s) => s.selectedNodeIds);
-  const alignSelectedNodes = useProjectStore((s) => s.alignSelectedNodes);
-  const distributeSelectedNodes = useProjectStore((s) => s.distributeSelectedNodes);
   const zoom = useStore((s) => s.transform[2]);
   const [zoomMenuOpen, setZoomMenuOpen] = useState(false);
-  const [tidyConfirm, setTidyConfirm] = useState(false);
-  const [tidyMovedCount, setTidyMovedCount] = useState(0);
+  const [tidyConfirm, setTidyConfirm] = useState(false); // 整理画布确认状态
   const tidyBeforeRef = useRef<{ nodes: Node[]; edges: Edge[] } | null>(null); // 整理前的状态
   const zoomMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const zoomPercent = Math.round(zoom * 100);
@@ -117,44 +115,34 @@ export function CanvasFlowChrome() {
     [getViewport, setViewport, commitViewport],
   );
 
-  const fitCanvasToView = useCallback(async () => {
+  // 整理画布
+  const tidyCanvas = useCallback(async () => {
+    // 保存整理前的状态
+    tidyBeforeRef.current = {
+      nodes: JSON.parse(JSON.stringify(getNodes())),
+      edges: JSON.parse(JSON.stringify(getEdges())),
+    };
     try {
       await fitView({ padding: 0.12, duration: 380, minZoom: MIN_ZOOM, maxZoom: MAX_ZOOM });
     } catch {
       /* fitView 在极端尺寸下可能失败 */
     }
     commitViewport(getViewport());
-  }, [commitViewport, fitView, getViewport]);
-
-  // 整理画布：宫格排列顶层节点 + 适配视口
-  const tidyCanvas = useCallback(async () => {
-    tidyBeforeRef.current = {
-      nodes: JSON.parse(JSON.stringify(nodes)) as Node[],
-      edges: JSON.parse(JSON.stringify(edges)) as Edge[],
-    };
-    const moved = tidyCanvasLayout();
-    if (moved === 0) {
-      tidyBeforeRef.current = null;
-      return;
-    }
-    await fitCanvasToView();
-    setTidyMovedCount(moved);
+    // 显示确认按钮
     setTidyConfirm(true);
-  }, [nodes, edges, tidyCanvasLayout, fitCanvasToView]);
+  }, [commitViewport, fitView, getNodes, getEdges]);
 
+  // 还原整理前的状态
   const handleTidyUndo = useCallback(() => {
     if (tidyBeforeRef.current) {
-      useProjectStore.setState({
-        nodes: tidyBeforeRef.current.nodes,
-        edges: tidyBeforeRef.current.edges,
-        projectDirty: Boolean(useProjectStore.getState().projectPath),
-      });
+      setNodes(tidyBeforeRef.current.nodes);
+      setEdges(tidyBeforeRef.current.edges);
       tidyBeforeRef.current = null;
-      void fitCanvasToView();
     }
     setTidyConfirm(false);
-  }, [fitCanvasToView]);
+  }, [setNodes, setEdges]);
 
+  // 保留整理结果
   const handleTidyConfirm = useCallback(() => {
     tidyBeforeRef.current = null;
     setTidyConfirm(false);
@@ -166,18 +154,6 @@ export function CanvasFlowChrome() {
         e.preventDefault();
         setShortcutsOverlayOpen(false);
         return;
-      }
-      if (tidyConfirm) {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          handleTidyUndo();
-          return;
-        }
-        if (e.key === "Enter") {
-          e.preventDefault();
-          handleTidyConfirm();
-          return;
-        }
       }
       if (isEditingTextField(e.target)) return;
 
@@ -231,77 +207,20 @@ export function CanvasFlowChrome() {
         e.preventDefault();
         const v = useCanvasUiStore.getState().minimapVisible;
         setMinimapVisible(!v);
-        return;
-      }
-      if (e.altKey && e.shiftKey && key === "g") {
-        e.preventDefault();
-        const on = useCanvasUiStore.getState().snapGridEnabled;
-        setSnapGridEnabled(!on);
-        return;
-      }
-
-      if (e.altKey && e.shiftKey) {
-        const alignKeys: Record<string, Parameters<typeof alignSelectedNodes>[0]> = {
-          l: "left",
-          r: "right",
-          t: "top",
-          b: "bottom",
-          h: "centerH",
-          v: "centerV",
-        };
-        const alignOp = alignKeys[key];
-        if (alignOp) {
-          e.preventDefault();
-          alignSelectedNodes(alignOp);
-          return;
-        }
-        if (key === "e") {
-          e.preventDefault();
-          distributeSelectedNodes("horizontal");
-          return;
-        }
-        if (key === "j") {
-          e.preventDefault();
-          distributeSelectedNodes("vertical");
-          return;
-        }
-      }
-
-      if (mod && !e.shiftKey && (key === "=" || key === "+")) {
-        e.preventDefault();
-        applyZoom(zoom + 0.1);
-        return;
-      }
-      if (mod && !e.shiftKey && key === "-") {
-        e.preventDefault();
-        applyZoom(zoom - 0.1);
-        return;
-      }
-      if (mod && !e.shiftKey && key === "0") {
-        e.preventDefault();
-        applyZoom(1);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [
-    alignSelectedNodes,
-    distributeSelectedNodes,
     setMinimapVisible,
     setNodeSnapAlignmentEnabled,
-    setSnapGridEnabled,
     setShortcutsOverlayOpen,
     shortcutsOverlayOpen,
-    tidyConfirm,
-    handleTidyConfirm,
-    handleTidyUndo,
     tidyCanvas,
     selectedNodeIds,
     fitView,
     getViewport,
     commitViewport,
-    applyZoom,
-    zoom,
   ]);
 
   // 点击外部关闭菜单
@@ -337,11 +256,31 @@ export function CanvasFlowChrome() {
             <button
               type="button"
               className="leftAddDockFab"
-              title="整理画布（宫格排列并适配视口）"
+              title="整理画布（适配全部节点）"
               onClick={() => tidyCanvas()}
             >
               <IconTidy />
             </button>
+            {tidyConfirm && (
+              <div className="tidyConfirmBtns">
+                <button
+                  type="button"
+                  className="tidyConfirmBtn tidyConfirmBtn--undo"
+                  title="还原"
+                  onClick={handleTidyUndo}
+                >
+                  <IconUndo />
+                </button>
+                <button
+                  type="button"
+                  className="tidyConfirmBtn tidyConfirmBtn--confirm"
+                  title="保留"
+                  onClick={handleTidyConfirm}
+                >
+                  <IconCheck />
+                </button>
+              </div>
+            )}
             <button
               type="button"
               className={fabOn(nodeSnapAlignmentEnabled)}
@@ -395,86 +334,39 @@ export function CanvasFlowChrome() {
         </div>
       </Panel>
       {shortcutsOverlayOpen ? <CanvasShortcutsOverlay onClose={() => setShortcutsOverlayOpen(false)} /> : null}
-      <TidyCanvasConfirmBar
-        open={tidyConfirm}
-        movedCount={tidyMovedCount}
-        onUndo={handleTidyUndo}
-        onConfirm={handleTidyConfirm}
-      />
 
       {/* 缩放菜单 - Portal 渲染到 body */}
-      {zoomMenuOpen && zoomMenuTriggerRef.current && (() => {
-        const rect = zoomMenuTriggerRef.current.getBoundingClientRect();
-        const menuW = 172;
-        const pos = anchorMenuAboveTrigger(rect, menuW);
-        const close = () => setZoomMenuOpen(false);
-        const pct = Math.round(zoom * 100);
-        return createPortal(
-          <FloatMenuShell
-            className="zoomMenu"
-            aria-label="缩放"
-            style={{ left: pos.left, bottom: pos.bottom, width: menuW }}
-          >
-            <FloatMenuSection>
-              <FloatMenuItem
-                icon={<IconZoomIn />}
-                label="放大"
-                onClick={() => {
-                  applyZoom(zoom + 0.1);
-                  close();
-                }}
-              />
-              <FloatMenuItem
-                icon={<IconZoomOut />}
-                label="缩小"
-                onClick={() => {
-                  applyZoom(zoom - 0.1);
-                  close();
-                }}
-              />
-              <FloatMenuItem
-                icon={<IconFitScreen />}
-                label="适合屏幕"
-                onClick={() => {
-                  void fitCanvasToView();
-                  close();
-                }}
-              />
-            </FloatMenuSection>
-            <FloatMenuDivider />
-            <FloatMenuSection title="缩放比例">
-              <FloatMenuItem
-                icon={<IconZoomPreset />}
-                label="50%"
-                active={pct === 50}
-                onClick={() => {
-                  applyZoom(0.5);
-                  close();
-                }}
-              />
-              <FloatMenuItem
-                icon={<IconZoomPreset />}
-                label="100%"
-                active={pct === 100}
-                onClick={() => {
-                  applyZoom(1);
-                  close();
-                }}
-              />
-              <FloatMenuItem
-                icon={<IconZoomPreset />}
-                label="200%"
-                active={pct === 200}
-                onClick={() => {
-                  applyZoom(2);
-                  close();
-                }}
-              />
-            </FloatMenuSection>
-          </FloatMenuShell>,
-          document.body,
-        );
-      })()}
+      {zoomMenuOpen && zoomMenuTriggerRef.current && createPortal(
+        <div
+          className="zoomMenu"
+          style={{
+            position: "fixed",
+            top: `${zoomMenuTriggerRef.current.getBoundingClientRect().top - 2}px`,
+            left: `${zoomMenuTriggerRef.current.getBoundingClientRect().left + zoomMenuTriggerRef.current.getBoundingClientRect().width / 2}px`,
+            transform: "translate(-50%, -100%)",
+          }}
+        >
+          <button type="button" className="zoomMenuItem" onClick={() => { applyZoom(zoom + 0.1); setZoomMenuOpen(false); }}>
+            放大
+          </button>
+          <button type="button" className="zoomMenuItem" onClick={() => { applyZoom(zoom - 0.1); setZoomMenuOpen(false); }}>
+            缩小
+          </button>
+          <button type="button" className="zoomMenuItem" onClick={() => { void tidyCanvas(); setZoomMenuOpen(false); }}>
+            适合屏幕
+          </button>
+          <button type="button" className="zoomMenuItem" onClick={() => { applyZoom(0.5); setZoomMenuOpen(false); }}>
+            缩放至 50%
+          </button>
+          <button type="button" className="zoomMenuItem" onClick={() => { applyZoom(1); setZoomMenuOpen(false); }}>
+            缩放至 100%
+          </button>
+          <button type="button" className="zoomMenuItem" onClick={() => { applyZoom(2); setZoomMenuOpen(false); }}>
+            缩放至 200%
+          </button>
+        </div>,
+        document.body
+      )}
     </>
   );
 }

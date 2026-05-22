@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { memo, useMemo, type Dispatch, type SetStateAction } from "react";
+import type { Dispatch, SetStateAction } from "react";
 import { formatUserError } from "@/lib/errors";
 import {
   defaultApiBaseUrlByModelName,
@@ -9,7 +9,6 @@ import {
 import { newImageModelTemplate } from "@/lib/settingsModelTemplates";
 import type { AppSettings, ImageModelConfig } from "@/lib/settingsPanelTypes";
 import { SettingsFormField } from "@/components/SettingsFormField";
-import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
 type Props = {
   settings: AppSettings;
@@ -24,23 +23,7 @@ type Props = {
   customModelVariantValue: string;
 };
 
-const IMAGE_MODEL_VENDORS = (() => {
-  const vendorMap = new Map<string, (typeof MAINSTREAM_IMAGE_MODEL_CATALOG)[number]>();
-  for (const item of MAINSTREAM_IMAGE_MODEL_CATALOG) {
-    if (!vendorMap.has(item.modelName)) vendorMap.set(item.modelName, item);
-  }
-  return [...vendorMap.values()];
-})();
-
-function variantsForModelName(modelName: string) {
-  const variantMap = new Map<string, { label: string; value: string }>();
-  for (const item of variantsByModelName(modelName)) {
-    if (!variantMap.has(item.value)) variantMap.set(item.value, item);
-  }
-  return [...variantMap.values()];
-}
-
-export const SettingsImageModelsSection = memo(function SettingsImageModelsSection({
+export function SettingsImageModelsSection({
   settings,
   setSettings,
   imageModelKeys,
@@ -52,50 +35,50 @@ export const SettingsImageModelsSection = memo(function SettingsImageModelsSecti
   customModelNameValue,
   customModelVariantValue,
 }: Props) {
-  const variantOptionsByModelName = useMemo(() => {
-    const cache = new Map<string, ReturnType<typeof variantsForModelName>>();
-    for (const m of settings.imageModels) {
-      const key = m.modelName || "";
-      if (!cache.has(key)) cache.set(key, variantsForModelName(key));
-    }
-    return cache;
-  }, [settings.imageModels]);
-
   return (
-    <div className="settingsSection settingsSection--sub">
-      <SettingsSectionHeader
-        title="图片模型"
-        description="供图片节点选用；接入说明见 docs/image-model-api-tutorial.md"
-        action={
-          <button
-            type="button"
-            className="btn btn--secondary"
-            onClick={() =>
-              setSettings((prev) =>
-                prev ? { ...prev, imageModels: [...prev.imageModels, newImageModelTemplate()] } : prev,
-              )
-            }
-          >
-            添加模型
-          </button>
-        }
-      />
+    <>
+      <div style={{ height: 12 }} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <div style={{ fontWeight: 650 }}>图片模型</div>
+        <button
+          type="button"
+          className="btn"
+          onClick={() =>
+            setSettings((prev) => (prev ? { ...prev, imageModels: [...prev.imageModels, newImageModelTemplate()] } : prev))
+          }
+        >
+          + 添加模型
+        </button>
+      </div>
+      <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 10 }}>
+        接入说明见教程：`docs/image-model-api-tutorial.md`
+      </div>
 
       {settings.imageModels.length === 0 ? (
-        <p className="settings-desc">尚未配置图片模型；添加后可在图片节点的模型下拉框中选择。</p>
+        <div style={{ color: "var(--muted)", fontSize: 12, marginBottom: 10 }}>
+          暂无图片模型；添加后可在图片节点下拉中选择。
+        </div>
       ) : null}
 
       {settings.imageModels.map((m) => {
-        const vendors = IMAGE_MODEL_VENDORS;
-        const variants = variantOptionsByModelName.get(m.modelName || "") ?? [];
+        const vendorMap = new Map<string, (typeof MAINSTREAM_IMAGE_MODEL_CATALOG)[number]>();
+        for (const item of MAINSTREAM_IMAGE_MODEL_CATALOG) {
+          if (!vendorMap.has(item.modelName)) vendorMap.set(item.modelName, item);
+        }
+        const vendors = [...vendorMap.values()];
+        const variantMap = new Map<string, { label: string; value: string }>();
+        for (const item of variantsByModelName(m.modelName)) {
+          if (!variantMap.has(item.value)) variantMap.set(item.value, item);
+        }
+        const variants = [...variantMap.values()];
         const isCustomModelName = !m.modelName || m.modelName === customModelNameValue;
         const isCustomModelVariant = !m.modelVariant || m.modelVariant === customModelVariantValue;
         return (
-          <div key={m.id} className="settingsModelCard">
-            <div className="settingsModelCardHead">
-              <div className="settingsModelCardTitle">{m.model || "自定义模型"}</div>
-              <div className="settingsModelCardFlags">
-                <label className="settingsModelCardFlag">
+          <div key={m.id} style={{ border: "1px solid var(--border)", borderRadius: 12, padding: 12, marginBottom: 10 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center" }}>
+              <div style={{ fontWeight: 650 }}>{m.model || "自定义模型"}</div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
                   <input
                     type="checkbox"
                     checked={m.enabled}
@@ -112,7 +95,7 @@ export const SettingsImageModelsSection = memo(function SettingsImageModelsSecti
                   />
                   启用
                 </label>
-                <label className="settingsModelCardFlag">
+                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
                   <input
                     type="checkbox"
                     checked={m.supportsMultiRefFusion !== false}
@@ -131,7 +114,7 @@ export const SettingsImageModelsSection = memo(function SettingsImageModelsSecti
                   />
                   多图参考
                 </label>
-                <label className="settingsModelCardFlag">
+                <label style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 12, color: "var(--muted)" }}>
                   <input
                     type="checkbox"
                     checked={m.supportsImageEdit !== false}
@@ -429,6 +412,6 @@ export const SettingsImageModelsSection = memo(function SettingsImageModelsSecti
           </div>
         );
       })}
-    </div>
+    </>
   );
-});
+}

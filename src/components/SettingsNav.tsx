@@ -1,6 +1,6 @@
-import { memo, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
-export type SettingsCategory = "general" | "models" | "canvas" | "about";
+export type SettingsCategory = "general" | "models" | "shortcuts" | "canvas" | "about";
 
 type Props = {
   activeCategory: SettingsCategory;
@@ -36,6 +36,15 @@ function IconModels() {
   );
 }
 
+function IconShortcuts() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="2" y="6" width="20" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6 10h2M10 10h2M14 10h2M8 14h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function IconCanvas() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -59,19 +68,19 @@ function IconAbout() {
 const navItems: NavItem[] = [
   { id: "general", label: "常规", icon: <IconGeneral /> },
   { id: "models", label: "模型", icon: <IconModels /> },
+  { id: "shortcuts", label: "快捷键", icon: <IconShortcuts /> },
   { id: "canvas", label: "画布", icon: <IconCanvas /> },
   { id: "about", label: "关于", icon: <IconAbout /> },
 ];
 
-export const SettingsNav = memo(function SettingsNav({ activeCategory, onSelect }: Props) {
+export function SettingsNav({ activeCategory, onSelect }: Props) {
   return (
-    <nav className="settingsNav" aria-label="设置分类">
+    <nav className="settingsNav">
       {navItems.map((item) => (
         <button
           key={item.id}
           type="button"
           className={`settingsNavItem${activeCategory === item.id ? " settingsNavItem--active" : ""}`}
-          aria-current={activeCategory === item.id ? "page" : undefined}
           onClick={() => onSelect(item.id)}
         >
           <span className="settingsNavItemIcon">{item.icon}</span>
@@ -80,4 +89,4 @@ export const SettingsNav = memo(function SettingsNav({ activeCategory, onSelect 
       ))}
     </nav>
   );
-});
+}
