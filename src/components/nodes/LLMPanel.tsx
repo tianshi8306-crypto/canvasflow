@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
+import { TextProviderPicker } from "@/components/nodes/TextProviderPicker";
 import {
   getProviderSelectionPatch,
-  loadEnabledProviderOptions,
+  loadEnabledChatProviderOptions,
   type TextNodeProviderOption,
 } from "@/lib/textNodeProviders";
 import { resolveMentionTokens } from "@/lib/resolveMentionTokens";
@@ -32,6 +32,7 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
   );
 
   const [providerOptions, setProviderOptions] = useState<TextNodeProviderOption[]>([]);
+  const [providersLoading, setProvidersLoading] = useState(true);
   const [selectedProviderId, setSelectedProviderId] = useState(providerId ?? "");
   const [inputText, setInputText] = useState(modelInput ?? "");
   const [response, setResponse] = useState(prompt ?? "");
@@ -40,7 +41,18 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
   const mentionRef = useRef<MentionInputRef>(null);
 
   useEffect(() => {
-    void loadEnabledProviderOptions().then(setProviderOptions);
+    let cancelled = false;
+    setProvidersLoading(true);
+    void (async () => {
+      const list = await loadEnabledChatProviderOptions();
+      if (!cancelled) {
+        setProviderOptions(list);
+        setProvidersLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
@@ -114,20 +126,12 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
       <form className="scriptGenComposer" onSubmit={handleSend} style={{ margin: 0 }}>
         <div className="scriptGenComposerBar">
           <div className="scriptGenModel">
-            <span className="scriptGenModelLogo" aria-hidden />
-            <select
-              className={`scriptGenModelSelect ${RF_NODE_INPUT_CLASS}`}
-              aria-label="模型"
+            <TextProviderPicker
+              providers={providerOptions}
               value={selectedProviderId}
-              onChange={(e) => onProviderChange(e.currentTarget.value.trim())}
-            >
-              <option value="">默认模型（设置中优先级最高）</option>
-              {providerOptions.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.label} · {p.model}
-                </option>
-              ))}
-            </select>
+              loading={providersLoading}
+              onChange={onProviderChange}
+            />
           </div>
           <div className="scriptGenComposerActions">
             <span className="scriptGenComposerHint">{inputText.length}/{MAX_CHARS}</span>

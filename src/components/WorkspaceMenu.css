@@ -1,0 +1,59 @@
+.workspaceMenuTrigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: min(280px, 36vw);
+  padding: 4px 8px 4px 4px;
+  margin: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cf-soft-white);
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.workspaceMenuTrigger:hover,
+.workspaceMenuTrigger--open {
+  background: var(--cf-hover);
+}
+
+.workspaceMenuTrigger--empty {
+  color: var(--cf-soft-white-secondary);
+  font-weight: 500;
+}
+
+.workspaceMenuTriggerMark {
+  display: grid;
+  place-items: center;
+  color: var(--cf-soft-white-tertiary);
+  flex-shrink: 0;
+}
+
+.workspaceMenuTriggerLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspaceMenuDirtyDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fbbf24;
+  flex-shrink: 0;
+}
+
+.workspaceMenuPanel {
+  position: fixed;
+  overflow: auto;
+  z-index: var(--canvas-z-project-panel);
+}
+
+.workspaceMenuPanel .canvasFloatMenuBody {
+  padding-bottom: 8px;
+}
