@@ -1,7 +1,10 @@
-import React, { useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle } from "react";
+import React, { useRef, useState, useCallback, useMemo, forwardRef, useImperativeHandle, useEffect } from "react";
 import "./MentionInput.css";
 import { useUpstreamNodeCandidates } from "../../hooks/useUpstreamNodeCandidates";
 import { parsePromptInlineSegments } from "@/lib/imageGeneration/imageStyleTokens";
+import { getAtomicPromptInlineDeletion } from "@/lib/imageGeneration/promptInlineMentionEditing";
+import { applyAtomicTokenDeletion } from "@/lib/mentionInputEditing";
+import { useMentionTextMirror } from "@/hooks/useMentionTextMirror";
 import { USER_INPUT_PLACEHOLDER } from "@/lib/slashPresets";
 
 export interface MentionInputProps {
@@ -29,6 +32,10 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
     const pendingValueRef = useRef(value);
     const pendingCursorRef = useRef(0);
     const upstreamNodes = useUpstreamNodeCandidates(nodeId);
+
+    useEffect(() => {
+      pendingValueRef.current = value;
+    }, [value]);
 
     useImperativeHandle(ref, () => ({
       insertPresetTemplate: (template: string) => {
@@ -130,6 +137,36 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      const textarea = e.currentTarget;
+      const cursor = textarea.selectionStart ?? pendingCursorRef.current;
+      const selEnd = textarea.selectionEnd ?? cursor;
+
+      if (e.key === "Backspace" || e.key === "Delete") {
+        const deletion = getAtomicPromptInlineDeletion(
+          pendingValueRef.current,
+          cursor,
+          selEnd,
+          e.key,
+          nodeLabels,
+        );
+        if (deletion) {
+          e.preventDefault();
+          const { value: newValue, cursor: newCursor } = applyAtomicTokenDeletion(
+            pendingValueRef.current,
+            deletion,
+          );
+          pendingValueRef.current = newValue;
+          pendingCursorRef.current = newCursor;
+          onChange(newValue);
+          setShowDropdown(false);
+          requestAnimationFrame(() => {
+            textarea.focus();
+            textarea.setSelectionRange(newCursor, newCursor);
+          });
+          return;
+        }
+      }
+
       if (!showDropdown) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
@@ -146,13 +183,15 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
         setShowDropdown(false);
       }
     },
-    [showDropdown, filteredNodes, dropdownIndex, insertMention]
+    [showDropdown, filteredNodes, dropdownIndex, insertMention, nodeLabels, onChange]
   );
 
   const overlaySegments = useMemo(
     () => parsePromptInlineSegments(value, nodeLabels),
     [value, nodeLabels],
   );
+
+  useMentionTextMirror(textareaRef, overlayRef, [value]);
 
   return (
     <div className={`mention-input-wrapper ${className}`} style={style}>
@@ -187,6 +226,12 @@ export const MentionInput = forwardRef<MentionInputRef, MentionInputProps>(
         value={value}
         onChange={handleChange}
         onKeyDown={handleKeyDown}
+        onSelect={(e) => {
+          pendingCursorRef.current = e.currentTarget.selectionStart ?? 0;
+        }}
+        onClick={(e) => {
+          pendingCursorRef.current = e.currentTarget.selectionStart ?? 0;
+        }}
         placeholder={placeholder}
         rows={3}
       />

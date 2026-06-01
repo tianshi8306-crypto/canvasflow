@@ -50,10 +50,115 @@
 
 .workspaceMenuPanel {
   position: fixed;
+  width: 272px;
+  max-height: 420px;
   overflow: auto;
+  border-radius: 12px;
+  border: 1px solid var(--canvas-dock-border);
+  background: var(--canvas-dock-bg);
+  box-shadow: var(--canvas-dock-shadow);
   z-index: var(--canvas-z-project-panel);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
 
-.workspaceMenuPanel .canvasFloatMenuBody {
-  padding-bottom: 8px;
+.workspaceMenuCurrent {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 6px 8px;
+  border-bottom: 1px solid var(--cf-border);
+  margin-bottom: 2px;
+}
+
+.workspaceMenuCurrentLabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cf-soft-white-tertiary);
+}
+
+.workspaceMenuCurrentPath {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--cf-soft-white-secondary);
+  word-break: break-all;
+}
+
+.workspaceMenuBrowserHint {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--cf-soft-white-tertiary);
+}
+
+.workspaceMenuSectionTitle {
+  padding: 6px 8px 2px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--cf-soft-white-tertiary);
+}
+
+.workspaceMenuSection {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.workspaceMenuRecent {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.workspaceMenuDivider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--cf-border);
+}
+
+.workspaceMenuRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cf-soft-white);
+  font-size: 13px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.workspaceMenuRow:hover:not(:disabled) {
+  background: var(--cf-hover);
+}
+
+.workspaceMenuRow:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.workspaceMenuRowLabel {
+  font-weight: 500;
+}
+
+.workspaceMenuRowHint {
+  font-size: 10px;
+  line-height: 1.3;
+  color: var(--cf-soft-white-tertiary);
+  word-break: break-all;
 }

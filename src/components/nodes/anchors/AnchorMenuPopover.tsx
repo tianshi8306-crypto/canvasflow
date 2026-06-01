@@ -1,4 +1,5 @@
 import { createPortal } from "react-dom";
+import type React from "react";
 import type { ReactNode, RefObject, CSSProperties } from "react";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import type { AnchorMenuRow } from "@/lib/nodeAnchorMenus";
@@ -31,8 +32,8 @@ export function AnchorMenuPopover({
 
   return createPortal(
     <div
-      ref={popRef}
-      className={`nodeAnchorPopover ${RF_NODE_INPUT_CLASS}`}
+      ref={popRef as React.Ref<HTMLDivElement>}
+      className={`nodeAnchorPopover canvasFloatMenuShell ${RF_NODE_INPUT_CLASS}`}
       role="menu"
       aria-label={title}
       style={{
@@ -43,14 +44,14 @@ export function AnchorMenuPopover({
       onPointerDown={(e) => e.stopPropagation()}
       onClick={(e) => e.stopPropagation()}
     >
-      <div className="nodeAnchorPopoverTitle">{title}</div>
-      <div className="nodeAnchorPopoverList">
+      <div className="nodeAnchorPopoverTitle canvasFloatMenuTitle">{title}</div>
+      <div className="nodeAnchorPopoverList canvasFloatMenuBody">
         {rows.map((row) => (
           <button
             key={row.key}
             type="button"
             role="menuitem"
-            className="nodeAnchorPopoverRow"
+            className="nodeAnchorPopoverRow canvasFloatMenuRow"
             onClick={() => onPick(row.key)}
           >
             <span className="nodeAnchorPopoverRowIcon">{renderIcon(row)}</span>

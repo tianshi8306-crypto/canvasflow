@@ -1,8 +1,8 @@
-import { useEffect, useMemo, type CSSProperties } from "react";
+import { useEffect, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { AudioTtsPanel } from "@/components/nodes/AudioTtsPanel";
 import { NODE_CHROME_AUDIO_PANEL_CLASS } from "@/components/nodes/nodeChrome";
-import { computeAudioNodeFrameSize } from "@/lib/audioNodeFrameSize";
+import { GEN_PANEL_CHROME_WIDTH } from "@/hooks/useNodeGenerationChrome";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import "./ImageGenerationPanelExpandedModal.css";
@@ -10,7 +10,7 @@ import "./AudioNodeChrome.css";
 
 const EXPANDED_Z = 55;
 
-/** 音频节点 TTS 面板放大态（对齐 TextComposerPanelExpandedModal） */
+/** 音频节点 TTS 面板放大态（底栏宽与图片 IGP 一致 500px） */
 export function AudioTtsPanelExpandedModal() {
   const expandedNodeId = useCanvasUiStore((s) => s.audioTtsPanelExpandedNodeId);
   const setExpandedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelExpandedNodeId);
@@ -19,17 +19,6 @@ export function AudioTtsPanelExpandedModal() {
   const nodes = useProjectStore((s) => s.nodes);
 
   const node = expandedNodeId ? nodes.find((n) => n.id === expandedNodeId) : undefined;
-  const shellWidth = useMemo(() => {
-    if (!node || node.type !== "audioNode") return undefined;
-    const params =
-      node.data.params && typeof node.data.params === "object"
-        ? (node.data.params as { chromeWidth?: number; chromeHeight?: number })
-        : {};
-    return computeAudioNodeFrameSize({
-      chromeWidth: params.chromeWidth,
-      chromeHeight: params.chromeHeight,
-    }).width;
-  }, [node]);
 
   useEffect(() => {
     if (!expandedNodeId) return;
@@ -64,13 +53,14 @@ export function AudioTtsPanelExpandedModal() {
     >
       <div
         className={`igp-expanded-card atp-expanded-card ${NODE_CHROME_AUDIO_PANEL_CLASS} atp-layout-expanded`}
-        style={{ ["--atp-shell-width" as string]: `${shellWidth}px` } as CSSProperties}
+        style={
+          { ["--atp-shell-width" as string]: `${GEN_PANEL_CHROME_WIDTH}px` } as CSSProperties
+        }
         onPointerDown={(e) => e.stopPropagation()}
       >
         <div className="igp-expanded-modal-body">
           <AudioTtsPanel
             nodeId={expandedNodeId}
-            showChromeHead
             onRequestClose={close}
             onRequestDock={dockToNode}
           />

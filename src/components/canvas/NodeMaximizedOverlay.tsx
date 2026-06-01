@@ -5,6 +5,12 @@ import { AudioTtsPanel } from "@/components/nodes/AudioTtsPanel";
 import { ScriptNodeWorkbench } from "@/components/ScriptNodeWorkbench";
 import { ScriptStoryboardSection } from "@/components/ScriptStoryboardSection";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
+import {
+  openScriptNodeFullscreen,
+  SCRIPT_ENTRY_FULLSCREEN_LABEL,
+  SCRIPT_ENTRY_FULLSCREEN_TITLE,
+  SCRIPT_NODE_ENTRY_HINT,
+} from "@/lib/scriptNodeCanvasEntries";
 
 /**
  * 右键双击节点：在当前画布内最大化展示节点对应 Agent 工作区，并与节点数据双向同步。
@@ -77,14 +83,26 @@ export function NodeMaximizedOverlay() {
               "scriptNode",
             ].includes(node.type ?? "") && "节点"}
           </span>
-          <button
-            type="button"
-            className="nodeMaxOverlayClose"
-            onClick={() => setMaximizedNodeId(null)}
-            title="关闭 (Esc)"
-          >
-            ✕
-          </button>
+          <div className="nodeMaxOverlayHeadActions">
+            {node.type === "scriptNode" ? (
+              <button
+                type="button"
+                className="nodeMaxOverlayActionBtn"
+                onClick={() => openScriptNodeFullscreen(node.id)}
+                title={SCRIPT_ENTRY_FULLSCREEN_TITLE}
+              >
+                {SCRIPT_ENTRY_FULLSCREEN_LABEL}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="nodeMaxOverlayClose"
+              onClick={() => setMaximizedNodeId(null)}
+              title="关闭 (Esc)"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         <div className="nodeMaxOverlayBody">
           {node.type === "audioNode" ? (
@@ -103,6 +121,7 @@ export function NodeMaximizedOverlay() {
             </div>
           ) : node.type === "scriptNode" ? (
             <div className="nodeMaxOverlayStack">
+              <p className="nodeMaxOverlayEntryHint">{SCRIPT_NODE_ENTRY_HINT}</p>
               <div className="field">
                 <label>剧情主题 / 一句话梗概（脚本 Agent 记忆体）</label>
                 <textarea

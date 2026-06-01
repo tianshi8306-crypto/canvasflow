@@ -79,6 +79,37 @@ pub fn probe_media(path: &Path) -> Result<MediaMeta, String> {
     })
 }
 
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageFileProbe {
+    pub width: u32,
+    pub height: u32,
+    pub size_bytes: u64,
+    pub ext: String,
+}
+
+/// 工程内图片：imagesize 读宽高 + metadata 读大小（Seedance 合规预检）
+pub fn probe_image_file(path: &Path) -> Result<ImageFileProbe, String> {
+    if !path.is_file() {
+        return Err(format!("文件不存在: {}", path.display()));
+    }
+    let size_bytes = std::fs::metadata(path)
+        .map_err(|e| format!("读取文件信息失败: {}", e))?
+        .len();
+    let dim = imagesize::size(path).map_err(|e| format!("读取图片尺寸失败: {}", e))?;
+    let ext = path
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
+    Ok(ImageFileProbe {
+        width: dim.width as u32,
+        height: dim.height as u32,
+        size_bytes,
+        ext,
+    })
+}
+
 /// M1-2.1：仅读文件头解析图片宽高，失败返回 `None`（不阻断导入）。
 pub fn meta_json_for_image(path: &Path) -> Option<String> {
     let dim = imagesize::size(path).ok()?;

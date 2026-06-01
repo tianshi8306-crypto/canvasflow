@@ -1,5 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
+import "./styles/app-boot.css";
 import "./styles/global.css";
 import "@/components/nodes/nodeChrome/nodeChromeTokens.css";
 import "@xyflow/react/dist/style.css";

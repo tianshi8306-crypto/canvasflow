@@ -23,7 +23,9 @@ static INTEGRATION_SEQ: Mutex<()> = Mutex::new(());
 
 #[tokio::test]
 async fn mocked_openai_script_parse_then_image_params_binding() {
-    let _seq = INTEGRATION_SEQ.lock().expect("integration test lock");
+    let _seq = INTEGRATION_SEQ
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let _clear_key = ClearEnvVar("CANVASFLOW_TEST_API_KEY");
     std::env::set_var("CANVASFLOW_TEST_API_KEY", "sk-integration-mock");
 
@@ -125,7 +127,9 @@ async fn mocked_openai_script_parse_then_image_params_binding() {
 
 #[tokio::test]
 async fn mocked_openai_script_parse_then_video_params_binding() {
-    let _seq = INTEGRATION_SEQ.lock().expect("integration test lock");
+    let _seq = INTEGRATION_SEQ
+        .lock()
+        .unwrap_or_else(|e| e.into_inner());
     let _clear_key = ClearEnvVar("CANVASFLOW_TEST_API_KEY");
     std::env::set_var("CANVASFLOW_TEST_API_KEY", "sk-integration-mock");
 

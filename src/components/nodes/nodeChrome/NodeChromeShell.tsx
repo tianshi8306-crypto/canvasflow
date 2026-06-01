@@ -1,3 +1,4 @@
+import type React from "react";
 import { type CSSProperties, type ReactNode, type RefObject } from "react";
 
 type Props = {
@@ -45,7 +46,7 @@ export function NodeChromeShell({
 
   return (
     <div className={shellCls} style={shellStyle}>
-      <div className={previewCls} ref={previewRef}>
+      <div className={previewCls} ref={previewRef as React.Ref<HTMLDivElement> | undefined}>
         {children}
       </div>
       {afterPreview}

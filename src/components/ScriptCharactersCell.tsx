@@ -2,6 +2,8 @@ import type { Dispatch, SetStateAction } from "react";
 import type { ScriptBeat } from "@/lib/types";
 import { parseCharacters, patchRowCharacters, serializeCharacters, type ScriptBeatsTableVariant } from "@/lib/scriptBeatsTableModel";
 import { ScriptRolePopoverEditor } from "@/components/ScriptRolePopoverEditor";
+import { ScriptBeatRoleSummary } from "@/components/script/ScriptBeatRoleSummary";
+import { getBeatRoles } from "@/lib/scriptBeatsTableModel";
 
 type Props = {
   beat: ScriptBeat;
@@ -29,20 +31,21 @@ export function ScriptCharactersCell({
   setRoleEditorRowId,
 }: Props) {
   if (variant === "fullscreen") {
-    const roles = beat.characters ?? [];
+    const roles = getBeatRoles(beat);
     return (
-      <div style={{ position: "relative" }}>
+      <div className="scriptCharsCellWrap">
         <button
           type="button"
-          className="btn"
-          style={{ padding: "4px 8px", fontSize: 11 }}
+          className="btn scriptCharsCellBtn"
           onMouseDown={(e) => e.stopPropagation()}
           onClick={(e) => {
             e.stopPropagation();
             setRoleEditorRowId((cur) => (cur === beat.id ? null : beat.id));
           }}
+          title="编辑角色（与卡片视图同步）"
         >
-          角色编辑（{roles.length}）
+          <ScriptBeatRoleSummary beat={beat} projectPath={projectPath ?? null} maxAvatars={2} />
+          <span className="scriptCharsCellCount mono">（{roles.length}）</span>
         </button>
         {roleEditorRowId === beat.id ? (
           <ScriptRolePopoverEditor

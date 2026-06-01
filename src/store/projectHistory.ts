@@ -2,6 +2,8 @@ import type { Edge, Node, Viewport } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import type { GraphSnapshot, ProjectState } from "./projectStoreTypes";
 import { scheduleSave } from "./projectSaveDebounce";
+import { isProjectSaveInFlight } from "./projectSaveRunner";
+import { useCanvasUiStore } from "./canvasUiStore";
 
 const MAX_UNDO = 50;
 const HISTORY_BURST_MS = 400;
@@ -19,12 +21,32 @@ export function getUndoRedoAvailability(): { canUndo: boolean; canRedo: boolean 
   };
 }
 
+/** 连续编辑防抖用：仅复制节点壳与坐标，避免 structuredClone 整图 data */
+function cloneGraphShallow(get: () => ProjectState): GraphSnapshot {
+  const { nodes, edges, viewport, graphRevision } = get();
+  return {
+    nodes: nodes.map((n) => ({
+      ...n,
+      position: { ...n.position },
+    })) as Node<FlowNodeData>[],
+    edges: edges.map((e) => ({ ...e })),
+    viewport: { ...viewport },
+    revision: graphRevision,
+  };
+}
+
+/** 离散撤销用：深拷贝，保证 data 可安全回滚 */
 export function cloneGraph(get: () => ProjectState): GraphSnapshot {
-  const { nodes, edges, viewport } = get();
+  const { nodes, edges, viewport, graphRevision } = get();
+  const snap = { nodes, edges, viewport, revision: graphRevision };
+  if (typeof structuredClone === "function") {
+    return structuredClone(snap);
+  }
   return {
     nodes: JSON.parse(JSON.stringify(nodes)) as Node<FlowNodeData>[],
     edges: JSON.parse(JSON.stringify(edges)) as Edge[],
     viewport: { ...viewport },
+    revision: graphRevision,
   };
 }
 
@@ -37,14 +59,19 @@ export function viewportNearlyEqual(a: Viewport, b: Viewport): boolean {
   );
 }
 
+export function isHistoryBurstPending(): boolean {
+  return historyBurstTimer !== undefined;
+}
+
 export function flushHistoryBurst(get: () => ProjectState) {
   window.clearTimeout(historyBurstTimer);
+  historyBurstTimer = undefined;
   if (!historyBurstBaseline || applyingHistory) {
     historyBurstBaseline = null;
     return;
   }
-  const now = cloneGraph(get);
-  if (JSON.stringify(historyBurstBaseline) !== JSON.stringify(now)) {
+  const rev = get().graphRevision;
+  if (rev !== historyBurstBaseline.revision) {
     undoPast.push(historyBurstBaseline);
     while (undoPast.length > MAX_UNDO) undoPast.shift();
     undoFuture = [];
@@ -54,9 +81,10 @@ export function flushHistoryBurst(get: () => ProjectState) {
 
 export function scheduleHistoryBurst(get: () => ProjectState) {
   if (applyingHistory) return;
-  if (!historyBurstBaseline) historyBurstBaseline = cloneGraph(get);
+  if (!historyBurstBaseline) historyBurstBaseline = cloneGraphShallow(get);
   window.clearTimeout(historyBurstTimer);
   historyBurstTimer = window.setTimeout(() => {
+    historyBurstTimer = undefined;
     flushHistoryBurst(get);
   }, HISTORY_BURST_MS);
 }
@@ -75,6 +103,7 @@ export function clearHistoryStacks() {
   undoFuture = [];
   historyBurstBaseline = null;
   window.clearTimeout(historyBurstTimer);
+  historyBurstTimer = undefined;
 }
 
 export function runUndo(get: () => ProjectState, set: (partial: Partial<ProjectState>) => void) {
@@ -94,6 +123,8 @@ export function runUndo(get: () => ProjectState, set: (partial: Partial<ProjectS
     selectedNodeIds: [],
     selectedEdgeIds: [],
     statusText: "已撤销",
+    projectDirty: true,
+    graphRevision: prev.revision,
   });
   applyingHistory = false;
   if (get().projectPath) scheduleSave(get);
@@ -117,7 +148,17 @@ export function runRedo(get: () => ProjectState, set: (partial: Partial<ProjectS
     selectedNodeIds: [],
     selectedEdgeIds: [],
     statusText: "已重做",
+    projectDirty: true,
+    graphRevision: next.revision,
   });
   applyingHistory = false;
   if (get().projectPath) scheduleSave(get);
+}
+
+/** 拖拽 / 撤销防抖 / 保存进行中时推迟自动保存，避免与编辑争抢主线程 */
+export function shouldDeferProjectAutoSave(): boolean {
+  if (useCanvasUiStore.getState().nodeDragSuppressUi) return true;
+  if (isHistoryBurstPending()) return true;
+  if (isProjectSaveInFlight()) return true;
+  return false;
 }

@@ -15,10 +15,13 @@ import {
   autoComposePreviewAfterBatchVideo,
   videoNodeIdsForBeats,
 } from "@/lib/storyboard/autoComposePreviewAfterBatch";
+import { runPool } from "@/lib/async/runPool";
 
 export { findVideoNodesForScript, findImageNodesForScript } from "@/lib/storyboard/storyboardMediaNodes";
 
 export type BatchVideoResult = { started: number; skipped: number; failed: number };
+
+type VideoJobOutcome = "started" | "skipped" | "failed";
 
 /**
  * 为已有分镜图、且存在对应 videoNode 的镜头批量提交视频生成。
@@ -34,7 +37,9 @@ export async function batchGenerateVideosForStoryboard(opts: {
   updateNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
   setStatusText: (t: string) => void;
   beatIds?: string[];
-  onProgress?: (current: number, total: number, shotNumber: string) => void;
+  onProgress?: (current: number, total: number, detail?: string) => void;
+  /** 镜级并发上限（1～3）；默认 1 为顺序提交 */
+  maxConcurrent?: number;
   /** 提交完成后等待落盘并打开成片合成预览（默认读取 localStorage 偏好） */
   autoComposePreview?: boolean;
 }): Promise<BatchVideoResult> {
@@ -50,6 +55,7 @@ export async function batchGenerateVideosForStoryboard(opts: {
     beatIds,
     onProgress,
     autoComposePreview,
+    maxConcurrent = 1,
   } = opts;
 
   const videoByBeat = findVideoNodesForScript(scriptNodeId, nodes, edges);
@@ -78,17 +84,20 @@ export async function batchGenerateVideosForStoryboard(opts: {
   }
 
   const total = eligible.length;
-  setStatusText(`批量视频：开始提交 ${total} 个镜头…`);
+  setStatusText(
+    `批量视频：开始提交 ${total} 个镜头` +
+      (maxConcurrent > 1 ? `（并发 ${maxConcurrent} 镜）` : "") +
+      "…",
+  );
+  onProgress?.(0, total, "准备");
 
-  for (let i = 0; i < eligible.length; i++) {
-    const shot = eligible[i]!;
+  const runOneShot = async (shot: StoryboardShot): Promise<VideoJobOutcome> => {
     const videoNodeId = videoByBeat.get(shot.scriptBeatId)!;
     const beat = useProjectStore
       .getState()
       .nodes.find((n) => n.id === scriptNodeId)
       ?.data.scriptBeats?.find((b) => b.id === shot.scriptBeatId);
-    const shotLabel = beat?.shotNumber?.trim() || String(i + 1);
-    onProgress?.(i + 1, total, shotLabel);
+    const shotLabel = beat?.shotNumber?.trim() || shot.scriptBeatId.slice(0, 6);
 
     const latestNodes = useProjectStore.getState().nodes;
     const latestEdges = useProjectStore.getState().edges;
@@ -104,12 +113,9 @@ export async function batchGenerateVideosForStoryboard(opts: {
     const videoNode = useProjectStore.getState().nodes.find((n) => n.id === videoNodeId);
     const videoBlock = videoNode?.data.video as VideoNodePersisted | undefined;
     if (!videoBlock?.draft?.prompt?.trim()) {
-      skipped += 1;
       setStatusText(`批量视频：镜 ${shotLabel} 跳过（无视频草稿 prompt）`);
-      continue;
+      return "skipped";
     }
-
-    setStatusText(`批量视频：${i + 1}/${total} 镜 ${shotLabel}…`);
 
     patchStoryboardShot(
       scriptNodeId,
@@ -129,17 +135,39 @@ export async function batchGenerateVideosForStoryboard(opts: {
           setStatusText,
         },
       );
-      started += 1;
-      startedBeatIds.push(shot.scriptBeatId);
+      return "started";
     } catch {
-      failed += 1;
       patchStoryboardShot(
         scriptNodeId,
         shot.scriptBeatId,
         { videoStatus: "failed", videoError: "批量视频生成失败" },
         updateNodeData,
       );
+      return "failed";
     }
+  };
+
+  let completedJobs = 0;
+  const outcomes = await runPool(eligible, maxConcurrent, async (shot) => {
+    const outcome = await runOneShot(shot);
+    completedJobs += 1;
+    const beat = beats.find((b) => b.id === shot.scriptBeatId);
+    const shotLabel = beat?.shotNumber?.trim() || String(completedJobs);
+    onProgress?.(completedJobs, total, `镜 ${shotLabel}`);
+    if (outcome === "started") {
+      setStatusText(`批量视频：${completedJobs}/${total} 镜 ${shotLabel}…`);
+    }
+    return outcome;
+  });
+
+  for (let i = 0; i < outcomes.length; i++) {
+    const outcome = outcomes[i]!;
+    const shot = eligible[i]!;
+    if (outcome === "started") {
+      started += 1;
+      startedBeatIds.push(shot.scriptBeatId);
+    } else if (outcome === "skipped") skipped += 1;
+    else if (outcome === "failed") failed += 1;
   }
 
   setStatusText(

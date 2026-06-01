@@ -90,3 +90,22 @@ export function indexFromPoint(
   }
   return best;
 }
+
+/** `@` 触发符在视口中的锚点（用于浮层紧贴字符右下） */
+export function getTextareaAtTriggerViewportRect(
+  textarea: HTMLTextAreaElement,
+  cursor: number,
+): { left: number; top: number; bottom: number; atIndex: number } | null {
+  const textBefore = textarea.value.slice(0, cursor);
+  const atMatch = textBefore.match(/@([^@\n]*)$/);
+  if (!atMatch) return null;
+  const atIndex = cursor - atMatch[0].length;
+  const coords = getCaretCoordinates(textarea, atIndex);
+  const rect = textarea.getBoundingClientRect();
+  return {
+    left: rect.left + coords.left,
+    top: rect.top + coords.top,
+    bottom: rect.top + coords.top + coords.height,
+    atIndex,
+  };
+}

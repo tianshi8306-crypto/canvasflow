@@ -4,7 +4,6 @@ import type { FlowNodeData } from "@/lib/types";
 import {
   cloneGraph,
   clearHistoryStacks,
-  flushHistoryBurst,
   getUndoRedoAvailability,
   recordBeforeDiscreteMutation,
   runRedo,
@@ -12,19 +11,39 @@ import {
   scheduleHistoryBurst,
   viewportNearlyEqual,
 } from "./projectHistory";
+import type { ProjectState } from "./projectStoreTypes";
 
-// Minimal ProjectState shape for testing
-const makeState = (
+type HistoryTestSlice = Pick<
+  ProjectState,
+  "nodes" | "edges" | "viewport" | "projectPath" | "setStatusText"
+>;
+
+function makeState(
   nodes: Node<FlowNodeData>[] = [],
   edges: Edge[] = [],
   viewport: Viewport = { x: 0, y: 0, zoom: 1 },
-): { get: () => { nodes: Node<FlowNodeData>[]; edges: Edge[]; viewport: Viewport; projectPath: string | null; setStatusText: (t: string) => void }; set: (p: Partial<{ nodes: Node<FlowNodeData>[]; edges: Edge[]; viewport: Viewport; selectedNodeId: string | null; selectedNodeIds: string[]; selectedEdgeIds: string[]; statusText: string }>) => void } => {
-  const state = { nodes, edges, viewport, projectPath: "/test" as string | null, setStatusText: (_t: string) => {} };
-  return {
-    get: () => state,
-    set: (patch) => Object.assign(state, patch),
+): {
+  get: () => ProjectState;
+  set: (partial: Partial<ProjectState>) => void;
+} {
+  const state: HistoryTestSlice & { graphRevision: number } = {
+    nodes,
+    edges,
+    viewport,
+    projectPath: "/test",
+    graphRevision: 0,
+    setStatusText: () => {},
   };
-};
+  return {
+    get: () => state as unknown as ProjectState,
+    set: (patch) => {
+      Object.assign(state, patch);
+      if ("nodes" in patch || "edges" in patch || "viewport" in patch) {
+        state.graphRevision += 1;
+      }
+    },
+  };
+}
 
 describe("viewportNearlyEqual", () => {
   it("returns true for identical viewports", () => {
@@ -54,9 +73,8 @@ describe("cloneGraph", () => {
 
     const snap = cloneGraph(get);
 
-    // 修改原始 state 不影响 snapshot
-    const state = get();
-    (state.nodes[0] as { position: { x: number } }).position.x = 999;
+    const state = get() as unknown as HistoryTestSlice;
+    state.nodes[0]!.position.x = 999;
     expect(snap.nodes[0]!.position.x).toBe(10);
     expect(snap.edges).toEqual(edges);
     expect(snap.viewport).toEqual(vp);
@@ -70,8 +88,10 @@ describe("clearHistoryStacks", () => {
   it("empties undo and redo stacks", () => {
     const { get, set } = makeState([{ id: "n1", type: "imageNode", position: { x: 0, y: 0 }, data: {} } as Node<FlowNodeData>]);
     recordBeforeDiscreteMutation(get);
-    runUndo(get, set); // 无东西可撤销，状态文本会被 set
+    runUndo(get, set);
+    expect(getUndoRedoAvailability().canRedo).toBe(true);
 
+    clearHistoryStacks();
     const avail = getUndoRedoAvailability();
     expect(avail.canUndo).toBe(false);
     expect(avail.canRedo).toBe(false);
@@ -84,21 +104,16 @@ describe("recordBeforeDiscreteMutation", () => {
 
   it("pushes current graph into undo stack", () => {
     const nodes: Node<FlowNodeData>[] = [{ id: "n1", type: "imageNode", position: { x: 0, y: 0 }, data: { label: "A" } } as Node<FlowNodeData>];
-    const { get, set } = makeState(nodes);
+    const { get } = makeState(nodes);
     recordBeforeDiscreteMutation(get);
     expect(getUndoRedoAvailability().canUndo).toBe(true);
   });
 
   it("clears redo stack on new mutation", () => {
     const nodes: Node<FlowNodeData>[] = [{ id: "n1", type: "imageNode", position: { x: 0, y: 0 }, data: { label: "A" } } as Node<FlowNodeData>];
-    const { get, set } = makeState(nodes);
+    const { get } = makeState(nodes);
     recordBeforeDiscreteMutation(get);
-
-    // 模拟 undo
-    const avail0 = getUndoRedoAvailability();
-    expect(avail0.canUndo).toBe(true);
-
-    // 新 mutation 后 redo 应清空
+    expect(getUndoRedoAvailability().canUndo).toBe(true);
     recordBeforeDiscreteMutation(get);
     expect(getUndoRedoAvailability().canRedo).toBe(false);
   });
@@ -111,8 +126,9 @@ describe("runUndo", () => {
   it("does nothing when undo stack is empty", () => {
     const { get, set } = makeState();
     const statusTexts: string[] = [];
-    const state = { ...makeState().get(), setStatusText: (t: string) => statusTexts.push(t) };
-    runUndo(() => state as ReturnType<typeof makeState>["get"], (p) => Object.assign(state, p));
+    const slice = get() as unknown as HistoryTestSlice;
+    slice.setStatusText = (t: string) => statusTexts.push(t);
+    runUndo(get, set);
     expect(statusTexts).toContain("没有可撤销的操作");
   });
 
@@ -121,13 +137,11 @@ describe("runUndo", () => {
     const nodesB: Node<FlowNodeData>[] = [{ id: "n1", type: "imageNode", position: { x: 100, y: 0 }, data: { label: "B" } } as Node<FlowNodeData>];
     const { get, set } = makeState(nodesA);
     recordBeforeDiscreteMutation(get);
-
-    // 修改 state
     set({ nodes: nodesB });
-    expect(get().nodes[0]!.position.x).toBe(100);
+    expect((get() as unknown as HistoryTestSlice).nodes[0]!.position.x).toBe(100);
 
     runUndo(get, set);
-    expect(get().nodes[0]!.position.x).toBe(0);
+    expect((get() as unknown as HistoryTestSlice).nodes[0]!.position.x).toBe(0);
   });
 });
 
@@ -136,8 +150,8 @@ describe("runRedo", () => {
   afterEach(() => clearHistoryStacks());
 
   it("does nothing when redo stack is empty", () => {
-    const state = { ...makeState().get(), setStatusText: (t: string) => {} };
-    runRedo(() => state as ReturnType<typeof makeState>["get"], (p) => Object.assign(state, p));
+    const { get, set } = makeState();
+    runRedo(get, set);
     expect(getUndoRedoAvailability().canRedo).toBe(false);
   });
 
@@ -149,14 +163,14 @@ describe("runRedo", () => {
     set({ nodes: nodesB });
 
     runUndo(get, set);
-    expect(get().nodes[0]!.position.x).toBe(0);
+    expect((get() as unknown as HistoryTestSlice).nodes[0]!.position.x).toBe(0);
 
     runRedo(get, set);
-    expect(get().nodes[0]!.position.x).toBe(100);
+    expect((get() as unknown as HistoryTestSlice).nodes[0]!.position.x).toBe(100);
   });
 });
 
-describe("scheduleHistoryBurst and flushHistoryBurst", () => {
+describe("scheduleHistoryBurst", () => {
   beforeEach(() => clearHistoryStacks());
   afterEach(() => clearHistoryStacks());
 
@@ -165,11 +179,10 @@ describe("scheduleHistoryBurst and flushHistoryBurst", () => {
     const { get } = makeState(nodes);
 
     scheduleHistoryBurst(get);
-    scheduleHistoryBurst(get); // 第二次调用应在同一 burst 内，不记新快照
+    scheduleHistoryBurst(get);
 
-    // burst 未结束，undo 里应最多只有一条
     const avail = getUndoRedoAvailability();
-    expect(avail.canUndo).toBe(false); // burst 未 flush，所以无 undo
+    expect(avail.canUndo).toBe(false);
   });
 });
 
@@ -183,14 +196,11 @@ describe("undo/redo caps at MAX_UNDO", () => {
 
     for (let i = 0; i < 55; i++) {
       recordBeforeDiscreteMutation(get);
-      // 改一点 position 让快照不同
       set({ nodes: [{ ...nodes[0]!, position: { x: i, y: 0 } }] });
     }
 
-    const avail = getUndoRedoAvailability();
-    // 能 undo 最多 50 次
     let count = 0;
-    while (avail.canUndo) {
+    while (getUndoRedoAvailability().canUndo) {
       runUndo(get, set);
       count++;
     }

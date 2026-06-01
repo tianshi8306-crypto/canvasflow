@@ -31,7 +31,9 @@ export function DreaminaLoginPanel({ auth, onAuthChange }: Props) {
 
   const refreshAuth = useCallback(
     async (refreshStatus = false) => {
-      const state = await checkDreaminaAuthState(refreshStatus);
+      const state = await checkDreaminaAuthState(refreshStatus, {
+        preferCache: !refreshStatus,
+      });
       onAuthChange(state);
       setRuntime(state.runtime);
       return state;
@@ -139,11 +141,30 @@ export function DreaminaLoginPanel({ auth, onAuthChange }: Props) {
       <div className="settingsField">
         <label className="settingsFieldLabel">登录状态</label>
         <div className="dreamina-settings-status">
-          <span className="dreamina-settings-status-text">{auth?.statusText ?? "检测中..."}</span>
+          <span className="dreamina-settings-status-text">
+            {auth?.statusText ?? "尚未检测"}
+          </span>
           {auth?.isLoggedIn ? (
             <span className="dreamina-settings-credit">{auth.creditText}</span>
           ) : null}
+          <button
+            type="button"
+            className="btn btn--ghost btn--sm dreamina-refresh-status"
+            disabled={busy || runtime?.active}
+            onClick={() => void refreshAuth(true)}
+          >
+            刷新状态
+          </button>
         </div>
+        {auth?.fromCache && auth.statusText !== "尚未检测" ? (
+          <p className="settings-desc settings-desc-tight dreamina-auth-cache-note">
+            来自上次记录；即梦生成失败后将自动重新检测
+          </p>
+        ) : auth?.statusText === "尚未检测" ? (
+          <p className="settings-desc settings-desc-tight dreamina-auth-cache-note">
+            打开本页不会调用 CLI；生成失败或点击「刷新状态」后更新
+          </p>
+        ) : null}
       </div>
 
       {(busy || runtime?.active) && (

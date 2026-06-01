@@ -1,9 +1,23 @@
 import { invoke } from "@tauri-apps/api/core";
+import type { Edge } from "@xyflow/react";
 import type { ImageStyleId } from "@/lib/imageGeneration/catalog";
 import { parseApiSizeLabel } from "@/lib/imageGeneration/imageAspectSize";
 import { buildImagePromptWithStyles } from "@/lib/imageGeneration/helpers";
+import { parseImageGenerationRelPaths } from "@/lib/imageGeneration/parseImageGenerationResult";
+import { spawnExtraImageOutputNodes } from "@/lib/imageGeneration/spawnMultiImageOutputNodes";
+import {
+  getScriptBeatIdFromParams,
+  orderedIncomingScriptNodeIds,
+} from "@/lib/incomingScriptBinding";
+import {
+  resolveVacantBeatsForSplitShots,
+  writebackSpawnedImagesToStoryboard,
+} from "@/lib/storyboard/splitSpawnedImagesIntoStoryboard";
+import { writebackStoryboardShotImagePath } from "@/lib/storyboard/writebackStoryboardImage";
+import { refreshDreaminaAuthOnGenerationFailure } from "@/lib/dreaminaAuthOnFailure";
 import { startImageGenProgressTicker } from "@/lib/nodeAgentRuntime/imageGenProgress";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
+import { useProjectStore } from "@/store/projectStore";
 
 type ImageGenerationAgentInput = {
   prompt: string;
@@ -33,7 +47,7 @@ type ImageGenerationSensed = {
 };
 
 type ImageGenerationExecuted = {
-  rel: string;
+  relPaths: string[];
   imageWidth?: number;
   imageHeight?: number;
 };
@@ -93,26 +107,97 @@ export const imageGenerationAgentRuntime: NodeTaskAgentRuntime<
         count: sensed.count,
         negativePrompt: sensed.negativePrompt,
       });
+    } catch (err) {
+      refreshDreaminaAuthOnGenerationFailure(sensed.modelId);
+      throw err;
     } finally {
       stopProgress();
     }
+    const relPaths = parseImageGenerationRelPaths(rel);
+    if (relPaths.length === 0) {
+      throw new Error("图片生成返回为空路径");
+    }
     const dims = sensed.resolution ? parseApiSizeLabel(sensed.resolution) : null;
     return {
-      rel,
+      relPaths,
       imageWidth: dims?.width,
       imageHeight: dims?.height,
     };
   },
-  validate: ({ rel, imageWidth, imageHeight }) => {
-    const out = rel.trim();
-    if (!out) throw new Error("图片生成返回为空路径");
-    return { rel: out, imageWidth, imageHeight };
+  validate: ({ relPaths, imageWidth, imageHeight }) => {
+    if (relPaths.length === 0) throw new Error("图片生成返回为空路径");
+    return { relPaths, imageWidth, imageHeight };
   },
-  commit: ({ rel, imageWidth, imageHeight }, ctx) => {
+  commit: ({ relPaths, imageWidth, imageHeight }, ctx) => {
+    const primary = relPaths[0]!;
     ctx.updateNodeData(ctx.nodeId, {
-      path: rel,
+      path: primary,
       ...(imageWidth && imageHeight ? { imageWidth, imageHeight } : {}),
     });
-    ctx.setStatusText(`图片生成成功：${rel}`);
+
+    const { nodes, edges, updateNodeData } = useProjectStore.getState();
+    writebackStoryboardShotImagePath({
+      nodes,
+      edges: edges as Edge[],
+      imageNodeId: ctx.nodeId,
+      imageRelPath: primary,
+      updateNodeData,
+    });
+
+    if (relPaths.length === 1) {
+      ctx.setStatusText(`图片生成成功：${primary}`);
+      return;
+    }
+
+    const extras = relPaths.slice(1);
+    let splitAssignments: ReturnType<typeof resolveVacantBeatsForSplitShots> = [];
+    const sourceNode = useProjectStore.getState().nodes.find((n) => n.id === ctx.nodeId);
+    const anchorBeatId = sourceNode ? getScriptBeatIdFromParams(sourceNode.data) : null;
+    const scriptIds = orderedIncomingScriptNodeIds(
+      nodes,
+      edges as Edge[],
+      ctx.nodeId,
+    );
+    const scriptNode =
+      anchorBeatId && scriptIds[0]
+        ? nodes.find((n) => n.id === scriptIds[0] && n.type === "scriptNode")
+        : undefined;
+    if (scriptNode && anchorBeatId) {
+      splitAssignments = resolveVacantBeatsForSplitShots({
+        scriptNodeId: scriptNode.id,
+        anchorBeatId,
+        slotCount: extras.length,
+        beats: scriptNode.data.scriptBeats ?? [],
+        shots: scriptNode.data.storyboardShots,
+        scriptBeatSelection: scriptNode.data.scriptBeatSelection,
+        nodes,
+        edges: edges as Edge[],
+      });
+    }
+
+    const spawned = spawnExtraImageOutputNodes({
+      sourceNodeId: ctx.nodeId,
+      extraRelPaths: extras,
+      imageWidth,
+      imageHeight,
+      splitShotAssignments: splitAssignments,
+    });
+
+    const latest = useProjectStore.getState();
+    const ingested = writebackSpawnedImagesToStoryboard({
+      assignments: spawned.map((nodeId, i) => ({
+        imageNodeId: nodeId,
+        relPath: extras[i]!,
+      })),
+      nodes: latest.nodes,
+      edges: latest.edges as Edge[],
+      updateNodeData,
+    });
+
+    const unbound = extras.length - splitAssignments.length;
+    let detail = `已宫格排布为 ${1 + spawned.length} 个图片节点`;
+    if (ingested > 0) detail += `，拆镜入库 ${ingested} 镜`;
+    if (unbound > 0) detail += `（${unbound} 张未绑定后续空缺镜头）`;
+    ctx.setStatusText(`已生成 ${relPaths.length} 张，${detail}`);
   },
 };

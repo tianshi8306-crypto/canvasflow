@@ -1,36 +1,67 @@
 .mention-input-wrapper {
   position: relative;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   width: 100%;
   box-sizing: border-box;
+  --mention-mirror-pad-block: 10px;
+  --mention-mirror-pad-inline: 12px;
+  --mention-mirror-font-size: 13px;
+  --mention-mirror-line-height: 1.6;
+  --mention-mirror-border-width: 1px;
+  --mention-mirror-text: rgba(255, 255, 255, 0.9);
+  --mention-mirror-caret: rgba(255, 255, 255, 0.9);
 }
 
-/* 镜像层：展示可见文字与 pill；textarea 仅负责输入与光标 */
-.mention-overlay {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  padding: inherit;
+/* 镜像层与 textarea 叠在同一格，避免滚动条挤占宽度导致错位 */
+.mention-input-wrapper .mention-overlay,
+.mention-input-wrapper .mention-textarea {
+  grid-area: 1 / 1;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  font-family: inherit;
+  font-size: var(--mention-mirror-font-size);
+  line-height: var(--mention-mirror-line-height);
+  font-weight: inherit;
+  letter-spacing: inherit;
+  tab-size: 8;
+  -moz-tab-size: 8;
+  padding: var(--mention-mirror-pad-block) var(--mention-mirror-pad-inline);
+  border: var(--mention-mirror-border-width) solid transparent;
   white-space: pre-wrap;
   word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+.mention-overlay {
+  pointer-events: none;
   overflow: hidden;
   z-index: 1;
-  font-family: inherit;
-  font-size: inherit;
-  line-height: inherit;
-  color: #cccccc;
+  color: var(--mention-mirror-text);
 }
 
 .mention-textarea {
-  position: relative;
   z-index: 2;
+  display: block;
   background: transparent;
-  color: transparent;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  caret-color: var(--mention-mirror-caret);
   resize: none;
-  width: 100%;
-  box-sizing: border-box;
-  caret-color: #cccccc;
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+.mention-textarea::selection {
+  background: rgba(59, 130, 246, 0.42);
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
+.mention-textarea::-moz-selection {
+  background: rgba(59, 130, 246, 0.42);
+  color: transparent;
 }
 
 .mention-token-slot {
@@ -43,17 +74,25 @@
 .mention-token-measure {
   visibility: hidden;
   pointer-events: none;
-  white-space: pre-wrap;
+  display: inline;
+  white-space: inherit;
+  font-size: inherit;
+  line-height: inherit;
 }
 
 .mention-token-slot > .mention-pill {
   position: absolute;
   left: 0;
-  top: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  transform-origin: left center;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  /* 不透明底，完全遮住 textarea 里同位置的透明原文 */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
 }
 
 .mention-pill {
@@ -72,14 +111,18 @@
 
 .mention-pill--style {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: none;
   color: #e0e0e0;
 }
 
 .imageGenPanel--minimal .mention-pill--style {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: none;
   color: #e0e0e0;
+}
+
+.imageGenPanel--minimal .mention-dropdown {
+  border-radius: var(--igp-control-radius-square);
 }
 
 .mention-dropdown {
@@ -131,4 +174,299 @@
 .mention-dropdown-label {
   flex: 1;
   font-size: 13px;
+}
+
+/* 视频/图片生成面板紧凑态 @ pill */
+.video-prompt-mention--compact,
+.image-prompt-mention--compact {
+  --mention-mirror-pad-block: 4px;
+  --mention-mirror-pad-inline: 0;
+  --mention-mirror-line-height: 20px;
+  --mention-pill-track: 20px;
+  --mention-mirror-border-width: 0;
+}
+
+/* 视频 @ 输入：强制 grid 叠层（优先级高于各面板误设的 flex-column） */
+.mention-input-wrapper.video-prompt-mention--compact,
+.mention-input-wrapper.image-prompt-mention--compact {
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+  --mention-mirror-line-height: 20px;
+  --mention-pill-track: 20px;
+}
+
+.mention-input-wrapper.video-prompt-mention--compact > .mention-overlay,
+.mention-input-wrapper.video-prompt-mention--compact > .mention-textarea,
+.mention-input-wrapper.image-prompt-mention--compact > .mention-overlay,
+.mention-input-wrapper.image-prompt-mention--compact > .mention-textarea {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+}
+
+.video-prompt-mention--legacy {
+  --mention-mirror-pad-block: 10px;
+  --mention-mirror-pad-inline: 12px;
+  --mention-mirror-line-height: 1.6;
+}
+
+.igp-expanded-card.vgp-layout-expanded .video-prompt-mention--compact {
+  --mention-mirror-font-size: 14px;
+  --mention-mirror-line-height: 1.45;
+  --mention-mirror-pad-block: 4px;
+  --mention-mirror-pad-inline: 0;
+}
+
+/* Hermes 浮窗输入 */
+.hermes-mention-input {
+  --mention-mirror-pad-block: 0;
+  --mention-mirror-pad-inline: 0;
+  --mention-mirror-line-height: 1.5;
+  --mention-mirror-font-size: 13px;
+  --mention-mirror-border-width: 0;
+  --mention-mirror-text: var(--cf-soft-white, #e8e6e3);
+  --mention-mirror-caret: var(--cf-soft-white, #e8e6e3);
+}
+
+/* 覆盖各面板对 .mmPromptInput / .hermesFloatInput 的独立 padding，避免镜像层错位 */
+.mention-input-wrapper .mention-overlay,
+.mention-input-wrapper .mention-textarea.mmPromptInput,
+.mention-input-wrapper .mention-textarea.hermesFloatInput {
+  padding: var(--mention-mirror-pad-block) var(--mention-mirror-pad-inline);
+  font-size: var(--mention-mirror-font-size);
+  line-height: var(--mention-mirror-line-height);
+}
+
+.mention-input-wrapper .mention-textarea.mmPromptInput,
+.mention-input-wrapper .mention-textarea.hermesFloatInput {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+  caret-color: var(--mention-mirror-caret);
+}
+
+.mention-input-wrapper .mention-textarea.hermesFloatInput::placeholder {
+  color: var(--cf-soft-white-tertiary, #6e6c69);
+  -webkit-text-fill-color: var(--cf-soft-white-tertiary, #6e6c69);
+}
+
+/* Hermes 灵体：与视频 prompt 相同的 grid 叠层 + 滚动镜像 */
+.mention-input-wrapper.hermes-mention-input {
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+}
+
+.mention-input-wrapper.hermes-mention-input > .mention-overlay,
+.mention-input-wrapper.hermes-mention-input > .mention-textarea {
+  grid-area: 1 / 1;
+  width: 100%;
+  min-width: 0;
+}
+
+.mention-input-wrapper.hermes-mention-input > .mention-overlay {
+  overflow: hidden;
+}
+
+/* 视频/图片 @ 标签：与 token 等宽占位 + 不透明 pill（LibTV inline chip） */
+.video-prompt-mention .mention-token-slot--media,
+.image-prompt-mention .mention-token-slot--media {
+  vertical-align: baseline;
+}
+
+.video-prompt-mention .mention-token-slot,
+.image-prompt-mention .mention-token-slot {
+  position: relative;
+  display: inline;
+  vertical-align: baseline;
+  line-height: inherit;
+}
+
+.video-prompt-mention .mention-token-measure,
+.image-prompt-mention .mention-token-measure {
+  visibility: hidden;
+  display: inline;
+  white-space: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}
+
+.video-prompt-mention .mention-token-slot > .mention-pill,
+.image-prompt-mention .mention-token-slot > .mention-pill {
+  top: 50%;
+  transform: translateY(-50%);
+  transform-origin: left center;
+  max-width: 100%;
+  min-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.video-prompt-mention .mention-pill--density-compact .mention-pill-thumb,
+.video-prompt-mention .mention-pill--density-icon .mention-pill-thumb,
+.image-prompt-mention .mention-pill--density-compact .mention-pill-thumb,
+.image-prompt-mention .mention-pill--density-icon .mention-pill-thumb {
+  width: 9px;
+  height: 9px;
+}
+
+.video-prompt-mention .mention-pill--density-icon,
+.image-prompt-mention .mention-pill--density-icon {
+  padding: 0 2px;
+  gap: 0;
+  min-height: 16px;
+  height: 16px;
+}
+
+.video-prompt-mention .mention-pill--density-compact,
+.image-prompt-mention .mention-pill--density-compact {
+  gap: 2px;
+  padding: 0 3px 0 1px;
+}
+
+.video-prompt-mention .mention-pill--density-compact .mention-pill-label,
+.image-prompt-mention .mention-pill--density-compact .mention-pill-label {
+  max-width: 4em;
+  font-size: 11px;
+}
+
+.video-prompt-mention .mention-pill--video-ref,
+.video-prompt-mention .mention-pill--video-named,
+.image-prompt-mention .mention-pill--video-ref,
+.image-prompt-mention .mention-pill--video-named {
+  line-height: 1;
+}
+
+/* iter-98 / LibTV 图 2：缩略图 + 图片N + 蓝勾 */
+.video-prompt-mention .mention-pill--with-media,
+.image-prompt-mention .mention-pill--with-media {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  max-width: 100%;
+  height: 18px;
+  min-height: 18px;
+  padding: 0 3px 0 1px;
+  vertical-align: middle;
+  background: rgba(38, 38, 42, 0.95);
+  border: none;
+  color: rgba(255, 255, 255, 0.92);
+  box-sizing: border-box;
+  border-radius: 6px;
+  font-size: inherit;
+  margin: 0;
+}
+
+.video-prompt-mention .mention-pill--clickable,
+.image-prompt-mention .mention-pill--clickable {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.video-prompt-mention .mention-pill--clickable:hover,
+.image-prompt-mention .mention-pill--clickable:hover {
+  background: rgba(48, 48, 54, 0.98);
+}
+
+.video-prompt-mention .mention-pill--ref-active,
+.image-prompt-mention .mention-pill--ref-active {
+  background: rgba(48, 48, 54, 0.98);
+  color: #fff;
+}
+
+.video-prompt-mention .mention-pill-thumb,
+.image-prompt-mention .mention-pill-thumb {
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  border-radius: 2px;
+  overflow: hidden;
+  background: #0a0a0b;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.video-prompt-mention .mention-pill-thumb img,
+.video-prompt-mention .mention-pill-thumb video,
+.video-prompt-mention .mention-pill-thumb .nodeThumb,
+.video-prompt-mention .mention-pill-thumb .nodeMediaClip,
+.image-prompt-mention .mention-pill-thumb img,
+.image-prompt-mention .mention-pill-thumb video,
+.image-prompt-mention .mention-pill-thumb .nodeThumb,
+.image-prompt-mention .mention-pill-thumb .nodeMediaClip,
+.mention-pill-thumb .mention-pill-thumb-media {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  object-fit: cover;
+  object-position: center;
+}
+
+.video-prompt-mention .mention-pill-thumb--audio,
+.image-prompt-mention .mention-pill-thumb--audio {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.video-prompt-mention .mention-pill-label,
+.image-prompt-mention .mention-pill-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 6em;
+  font-size: 11px;
+  line-height: 1;
+  font-weight: 500;
+}
+
+/* Seedance 2.0 合规标（LibTV 蓝勾：上游图自动校验，非「已 @」） */
+.seedanceComplianceBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: 999px;
+  line-height: 1;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.seedanceComplianceBadge--thumb {
+  position: absolute;
+  right: 3px;
+  bottom: 3px;
+  width: 16px;
+  height: 16px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.seedanceComplianceBadge--pill {
+  width: 13px;
+  height: 13px;
+  margin-left: 1px;
+  font-size: 9px;
+}
+
+.seedanceComplianceBadge--pass {
+  background: #2563eb;
+  color: #fff;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+}
+
+.seedanceComplianceBadge--fail {
+  background: rgba(239, 68, 68, 0.92);
+  color: #fff;
+}
+
+.seedanceComplianceBadge--unknown {
+  background: rgba(100, 116, 139, 0.85);
+  color: #fff;
 }

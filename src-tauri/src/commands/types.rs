@@ -98,6 +98,17 @@ pub struct VideoGenStartResponse {
     pub job_id: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DreaminaVideoRecoverRequest {
+    pub project_path: String,
+    pub node_id: String,
+    pub submit_id: String,
+    pub model_id: String,
+    #[serde(default)]
+    pub workflow: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct VideoJobSnapshot {

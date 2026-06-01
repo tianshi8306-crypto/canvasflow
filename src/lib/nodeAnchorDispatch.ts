@@ -39,7 +39,7 @@ function hasIncomingOfType(
   edges: { source: string; target: string; data?: unknown }[],
   nodes: { id: string; type?: string | null }[],
   targetId: string,
-  sourceType: "imageNode",
+  sourceType: "imageNode" | "videoNode",
 ): boolean {
   const prev = edges
     .filter((e) => !isEdgeDisabled(e) && e.target === targetId)
@@ -236,9 +236,19 @@ export function dispatchAnchorMenuPick(opts: {
           get.updateNodeData(anchorNodeId, { prompt: syncedContent });
         }
         get.setStatusText("已连接脚本节点并同步内容");
-      } else {
-        get.setStatusText("未找到上游脚本节点");
+        return;
       }
+      const scriptId = crypto.randomUUID();
+      const node: Node<FlowNodeData> = {
+        id: scriptId,
+        type: "scriptNode",
+        position: { x: x - PARTNER_GAP, y },
+        data: newNodeDataByType.scriptNode(),
+      };
+      get.addNodesWithEdges([node], [makeFlowEdge(scriptId, anchorNodeId, "scriptNode")]);
+      mergeTextWorkflow(anchorNodeId, "scriptToText", scriptId);
+      get.setSelectedNodeIds([scriptId]);
+      get.setStatusText("已添加脚本节点并联线");
       return;
     }
   }

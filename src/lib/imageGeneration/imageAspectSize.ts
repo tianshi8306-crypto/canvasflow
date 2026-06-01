@@ -5,8 +5,14 @@ import {
   type ImageResolutionTierId,
 } from "@/lib/imageGeneration/catalog";
 
-export const IMAGE_NODE_MAX_EDGE = 500;
-export const IMAGE_NODE_MIN_EDGE = 96;
+import {
+  CANVAS_MEDIA_NODE_MAX_EDGE,
+  CANVAS_MEDIA_NODE_MIN_EDGE,
+  computeCanvasMediaNodeFrameSize,
+} from "@/lib/canvasMediaNodeFrame";
+
+export const IMAGE_NODE_MAX_EDGE = CANVAS_MEDIA_NODE_MAX_EDGE;
+export const IMAGE_NODE_MIN_EDGE = CANVAS_MEDIA_NODE_MIN_EDGE;
 
 export function getAspectRatioNumber(aspectId: ImageAspectId): number {
   if (aspectId === "auto") return 16 / 9;
@@ -87,19 +93,7 @@ export function computeImageNodeFrameSize(
   ratio: number,
   maxEdge = IMAGE_NODE_MAX_EDGE,
 ): { width: number; height: number } {
-  if (!Number.isFinite(ratio) || ratio <= 0) ratio = 16 / 9;
-  let width: number;
-  let height: number;
-  if (ratio >= 1) {
-    width = maxEdge;
-    height = Math.round(maxEdge / ratio);
-  } else {
-    height = maxEdge;
-    width = Math.round(maxEdge * ratio);
-  }
-  width = Math.max(IMAGE_NODE_MIN_EDGE, width);
-  height = Math.max(IMAGE_NODE_MIN_EDGE, height);
-  return { width, height };
+  return computeCanvasMediaNodeFrameSize(ratio, maxEdge);
 }
 
 export function resolveImageNodeFrameRatio(opts: {

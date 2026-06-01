@@ -5,8 +5,8 @@ import {
   type TextComposerPanelLayout,
 } from "@/components/nodes/TextComposerPanel";
 import { NODE_CHROME_TEXT_PANEL_CLASS } from "@/components/nodes/nodeChrome";
+import { GEN_PANEL_CHROME_WIDTH } from "@/hooks/useNodeGenerationChrome";
 import type { TextWorkflowKind } from "@/lib/types";
-import { computeTextNodeFrameSize } from "@/lib/textNodeChrome";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import "./ImageGenerationPanelExpandedModal.css";
@@ -20,7 +20,7 @@ function layoutForWorkflow(workflow: TextWorkflowKind | undefined): TextComposer
   return "expanded";
 }
 
-/** 文本节点模型对话面板放大态（对齐图片 ImageGenerationPanelExpandedModal） */
+/** 文本节点模型对话面板放大态（底栏宽与图片 IGP 一致 500px） */
 export function TextComposerPanelExpandedModal() {
   const expandedNodeId = useCanvasUiStore((s) => s.textGenPanelExpandedNodeId);
   const setExpandedNodeId = useCanvasUiStore((s) => s.setTextGenPanelExpandedNodeId);
@@ -37,20 +37,6 @@ export function TextComposerPanelExpandedModal() {
         ? (params as { textWorkflow?: TextWorkflowKind }).textWorkflow
         : undefined;
     return layoutForWorkflow(workflow);
-  }, [node]);
-
-  const shellWidth = useMemo(() => {
-    if (!node || node.type !== "textNode") return undefined;
-    const params =
-      node.data.params && typeof node.data.params === "object"
-        ? (node.data.params as { chromeWidth?: number; chromeHeight?: number })
-        : {};
-    const prompt = (node.data.prompt ?? "").toString();
-    return computeTextNodeFrameSize({
-      hasBody: Boolean(prompt.trim()),
-      chromeWidth: params.chromeWidth,
-      chromeHeight: params.chromeHeight,
-    }).width;
   }, [node]);
 
   useEffect(() => {
@@ -86,9 +72,7 @@ export function TextComposerPanelExpandedModal() {
       <div
         className={`igp-expanded-card tgp-expanded-card tgp-expanded-shell ${NODE_CHROME_TEXT_PANEL_CLASS} tgp-layout-expanded`}
         style={
-          shellWidth
-            ? ({ ["--tgp-shell-width" as string]: `${shellWidth}px` } as CSSProperties)
-            : undefined
+          { ["--tgp-shell-width" as string]: `${GEN_PANEL_CHROME_WIDTH}px` } as CSSProperties
         }
         onPointerDown={(e) => e.stopPropagation()}
       >

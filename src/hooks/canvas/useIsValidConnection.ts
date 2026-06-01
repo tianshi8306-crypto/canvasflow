@@ -8,7 +8,16 @@ export function useIsValidConnection() {
   const isValidConnection = (c: Edge | Connection) => {
     if (isGraphRunning) return false;
     const state = useProjectStore.getState();
-    return validateConnection(normalizeConnection(c), state.nodes, state.edges).ok;
+    const conn =
+      "source" in c && "target" in c
+        ? {
+            source: c.source,
+            target: c.target,
+            sourceHandle: c.sourceHandle ?? null,
+            targetHandle: c.targetHandle ?? null,
+          }
+        : c;
+    return validateConnection(normalizeConnection(conn), state.nodes, state.edges).ok;
   };
 
   return { isValidConnection, isGraphRunning };

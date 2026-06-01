@@ -72,4 +72,29 @@ describe("scriptBeatChainBuild", () => {
     expect(map.get("b1")?.imageNodeId).toBe("i1");
     expect(map.get("b1")?.videoNodeId).toBe("v1");
   });
+
+  it("does not treat disabled script→image as existing downstream", () => {
+    const anchor = n("s1", "scriptNode", {});
+    const nodes = [
+      anchor,
+      n("i1", "imageNode", { params: { scriptBeatId: "b1" } }),
+    ];
+    const edges: Edge[] = [
+      { id: "e1", source: "s1", target: "i1", data: { disabled: true } },
+    ];
+    expect(findDownstreamByBeat("s1", nodes, edges).get("b1")?.imageNodeId).toBeUndefined();
+
+    const result = buildScriptBeatChain({
+      scriptNodeId: "s1",
+      anchor,
+      beats: [beats[0]!],
+      scriptBeatSelection: ["b1"],
+      nodes,
+      edges,
+      kinds: ["image"],
+    });
+    if ("message" in result) throw new Error(result.message);
+    expect(result.skipped.image).toBe(0);
+    expect(result.created.image).toBe(1);
+  });
 });

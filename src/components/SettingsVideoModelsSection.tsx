@@ -1,6 +1,9 @@
-import type { Dispatch, SetStateAction } from "react";
+import { useState, type Dispatch, type SetStateAction } from "react";
+import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { AppSettings } from "@/lib/settingsPanelTypes";
+import { formatUserError } from "@/lib/errors";
 import { newVideoModelTemplate } from "@/lib/settingsModelTemplates";
+import { DOUBAO_SEEDANCE_API_MODEL } from "@/lib/videoGeneration/seedanceApiModel";
 import { SettingsFormField } from "@/components/SettingsFormField";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
@@ -20,12 +23,13 @@ export function SettingsVideoModelsSection({
   hasVideoModelKey,
 }: Props) {
   const videoModels = settings.videoModels ?? [];
+  const [testingModelId, setTestingModelId] = useState<string | null>(null);
 
   return (
-    <div className="settingsSection settingsSection--sub">
+    <div className="settingsSection">
       <SettingsSectionHeader
-        title="视频模型"
-        description="供视频节点用于文生视频、图生视频等 API 对接。"
+        title="视频生成模型"
+        description="仅用于画布「视频」节点底栏的模型下拉（文生视频、图生视频等）。"
         action={
           <button
             type="button"
@@ -40,8 +44,12 @@ export function SettingsVideoModelsSection({
           </button>
         }
       />
+      <div className="settingsModelsNodeBadges">
+        <span className="settingsModelsNodeBadge">视频节点</span>
+      </div>
+
       {videoModels.length === 0 ? (
-        <p className="settings-desc">尚未配置视频模型；添加后可在视频节点中选择。</p>
+        <p className="settings-desc">尚未配置视频模型；添加后可在视频节点底栏选择。</p>
       ) : null}
       {videoModels.map((m) => (
         <div key={m.id} className="settingsModelCard">
@@ -117,7 +125,7 @@ export function SettingsVideoModelsSection({
                     : prev,
                 )
               }
-              placeholder="例如：doubao_seedance_2_0"
+              placeholder={`例如：${DOUBAO_SEEDANCE_API_MODEL}`}
             />
           </SettingsFormField>
           <SettingsFormField label="API Base URL">
@@ -145,6 +153,31 @@ export function SettingsVideoModelsSection({
               onChange={(e) => setVideoModelKeys((prev) => ({ ...prev, [m.id]: e.target.value }))}
             />
           </SettingsFormField>
+          {isTauri() ? (
+            <div style={{ display: "flex", justifyContent: "flex-end" }}>
+              <button
+                type="button"
+                className="btn"
+                disabled={testingModelId === m.id}
+                onClick={async () => {
+                  try {
+                    setTestingModelId(m.id);
+                    const msg = await invoke<string>("test_video_model_connection", {
+                      videoModelId: m.id,
+                      apiKeyOverride: videoModelKeys[m.id]?.trim() || null,
+                    });
+                    alert(msg);
+                  } catch (e) {
+                    alert(formatUserError(e));
+                  } finally {
+                    setTestingModelId(null);
+                  }
+                }}
+              >
+                {testingModelId === m.id ? "测试中…" : "测试连接"}
+              </button>
+            </div>
+          ) : null}
         </div>
       ))}
     </div>

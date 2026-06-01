@@ -48,7 +48,7 @@
 
 | 设计要求                  | 当前实现                                                                                       | 对照  |
 | --------------------- | ------------------------------------------------------------------------------------------ | --- |
-| 全局资产 ID，节点间只传 ID      | **M1+**：`runs.db.assets` 有 `asset_id`；执行器 `resolve_node_media_rel_path` 优先 `assetId` 查库再回退 `path`（`executor/asset_resolve.rs`） | ⚠️  |
+| 全局资产 ID，节点间只传 ID      | **M4**：`assetId` 为真源，`path` 由索引派生双写；打开工程 reconcile；DAG 媒体 `outputs` JSON；**未**删除 `path` 字段 | ⚠️  |
 | 标准化元数据（分辨率、镜头 ID、时序等） | **M1**：图片/音视频 `meta_json` 含基础宽高或时长等；**分镜 / 时序未形成全图统一坐标系**                                  | ⚠️  |
 | 数据格式自动适配算子            | **未见**通用适配层                                                                                | ❌   |
 
@@ -128,7 +128,7 @@
 | 视图层（画布/参数面板） | React + React Flow + 节点组件                               | ✅                         |
 | 全局状态         | Zustand（`projectStore`、`canvasUiStore` 等）               | ✅                         |
 | DAG 执行引擎     | Rust `graph` + `executor::run_graph`                    | ⚠️ **有骨架，缺完整状态机/并行/断点续跑** |
-| 资产与协议        | Rust `db`、素材索引与导入返回 `asset_id`、前端画廊/列表对齐；**执行器尚未只认 ID** | ⚠️                        |
+| 资产与协议        | Rust `db`、导入/同步/打开回填 `assetId`、前端 `resolveAssetRelPath`；执行器解析优先 ID，output 仍写 path | ⚠️                        |
 | 算子内核         | Rust 部分能力 + 前端 `invoke` 分散调用                            | ⚠️                        |
 | 渲染与编码        | 预览偏 Web；FFmpeg 在设置与拼接等中使用                               | ⚠️                        |
 

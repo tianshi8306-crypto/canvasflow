@@ -1,3 +1,9 @@
-export { NodeAnchors, type NodeAnchorsProps, type NodeAnchorsVariant } from "./NodeAnchors";
-export { SimpleAnchors } from "./SimpleAnchors";
-export { MagneticNodeAnchors } from "../MagneticNodeAnchors";
+export {
+  NodeAnchors,
+  CanvasNodeAnchors,
+  SimpleAnchors,
+  MagneticNodeAnchors,
+  type NodeAnchorsProps,
+  type NodeAnchorsVariant,
+} from "./NodeAnchors";
+export type { CanvasNodeAnchorsProps } from "./CanvasNodeAnchors";

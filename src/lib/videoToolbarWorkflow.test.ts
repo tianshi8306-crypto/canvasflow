@@ -34,4 +34,14 @@ describe("mergeDraftForVideoToolbarWorkflow", () => {
     );
     expect(next.prompt).toBe(VIDEO_HD_PROMPT_SEED);
   });
+
+  it("subtitle-auto enables noSubtitles on output", () => {
+    const next = mergeDraftForVideoToolbarWorkflow(
+      defaultVideoGenerationDraft(),
+      "assets/v.mp4",
+      "subtitle-auto",
+    );
+    expect(next.workflow).toBe("video_reference");
+    expect(next.output.noSubtitles).toBe(true);
+  });
 });

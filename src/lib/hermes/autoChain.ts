@@ -22,8 +22,16 @@ import type { HermesAutoChainResult, HermesShotNodeGroup } from "./types";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
 import type { Node } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
+import { isEdgeDisabled } from "@/lib/edgeState";
 import { getScriptBeatIdFromParams } from "@/lib/incomingScriptBinding";
 import { batchGenerateImagesForStoryboard } from "@/lib/storyboard/batchGenerateImages";
+import { getAgentMaxConcurrentMedia } from "@/lib/hermes/agent/hermesAgentSettings";
+import { createBeatReferenceResolver } from "@/lib/projectBible/resolveBeatRefsForBatch";
+import { useProjectBibleStore } from "@/store/projectBibleStore";
+import {
+  findImageNodesForScript,
+  findVideoNodesForScript,
+} from "@/lib/storyboard/storyboardMediaNodes";
 import { patchStoryboardShot } from "@/lib/storyboard/patchStoryboardShot";
 
 const IMAGE_AGENT_NAME = "图片 Agent";
@@ -52,6 +60,7 @@ export function rebuildShotNodeRegistry(nodes: Node<FlowNodeData>[]): void {
       // 这里假设 videoNode 通过 imageNode 连接到 scriptNode
       const incomingEdge = edges.find(
         (e) =>
+          !isEdgeDisabled(e) &&
           e.target === node.id &&
           (!e.sourceHandle || normalizeSourceHandle(e.sourceHandle) === "out"),
       );
@@ -61,6 +70,7 @@ export function rebuildShotNodeRegistry(nodes: Node<FlowNodeData>[]): void {
           // 找到 imageNode，继续向上找 scriptNode
           const imageToScriptEdge = edges.find(
             (e) =>
+              !isEdgeDisabled(e) &&
               e.target === sourceNode.id &&
               (!e.sourceHandle || normalizeSourceHandle(e.sourceHandle) === "out"),
           );
@@ -114,18 +124,8 @@ export function handleScriptNodeCompleted(
     return { total: 0, succeeded: 0, failed: 0, groups: [] };
   }
 
-  const existingVideo = new Set<string>();
-  for (const n of state.nodes) {
-    if (n.type !== "videoNode") continue;
-    const bid = n.data.params?.scriptBeatId;
-    if (typeof bid === "string" && bid.trim()) existingVideo.add(bid.trim());
-  }
-  const existingImage = new Set<string>();
-  for (const n of state.nodes) {
-    if (n.type !== "imageNode") continue;
-    const bid = n.data.params?.scriptBeatId;
-    if (typeof bid === "string" && bid.trim()) existingImage.add(bid.trim());
-  }
+  const imageByBeat = findImageNodesForScript(scriptNodeId, state.nodes, state.edges);
+  const videoByBeat = findVideoNodesForScript(scriptNodeId, state.nodes, state.edges);
 
   const results: HermesShotNodeGroup[] = [];
   let succeeded = 0;
@@ -140,7 +140,7 @@ export function handleScriptNodeCompleted(
   for (let idx = 0; idx < shots.length; idx++) {
     const shot = shots[idx];
     const beat = beats.find((b) => b.id === shot.scriptBeatId);
-    if (existingImage.has(shot.scriptBeatId) && existingVideo.has(shot.scriptBeatId)) {
+    if (imageByBeat.has(shot.scriptBeatId) && videoByBeat.has(shot.scriptBeatId)) {
       continue;
     }
 
@@ -179,6 +179,7 @@ export function handleScriptNodeCompleted(
         ? (scriptNode.data.params as Record<string, unknown>)
         : undefined;
     const split = resolveHermesBatchSplitSettings(loadHermesAutoChainSettings(), nodeParams);
+    const bible = useProjectBibleStore.getState().bible;
     void batchGenerateImagesForStoryboard({
       scriptNodeId,
       nodes: useProjectStore.getState().nodes,
@@ -187,6 +188,11 @@ export function handleScriptNodeCompleted(
       updateNodeData: state.updateNodeData,
       setStatusText: state.setStatusText,
       beatIds,
+      resolveBeatReferencePaths: createBeatReferenceResolver(
+        scriptNode.data.scriptBeats,
+        bible,
+      ),
+      maxConcurrent: getAgentMaxConcurrentMedia(),
       hermesBatch: {
         strategy: split.batchSplitStrategy,
         packImageCount: split.packImageCount,
@@ -204,7 +210,7 @@ export function handleScriptNodeCompleted(
  */
 function syncImageNodeStatusToStoryboard(
   imageNodeId: string,
-  phase: "error",
+  _phase: "error",
   error?: string,
 ): void {
   const state = useProjectStore.getState();
@@ -213,7 +219,7 @@ function syncImageNodeStatusToStoryboard(
   if (!beatId) return;
 
   const scriptIds = state.edges
-    .filter((e) => e.target === imageNodeId)
+    .filter((e) => !isEdgeDisabled(e) && e.target === imageNodeId)
     .map((e) => e.source)
     .map((id) => state.nodes.find((n) => n.id === id))
     .filter((n) => n?.type === "scriptNode")

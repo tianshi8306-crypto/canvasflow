@@ -8,6 +8,11 @@ import {
   type VideoPreviewToolbarMenuOption,
 } from "@/lib/videoPreviewToolbarActions";
 import { MediaPromptReverseButton } from "@/components/nodes/MediaPromptReverseButton";
+import { PreviewToolbarMenuPortal } from "@/components/nodes/nodeChrome";
+import {
+  isPreviewToolbarActionPending,
+  previewToolbarPendingTitle,
+} from "@/lib/previewToolbarPending";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 
@@ -144,9 +149,10 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodes = useProjectStore((s) => s.nodes);
   const setStatusText = useProjectStore((s) => s.setStatusText);
-  const setVideoGenPanelExpandedNodeId = useCanvasUiStore((s) => s.setVideoGenPanelExpandedNodeId);
+  const setVideoPreviewExpandedNodeId = useCanvasUiStore((s) => s.setVideoPreviewExpandedNodeId);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuDropRef = useRef<HTMLDivElement | null>(null);
 
   const mediaNode = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
   const mediaPath = mediaNode?.data.path?.trim();
@@ -156,12 +162,14 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
   useEffect(() => {
     if (!openMenuId) return;
     const onPointerDown = (e: PointerEvent) => {
-      if (!(e.target instanceof Element) || !toolbarRef.current?.contains(e.target)) {
-        setOpenMenuId(null);
-      }
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (menuTriggerRef.current?.contains(target)) return;
+      if (menuDropRef.current?.contains(target)) return;
+      setOpenMenuId(null);
     };
-    document.addEventListener("pointerdown", onPointerDown, true);
-    return () => document.removeEventListener("pointerdown", onPointerDown, true);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
   }, [openMenuId]);
 
   const extractVideoAudioLeftOfNode = useProjectStore((s) => s.extractVideoAudioLeftOfNode);
@@ -169,7 +177,6 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
   const openVideoToolbarWorkflow = useProjectStore((s) => s.openVideoToolbarWorkflow);
   const enterVideoTrimMode = useProjectStore((s) => s.enterVideoTrimMode);
   const enterVideoSubtitleRegionMode = useProjectStore((s) => s.enterVideoSubtitleRegionMode);
-  const setVideoGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setVideoGenPanelPinnedNodeId);
   const setVideoTrimEditingNodeId = useCanvasUiStore((s) => s.setVideoTrimEditingNodeId);
   const setVideoSubtitleRegionEditingNodeId = useCanvasUiStore(
     (s) => s.setVideoSubtitleRegionEditingNodeId,
@@ -177,6 +184,7 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
 
   const runMenuOption = useCallback(
     (opt: VideoPreviewToolbarMenuOption) => {
+      if (opt.kind === "stub") return;
       setOpenMenuId(null);
       if (opt.mode === "vocal" || opt.mode === "bgm") {
         void extractVideoAudioLeftOfNode(nodeId, opt.mode);
@@ -194,7 +202,6 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
       }
       if (opt.mode === "subtitle-auto") {
         openVideoToolbarWorkflow(nodeId, "subtitle-auto");
-        setVideoGenPanelPinnedNodeId(nodeId);
         return;
       }
       if (opt.mode === "subtitle-region") {
@@ -213,7 +220,6 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
       openVideoClipConcat,
       openVideoToolbarWorkflow,
       setStatusText,
-      setVideoGenPanelPinnedNodeId,
       setVideoSubtitleRegionEditingNodeId,
       setVideoTrimEditingNodeId,
     ],
@@ -221,10 +227,10 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
 
   const runItem = useCallback(
     (item: VideoPreviewToolbarItem) => {
+      if (isPreviewToolbarActionPending(item.kind)) return;
       if (item.kind === "workflow") {
         if (item.id === "parse" || item.id === "hd") {
           openVideoToolbarWorkflow(nodeId, item.id);
-          setVideoGenPanelPinnedNodeId(nodeId);
           return;
         }
       }
@@ -248,24 +254,31 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
         return;
       }
       if (item.id === "maximize") {
-        setVideoGenPanelExpandedNodeId(nodeId);
+        if (!hasVideo) {
+          setStatusText("请先有预览视频");
+          return;
+        }
+        setVideoPreviewExpandedNodeId(nodeId);
       }
     },
     [
+      hasVideo,
       mediaPath,
       nodeId,
-      openVideoClipConcat,
       openVideoToolbarWorkflow,
       projectPath,
       setStatusText,
-      setVideoGenPanelExpandedNodeId,
-      setVideoGenPanelPinnedNodeId,
+      setVideoPreviewExpandedNodeId,
     ],
   );
 
+  const openMenuOptions =
+    openMenuId != null
+      ? VIDEO_PREVIEW_TOOLBAR_PRIMARY.find((item) => item.id === openMenuId)?.menuOptions
+      : undefined;
+
   return (
     <div
-      ref={toolbarRef}
       className="videoPreviewToolbar"
       role="toolbar"
       aria-label="视频预览工具"
@@ -275,14 +288,20 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
         {VIDEO_PREVIEW_TOOLBAR_PRIMARY.map((item) => {
           const Icon = PRIMARY_ICONS[item.id];
           const isMenu = item.kind === "menu" && item.menuOptions?.length;
+          const pending = isPreviewToolbarActionPending(item.kind);
           return (
             <div key={item.id} className="videoPreviewToolbar-itemWrap">
               <button
+                ref={openMenuId === item.id ? menuTriggerRef : undefined}
                 type="button"
-                className={`videoPreviewToolbar-item${isMenu ? " videoPreviewToolbar-item--menu" : ""}${openMenuId === item.id ? " is-open" : ""}`}
-                title={item.label}
+                className={`videoPreviewToolbar-item${isMenu ? " videoPreviewToolbar-item--menu" : ""}${openMenuId === item.id ? " is-open" : ""}${pending ? " videoPreviewToolbar-item--pending" : ""}`}
+                title={
+                  pending ? previewToolbarPendingTitle(item.stubMessage) : item.label
+                }
+                aria-disabled={pending || undefined}
+                disabled={pending}
                 aria-expanded={isMenu ? openMenuId === item.id : undefined}
-                onClick={() => runItem(item)}
+                onClick={pending ? undefined : () => runItem(item)}
               >
                 {Icon ? (
                   <span className="videoPreviewToolbar-icon" aria-hidden>
@@ -292,25 +311,36 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
                 <span className="videoPreviewToolbar-label">{item.label}</span>
                 {isMenu ? <ToolbarChevron /> : null}
               </button>
-              {isMenu && openMenuId === item.id ? (
-                <div className="videoPreviewToolbar-menuDrop" role="menu">
-                  {item.menuOptions!.map((opt) => (
-                    <button
-                      key={opt.id}
-                      type="button"
-                      className="videoPreviewToolbar-menuItem"
-                      role="menuitem"
-                      onClick={() => runMenuOption(opt)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
             </div>
           );
         })}
       </div>
+      {openMenuOptions?.length ? (
+        <PreviewToolbarMenuPortal
+          open
+          triggerRef={menuTriggerRef}
+          menuRef={menuDropRef}
+          className="videoPreviewToolbar-menuDrop videoPreviewToolbar-menuDrop--portal"
+        >
+          {openMenuOptions.map((opt) => {
+            const pending = opt.kind === "stub";
+            return (
+            <button
+              key={opt.id}
+              type="button"
+              className={`videoPreviewToolbar-menuItem${pending ? " videoPreviewToolbar-menuItem--pending" : ""}`}
+              role="menuitem"
+              disabled={pending}
+              title={pending ? previewToolbarPendingTitle(opt.stubMessage) : opt.label}
+              aria-disabled={pending || undefined}
+              onClick={pending ? undefined : () => runMenuOption(opt)}
+            >
+              {opt.label}
+            </button>
+            );
+          })}
+        </PreviewToolbarMenuPortal>
+      ) : null}
       <div className="videoPreviewToolbar-itemWrap videoPreviewToolbar-itemWrap--reverse">
         <MediaPromptReverseButton
           sourceNodeId={nodeId}
@@ -324,17 +354,17 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
       <div className="videoPreviewToolbar-divider" aria-hidden />
       <div className="videoPreviewToolbar-utils">
         {VIDEO_PREVIEW_TOOLBAR_UTILITY.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className="videoPreviewToolbar-iconBtn"
-            title={item.label}
-            aria-label={item.label}
-            onClick={() => runItem(item)}
-          >
-            {item.id === "download" ? <IconDownload /> : <IconExpand />}
-          </button>
-        ))}
+            <button
+              key={item.id}
+              type="button"
+              className="videoPreviewToolbar-iconBtn"
+              title={item.label}
+              aria-label={item.label}
+              onClick={() => runItem(item)}
+            >
+              {item.id === "download" ? <IconDownload /> : <IconExpand />}
+            </button>
+          ))}
       </div>
     </div>
   );

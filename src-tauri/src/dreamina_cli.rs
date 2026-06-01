@@ -18,6 +18,8 @@ const WINDOWS_BINARY_URL: &str =
 #[allow(dead_code)]
 const DEFAULT_LOGIN_TIMEOUT_SEC: u64 = 90;
 const OUTPUT_TAIL_LIMIT: usize = 80;
+/// 进程内 `user_credit` 结果缓存（秒）；避免设置页短时间重复打开时反复拉起 CLI
+const CREDIT_CACHE_TTL_SECS: u64 = 30 * 60;
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -130,7 +132,7 @@ impl DreaminaCliState {
 
         if !force_refresh {
             if let Some(cache) = self.inner.lock().expect("dreamina lock").credit_cache.as_ref() {
-                if cache.checked_at.elapsed() < Duration::from_secs(8) {
+                if cache.checked_at.elapsed() < Duration::from_secs(CREDIT_CACHE_TTL_SECS) {
                     status.logged_in = cache.logged_in;
                     status.credit = cache.credit.clone();
                     status.message = cache.message.clone();

@@ -12,7 +12,6 @@ const EXPANDED_Z = 55;
 export function VideoGenerationPanelExpandedModal() {
   const expandedNodeId = useCanvasUiStore((s) => s.videoGenPanelExpandedNodeId);
   const setExpandedNodeId = useCanvasUiStore((s) => s.setVideoGenPanelExpandedNodeId);
-  const setPinnedNodeId = useCanvasUiStore((s) => s.setVideoGenPanelPinnedNodeId);
   const nodes = useProjectStore((s) => s.nodes);
 
   const node = expandedNodeId ? nodes.find((n) => n.id === expandedNodeId) : undefined;
@@ -31,10 +30,6 @@ export function VideoGenerationPanelExpandedModal() {
   }
 
   const close = () => setExpandedNodeId(null);
-  const dockToNode = () => {
-    setPinnedNodeId(expandedNodeId);
-    setExpandedNodeId(null);
-  };
 
   return createPortal(
     <div
@@ -56,7 +51,6 @@ export function VideoGenerationPanelExpandedModal() {
             videoNodeId={expandedNodeId}
             layout="expanded"
             onRequestClose={close}
-            onRequestDock={dockToNode}
           />
         </div>
       </div>

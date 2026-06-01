@@ -1,4 +1,4 @@
-﻿/* ── Settings Panel ── */
+/* ── Settings Panel ── */
 .settings-overlay {
   position: fixed;
   inset: 0;
@@ -228,7 +228,7 @@
 }
 
 .settingsToggle input:checked + .settingsToggleLabel .settingsToggleSwitch {
-  background: rgba(107, 155, 209, 0.28);
+  background: rgba(56, 189, 248, 0.28);
   border-color: var(--cf-accent-focus);
 }
 
@@ -240,6 +240,22 @@
 .settingsToggle input:focus-visible + .settingsToggleLabel .settingsToggleSwitch {
   outline: 2px solid var(--cf-accent-focus);
   outline-offset: 2px;
+}
+
+.settingsFieldset {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.settingsFieldset:disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.settingsFieldset > legend.settingsFieldLabel {
+  margin-bottom: 8px;
 }
 
 .settings-modal > .settings-loading,
@@ -322,6 +338,23 @@
   margin-bottom: 0;
 }
 
+.settingsMcpCard {
+  border: 1px solid var(--cf-border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settingsField--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
 .settingsSection--sub {
   margin-top: 8px;
   padding-top: 18px;
@@ -335,6 +368,14 @@
   text-transform: uppercase;
   margin-bottom: 12px;
   color: var(--cf-soft-white-secondary);
+}
+
+.settingsSectionDesc {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--cf-soft-white-secondary);
+  opacity: 0.85;
 }
 
 .settingsSectionHeader {
@@ -406,6 +447,22 @@
 
 .settingsInput {
   font-size: 13px;
+}
+
+.settingsPathRow {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.settingsPathRow .settingsInput {
+  flex: 1;
+  min-width: 0;
+}
+
+.settingsPathRow .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .settingsModelCard {
@@ -511,7 +568,7 @@
 .settings-card-badge {
   display: inline-flex; align-items: center; justify-content: center;
   width: 24px; height: 24px; border-radius: 6px;
-  background: rgba(107, 155, 209, 0.18); color: var(--cf-accent-focus); font-size: 11px; font-weight: 700;
+  background: rgba(56, 189, 248, 0.18); color: var(--cf-accent-focus); font-size: 11px; font-weight: 700;
 }
 .settings-card-title { font-weight: 600; font-size: 14px; flex: 1; }
 .settings-getkey { font-size: 12px; color: var(--cf-accent-focus); text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
@@ -524,8 +581,22 @@
 .settings-dreamina-section { display: flex; flex-direction: column; gap: 10px; }
 .settings-dreamina-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .settings-dreamina-actions--footer { margin-top: 4px; }
-.dreamina-settings-status { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.dreamina-settings-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 13px;
+}
 .dreamina-settings-status-text { font-weight: 500; }
+.dreamina-refresh-status { margin-left: auto; }
+.dreamina-auth-stale-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--warning, #c9a227);
+  line-height: 1.45;
+}
+.dreamina-auth-cache-note { margin-top: 4px; opacity: 0.75; }
 .dreamina-settings-credit { font-size: 12px; color: var(--muted); }
 .dreamina-login-progress {
   padding: 12px;
@@ -545,4 +616,353 @@
 
 .settingsProviderList { display: flex; flex-direction: column; gap: 0; }
 .settingsApiActions { margin-top: 12px; display: flex; gap: 8px; }
+
+/* ── 模型页：子导航与总览 ── */
+.settingsModelsSubNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--cf-border);
+}
+
+.settingsModelsSubNavItem {
+  padding: 6px 12px;
+  border: 1px solid var(--cf-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--cf-soft-white-secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+}
+
+.settingsModelsSubNavItem:hover {
+  background: var(--cf-hover);
+  color: var(--text);
+}
+
+.settingsModelsSubNavItem--active {
+  background: var(--cf-hover);
+  border-color: var(--cf-border-strong);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.12);
+}
+
+.settingsModelsOverviewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (max-width: 640px) {
+  .settingsModelsOverviewGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.settingsModelsOverviewCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--cf-border);
+  border-radius: 10px;
+  background: var(--cf-charcoal-surface);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.settingsModelsOverviewCard:hover {
+  border-color: var(--cf-border-strong);
+  background: var(--cf-hover);
+}
+
+.settingsModelsOverviewCardIcon {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: rgba(56, 189, 248, 0.1);
+  color: var(--cf-accent-focus);
+}
+
+.settingsModelsOverviewIcons {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.settingsModelsOverviewCardBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.settingsModelsOverviewCardTitle {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.settingsModelsOverviewCardNodes {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.45;
+  margin-bottom: 4px;
+}
+
+.settingsModelsOverviewCardHint {
+  font-size: 11px;
+  color: var(--cf-soft-white-tertiary);
+  margin-bottom: 6px;
+}
+
+.settingsModelsOverviewCardStatus {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cf-soft-white-secondary);
+}
+
+.settingsModelsOverviewCardStatus--ok {
+  color: var(--cf-success);
+}
+
+.settingsModelsOverviewCardChevron {
+  flex-shrink: 0;
+  font-size: 14px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+.settingsModelsNodeBadges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.settingsModelsNodeBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cf-soft-white-secondary);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--cf-border);
+}
+
+.settingsSection--inset {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px dashed var(--cf-border);
+}
+
+.settingsProviderToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.settingsProviderToggle--inline {
+  margin-left: auto;
+  margin-right: 4px;
+}
+
+.settingsProviderToggle input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.settingsProviderToggleSwitch {
+  width: 32px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--cf-border);
+  position: relative;
+  transition: background 0.15s ease;
+}
+
+.settingsProviderToggleSwitch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 0.15s ease;
+}
+
+.settingsProviderToggle input:checked + .settingsProviderToggleSwitch {
+  background: var(--cf-accent-focus);
+}
+
+.settingsProviderToggle input:checked + .settingsProviderToggleSwitch::after {
+  transform: translateX(14px);
+}
+
+.settingsDreaminaOverview {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid var(--cf-border);
+}
+
+.settingsDreaminaOverviewTitle {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.settingsAddModelSelect select {
+  min-width: 148px;
+  font-size: 12px;
+}
+
+.settingsSubsectionTitle {
+  margin: 12px 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cf-soft-white-secondary);
+}
+
+.settingsHermesTemplateList {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settingsHermesTemplateRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.settingsHermesTemplateMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settingsHermesTemplateTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settingsHermesTemplateTag {
+  margin-left: 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--muted);
+  padding: 1px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--cf-border);
+  vertical-align: middle;
+}
+
+.settingsHermesTemplateDesc,
+.settingsHermesTemplateMeta {
+  display: block;
+}
+
+.settingsHermesTemplateMeta code {
+  font-size: 11px;
+}
+
+.settingsHermesTemplateActions {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.settingsHermesTemplatesReadonly {
+  margin-top: 12px;
+}
+
+.settingsHermesTemplatesLead {
+  margin: 0 0 10px;
+}
+
+.settingsHermesTemplatesExamples {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px dashed var(--cf-cyan-border, rgba(56, 189, 248, 0.35));
+  background: rgba(56, 189, 248, 0.06);
+}
+
+.settingsHermesTemplatesExampleList {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  font-size: 12px;
+  color: var(--text-muted, var(--muted));
+}
+
+.settingsHermesTemplatesExampleList code {
+  font-size: 11px;
+}
+
+.settingsHermesTemplatesCatalog {
+  margin-bottom: 12px;
+}
+
+.settingsHermesTemplatesCatalogSummary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--cf-cyan-bright, #7dd3fc);
+  user-select: none;
+}
+
+.settingsHermesTemplatesCatalogPre {
+  margin: 8px 0 0;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border);
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  color: var(--text-muted, var(--muted));
+  max-height: 200px;
+  overflow: auto;
+}
+
+.settingsHermesTemplateRow--readonly {
+  justify-content: flex-start;
+}
+
+.btn--small {
+  padding: 4px 10px;
+  font-size: 11px;
+}
 

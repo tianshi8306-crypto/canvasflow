@@ -31,7 +31,7 @@ import { isConnectionAllowed } from "@/lib/flowConnectionPolicy";
 describe("§30 五类节点初始空 data", () => {
   it("textNode 初始 data 含 label 和空 prompt", () => {
     const d = newNodeDataByType.textNode();
-    expect(d.label).toBe("文本");
+    expect(d.label).toMatch(/^文本 \d+$/);
     expect(d.prompt).toBe("");
   });
 
@@ -50,13 +50,13 @@ describe("§30 五类节点初始空 data", () => {
 
   it("audioNode 初始 data 含 label 和空 path", () => {
     const d = newNodeDataByType.audioNode();
-    expect(d.label).toBe("音频");
+    expect(d.label).toMatch(/^音频 \d+$/);
     expect(d.path).toBe("");
   });
 
   it("scriptNode 初始 data 含 label 和空 prompt，无 scriptBeats", () => {
     const d = newNodeDataByType.scriptNode();
-    expect(d.label).toBe("分镜脚本");
+    expect(d.label).toMatch(/^分镜脚本 \d+$/);
     expect(d.prompt).toBe("");
     expect(d.scriptBeats).toBeUndefined();
   });

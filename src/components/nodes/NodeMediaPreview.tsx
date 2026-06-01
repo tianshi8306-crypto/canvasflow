@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { useProjectStore } from "@/store/projectStore";
 import { resolveProjectAssetSrc } from "@/lib/projectMediaUrl";
 import { useResolvedAssetRelPath } from "@/hooks/useResolvedAssetRelPath";
@@ -13,8 +13,23 @@ type NodeMediaPreviewProps = {
   kind: Kind;
   /** 仅 `kind="image"`：覆盖 img 的 class */
   imageClassName?: string;
+  /** 仅 `kind="image"`：覆盖 img 的行内样式（悬停预览等需精确 contain 缩放） */
+  imageStyle?: CSSProperties;
+  /** 仅 `kind="video"`：覆盖 video 的 class */
+  videoClassName?: string;
+  /** 仅 `kind="video"`：覆盖 video 的行内样式 */
+  videoStyle?: CSSProperties;
+  /** 仅 `kind="video"`：是否显示原生控制条（缩略图条建议 false） */
+  videoControls?: boolean;
+  /** 仅 `kind="video"`：缩略条内 muted 自动播放 */
+  videoAutoPlay?: boolean;
+  videoLoop?: boolean;
+  /** 仅 `kind="image"`：lazy / eager（悬停预览建议 eager） */
+  imageLoading?: "lazy" | "eager";
   /** 仅 `kind="image"`：图片加载完成回调 */
   onImageLoad?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  /** 仅 `kind="image"`：挂载/更新时回调（用于读取 naturalWidth 缓存图） */
+  onImageElement?: (el: HTMLImageElement | null) => void;
   /** 仅 `kind="video"`：视频元数据加载完成 */
   onVideoLoadedMetadata?: (e: React.SyntheticEvent<HTMLVideoElement>) => void;
 };
@@ -189,12 +204,59 @@ function AudioWavePreview({ src, onBroken }: { src: string; onBroken: () => void
   );
 }
 
+function NodeImagePreview({
+  src,
+  imageClassName,
+  imageStyle,
+  imageLoading,
+  onImageLoad,
+  onImageElement,
+  onBroken,
+}: {
+  src: string;
+  imageClassName?: string;
+  imageStyle?: CSSProperties;
+  imageLoading: "lazy" | "eager";
+  onImageLoad?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
+  onImageElement?: (el: HTMLImageElement | null) => void;
+  onBroken: () => void;
+}) {
+  const imgRef = useRef<HTMLImageElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = imgRef.current;
+    if (el?.complete && el.naturalWidth > 0) onImageElement?.(el);
+  }, [src, onImageElement]);
+
+  return (
+    <img
+      ref={imgRef}
+      src={src}
+      alt=""
+      className={imageClassName ?? "nodeThumb"}
+      style={imageStyle}
+      onLoad={onImageLoad}
+      onError={onBroken}
+      loading={imageLoading}
+      decoding="async"
+    />
+  );
+}
+
 export function NodeMediaPreview({
   relPath,
   assetId,
   kind,
   imageClassName,
+  imageStyle,
+  imageLoading = "lazy",
+  videoClassName,
+  videoStyle,
+  videoControls = true,
+  videoAutoPlay = false,
+  videoLoop = false,
   onImageLoad,
+  onImageElement,
   onVideoLoadedMetadata,
 }: NodeMediaPreviewProps) {
   const projectPath = useProjectStore((s) => s.projectPath);
@@ -205,7 +267,7 @@ export function NodeMediaPreview({
   );
   const [broken, setBroken] = useState(false);
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset error flag when preview URL changes
+     
     setBroken(false);
   }, [src]);
 
@@ -228,13 +290,14 @@ export function NodeMediaPreview({
 
   if (kind === "image") {
     return (
-      <img
+      <NodeImagePreview
         src={src}
-        alt=""
-        className={imageClassName ?? "nodeThumb"}
-        onLoad={onImageLoad}
-        onError={() => setBroken(true)}
-        loading="lazy"
+        imageClassName={imageClassName}
+        imageStyle={imageStyle}
+        imageLoading={imageLoading}
+        onImageLoad={onImageLoad}
+        onImageElement={onImageElement}
+        onBroken={() => setBroken(true)}
       />
     );
   }
@@ -242,10 +305,14 @@ export function NodeMediaPreview({
     return (
       <video
         src={src}
-        className="nodeMediaClip"
+        className={videoClassName ?? "nodeMediaClip"}
+        style={videoStyle}
         muted
-        controls
-        preload="metadata"
+        autoPlay={videoAutoPlay}
+        loop={videoLoop}
+        playsInline
+        controls={videoControls}
+        preload={videoAutoPlay ? "auto" : "metadata"}
         onLoadedMetadata={onVideoLoadedMetadata}
         onError={() => setBroken(true)}
       />

@@ -42,8 +42,6 @@ describe("useFocusLinkedPartnerNode", () => {
     useCanvasUiStore.setState({
       audioTtsPanelNodeId: null,
       audioTtsPanelPinnedNodeId: null,
-      videoGenPanelPinnedNodeId: null,
-      imageGenPanelPinnedNodeId: null,
     });
   });
 
@@ -74,8 +72,6 @@ describe("useFocusLinkedPartnerNode", () => {
     expect(fitViewToNode).toHaveBeenCalledWith("v1");
     expect(useProjectStore.getState().statusText).toBe("已定位到「主镜头」");
     expect(useCanvasUiStore.getState().audioTtsPanelNodeId).toBeNull();
-    expect(useCanvasUiStore.getState().videoGenPanelPinnedNodeId).toBeNull();
-    expect(useCanvasUiStore.getState().imageGenPanelPinnedNodeId).toBeNull();
   });
 
   it("uses custom label when provided", async () => {
@@ -107,32 +103,28 @@ describe("useFocusLinkedPartnerNode", () => {
 
     expect(useCanvasUiStore.getState().audioTtsPanelNodeId).toBe("a1");
     expect(useCanvasUiStore.getState().audioTtsPanelPinnedNodeId).toBe("a1");
-    expect(useCanvasUiStore.getState().videoGenPanelPinnedNodeId).toBeNull();
-    expect(useCanvasUiStore.getState().imageGenPanelPinnedNodeId).toBeNull();
   });
 
-  it("pins video gen panel for video kind", async () => {
+  it("selects video partner without extra panel state for video kind", async () => {
     const { result } = renderHook(() => useFocusLinkedPartnerNode());
 
     await act(async () => {
       await result.current.focusPartnerNode("v1", { kind: "video" });
     });
 
-    expect(useCanvasUiStore.getState().videoGenPanelPinnedNodeId).toBe("v1");
+    expect(useProjectStore.getState().selectedNodeIds).toEqual(["v1"]);
     expect(useCanvasUiStore.getState().audioTtsPanelNodeId).toBeNull();
-    expect(useCanvasUiStore.getState().imageGenPanelPinnedNodeId).toBeNull();
   });
 
-  it("pins image gen panel for image kind", async () => {
+  it("selects image partner without extra panel state for image kind", async () => {
     const { result } = renderHook(() => useFocusLinkedPartnerNode());
 
     await act(async () => {
       await result.current.focusPartnerNode("i1", { kind: "image" });
     });
 
-    expect(useCanvasUiStore.getState().imageGenPanelPinnedNodeId).toBe("i1");
+    expect(useProjectStore.getState().selectedNodeIds).toEqual(["i1"]);
     expect(useCanvasUiStore.getState().audioTtsPanelNodeId).toBeNull();
-    expect(useCanvasUiStore.getState().videoGenPanelPinnedNodeId).toBeNull();
   });
 
   it("falls back to node id when label is whitespace-only", async () => {

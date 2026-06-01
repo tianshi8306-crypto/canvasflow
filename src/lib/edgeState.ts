@@ -16,6 +16,18 @@ export function enabledEdges(edges: Edge[]): Edge[] {
   return edges.filter((e) => !isEdgeDisabled(e));
 }
 
+/** 从 `sourceId` 出发的启用边目标节点 id（建链 / 分镜媒体查找统一入口）。 */
+export function enabledTargetsFromSource(
+  edges: readonly { source: string; target: string; data?: unknown }[],
+  sourceId: string,
+): Set<string> {
+  return new Set(
+    edges
+      .filter((e) => e.source === sourceId && !isEdgeDisabled(e))
+      .map((e) => e.target),
+  );
+}
+
 export function edgeEditingLockedMessage(): string {
   return "执行中已锁定连线编辑，请等待当前运行完成";
 }

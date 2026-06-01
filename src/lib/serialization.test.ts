@@ -25,9 +25,18 @@ describe("serializeCanvas", () => {
     const raw = serializeCanvas([], [], defaultViewport, {
       imageNodeCounter: 3,
       videoNodeCounter: 2,
+      textNodeCounter: 4,
+      audioNodeCounter: 1,
+      scriptNodeCounter: 2,
     });
     const parsed = JSON.parse(raw);
-    expect(parsed.meta).toEqual({ imageNodeCounter: 3, videoNodeCounter: 2 });
+    expect(parsed.meta).toEqual({
+      imageNodeCounter: 3,
+      videoNodeCounter: 2,
+      textNodeCounter: 4,
+      audioNodeCounter: 1,
+      scriptNodeCounter: 2,
+    });
   });
 
   it("preserves node and edge data", () => {
@@ -54,10 +63,22 @@ describe("parseCanvas", () => {
       viewport: defaultViewport,
       nodes: [],
       edges: [],
-      meta: { imageNodeCounter: 5, videoNodeCounter: 7 },
+      meta: {
+        imageNodeCounter: 5,
+        videoNodeCounter: 7,
+        textNodeCounter: 3,
+        audioNodeCounter: 2,
+        scriptNodeCounter: 1,
+      },
     });
     const { meta } = parseCanvas(raw);
-    expect(meta).toEqual({ imageNodeCounter: 5, videoNodeCounter: 7 });
+    expect(meta).toEqual({
+      imageNodeCounter: 5,
+      videoNodeCounter: 7,
+      textNodeCounter: 3,
+      audioNodeCounter: 2,
+      scriptNodeCounter: 1,
+    });
   });
 
   it("returns empty state for empty JSON object", () => {
@@ -86,7 +107,7 @@ describe("parseCanvas", () => {
         { id: 123, position: { x: 0, y: 0 }, data: {} }, // id not string
       ],
     });
-    const { nodes, invalidEdgesDropped } = parseCanvas(raw);
+    const { nodes } = parseCanvas(raw);
     expect(nodes).toHaveLength(1);
     expect(nodes[0]!.id).toBe("valid-node");
   });
@@ -105,14 +126,11 @@ describe("parseCanvas", () => {
       ],
     });
     const { edges, invalidEdgesDropped } = parseCanvas(raw);
-    // sanitizeCanvasEdges: keeps [e1, idless-edge] (dangling edges dropped), droppedCount = 2
-    // validateEdge on rawEdges: e1 passes (has id/source/target), idless/e3/e4 fail → validEdges = [e1]
-    // returned edges = cleanedEdges = [e1, idless-edge] (2 edges)
-    // invalidEdgesDropped = 2 (sanitize) + 3 (validate: idless+e3+e4) = 5
-    expect(edges).toHaveLength(2);
+    // sanitizeCanvasEdges: keeps [e1]; drops duplicate n1→n2 (idless), dangling e3/e4
+    // validateEdge on rawEdges: only e1 passes
+    expect(edges).toHaveLength(1);
     expect(edges[0]!.id).toBe("e1");
-    expect(edges[1]).not.toHaveProperty("id"); // idless edge
-    expect(invalidEdgesDropped).toBe(5);
+    expect(invalidEdgesDropped).toBe(6);
   });
 
   it("drops nodes with non-object type fields but keeps valid ones", () => {

@@ -38,6 +38,8 @@ export function buildPasteNodesFromClipboard(
     if (map.size > 0) scriptBeatRemapsByOldNodeId.set(n.id, map);
   }
 
+  const copiedIdSet = new Set(copiedNodes.map((n) => n.id));
+
   const nextNodes = copiedNodes.map((n) => {
     const id = idMap.get(n.id)!;
     let data = cloneFlowNodeData(n.data);
@@ -49,16 +51,29 @@ export function buildPasteNodesFromClipboard(
       const bm = upScript ? scriptBeatRemapsByOldNodeId.get(upScript) : undefined;
       data = remapParamsScriptBeatIdForPaste(data, bm);
     }
-    // 图片节点复制时添加"副本"后缀
     if (n.type === "imageNode" || n.type === "videoNode") {
       data = { ...data, label: `${data.label ?? ""} 副本`.trim() };
     }
+    if (n.type === "group") {
+      const base = data.label?.trim() || "分组";
+      data = { ...data, label: `${base} 副本` };
+    }
+    const nextParentId =
+      n.parentId && idMap.has(n.parentId) ? idMap.get(n.parentId) : n.parentId;
+    // 仅对粘贴子树的根节点位移，避免嵌套组内成员被叠加两次 offset（G7）
+    const isPasteRoot =
+      !n.parentId || !copiedIdSet.has(n.parentId);
+    const position = isPasteRoot
+      ? { x: n.position.x + offset, y: n.position.y + offset }
+      : { ...n.position };
     return {
       ...n,
       id,
+      parentId: nextParentId,
+      extent: nextParentId ? ("parent" as const) : n.extent,
       data,
       selected: false,
-      position: { x: n.position.x + offset, y: n.position.y + offset },
+      position,
     };
   });
   return { nextNodes, idMap };

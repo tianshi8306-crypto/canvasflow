@@ -9,7 +9,10 @@ import {
   defaultVideoGenerationDraft,
   defaultVideoNodePersisted,
 } from "@/lib/videoNodeTypes";
+import { enabledTargetsFromSource } from "@/lib/edgeState";
 import { resolveStoryboardBeatScope, type StoryboardBeatScope } from "@/lib/scriptStoryboardScope";
+import { getGroupMemberIdSet } from "@/lib/canvasGroupStoryboard";
+import type { StoryboardMediaLookupOptions } from "@/lib/storyboard/storyboardMediaNodes";
 
 export type ChainMediaKind = "image" | "video" | "audio";
 
@@ -33,14 +36,12 @@ export function findDownstreamByBeat(
   scriptNodeId: string,
   nodes: Node<FlowNodeData>[],
   edges: { source: string; target: string }[],
+  options?: StoryboardMediaLookupOptions,
 ): Map<string, DownstreamByBeat> {
-  const linkedIds = new Set(
-    edges.filter((e) => e.source === scriptNodeId).map((e) => e.target),
-  );
   const map = new Map<string, DownstreamByBeat>();
 
-  const imageByBeat = findImageNodesForScript(scriptNodeId, nodes, edges);
-  const videoByBeat = findVideoNodesForScript(scriptNodeId, nodes, edges);
+  const imageByBeat = findImageNodesForScript(scriptNodeId, nodes, edges, options);
+  const videoByBeat = findVideoNodesForScript(scriptNodeId, nodes, edges, options);
 
   for (const [beatId, nodeId] of imageByBeat) {
     const cur = map.get(beatId) ?? {};
@@ -53,8 +54,11 @@ export function findDownstreamByBeat(
     map.set(beatId, cur);
   }
 
+  const linkedIds = enabledTargetsFromSource(edges, scriptNodeId);
+  const restrict = options?.restrictToNodeIds;
   for (const n of nodes) {
     if (n.type !== "audioNode" || !linkedIds.has(n.id)) continue;
+    if (restrict && !restrict.has(n.id)) continue;
     const beatId = beatIdFromNode(n.data);
     if (!beatId || map.get(beatId)?.audioNodeId) continue;
     const cur = map.get(beatId) ?? {};
@@ -182,6 +186,8 @@ export function buildScriptBeatChain(opts: {
   edges: { source: string; target: string }[];
   kinds: ChainMediaKind[];
   skipExisting?: boolean;
+  /** 分镜组：仅在组内建链/落点，新节点 parentId 指向该组 */
+  storyboardGroupId?: string;
 }): ScriptBeatChainBuildResult | { ok: false; message: string } {
   const scopeResult = resolveChainBuildScope(opts.beats, opts.scriptBeatSelection);
   if (!scopeResult.ok) return scopeResult;
@@ -189,7 +195,11 @@ export function buildScriptBeatChain(opts: {
   const skipExisting = opts.skipExisting !== false;
   const scope = scopeResult.scope;
   const shotMap = new Map((opts.shots ?? []).map((s) => [s.scriptBeatId, s]));
-  const existing = findDownstreamByBeat(opts.scriptNodeId, opts.nodes, opts.edges);
+  const groupRestrict = opts.storyboardGroupId
+    ? getGroupMemberIdSet(opts.nodes, opts.storyboardGroupId)
+    : undefined;
+  const mediaOpts = groupRestrict ? { restrictToNodeIds: groupRestrict } : undefined;
+  const existing = findDownstreamByBeat(opts.scriptNodeId, opts.nodes, opts.edges, mediaOpts);
 
   const newNodes: Node<FlowNodeData>[] = [];
   const newEdges: Edge[] = [];
@@ -201,14 +211,26 @@ export function buildScriptBeatChain(opts: {
   const wantAudio = opts.kinds.includes("audio");
   const pairedImageVideo = wantImage && wantVideo;
 
-  const startY =
-    opts.anchor.position.y - ((scope.beats.length - 1) * CHAIN_GAP_Y) / 2;
+  const layoutAnchor = opts.storyboardGroupId
+    ? { x: 48, y: 72 }
+    : opts.anchor.position;
+  const startY = layoutAnchor.y - ((scope.beats.length - 1) * CHAIN_GAP_Y) / 2;
+
+  const attachToGroup = (node: Node<FlowNodeData>): Node<FlowNodeData> => {
+    if (!opts.storyboardGroupId) return node;
+    return {
+      ...node,
+      parentId: opts.storyboardGroupId,
+      extent: "parent" as const,
+      zIndex: 1,
+    };
+  };
 
   for (const [i, beat] of scope.beats.entries()) {
     const shot = shotMap.get(beat.id);
     const ex = existing.get(beat.id) ?? {};
     const rowY = startY + i * CHAIN_GAP_Y;
-    const baseX = opts.anchor.position.x + CHAIN_GAP_X;
+    const baseX = layoutAnchor.x + CHAIN_GAP_X;
 
     let imageNode: Node<FlowNodeData> | null = null;
     let videoNode: Node<FlowNodeData> | null = null;
@@ -219,7 +241,7 @@ export function buildScriptBeatChain(opts: {
         const prev = opts.nodes.find((n) => n.id === ex.imageNodeId);
         if (prev) imageNode = prev;
       } else {
-        imageNode = buildImageNode(beat, shot, { x: baseX, y: rowY });
+        imageNode = attachToGroup(buildImageNode(beat, shot, { x: baseX, y: rowY }));
         newNodes.push(imageNode);
         newEdges.push(makeFlowEdge(opts.scriptNodeId, imageNode.id, "scriptNode"));
         created.image += 1;
@@ -232,7 +254,7 @@ export function buildScriptBeatChain(opts: {
       } else {
         const videoX = pairedImageVideo && imageNode ? imageNode.position.x + IMAGE_VIDEO_GAP_X : baseX;
         const videoY = pairedImageVideo && imageNode ? imageNode.position.y : rowY;
-        videoNode = buildVideoNode(beat, shot, { x: videoX, y: videoY });
+        videoNode = attachToGroup(buildVideoNode(beat, shot, { x: videoX, y: videoY }));
         newNodes.push(videoNode);
         if (imageNode) {
           newEdges.push(makeFlowEdge(imageNode.id, videoNode.id, "imageNode"));
@@ -247,10 +269,12 @@ export function buildScriptBeatChain(opts: {
       if (skipExisting && ex.audioNodeId) {
         skipped.audio += 1;
       } else {
-        const audioNode = buildAudioNode(beat, {
-          x: baseX + (pairedImageVideo ? IMAGE_VIDEO_GAP_X + 80 : 0),
-          y: rowY,
-        });
+        const audioNode = attachToGroup(
+          buildAudioNode(beat, {
+            x: baseX + (pairedImageVideo ? IMAGE_VIDEO_GAP_X + 80 : 0),
+            y: rowY,
+          }),
+        );
         newNodes.push(audioNode);
         newEdges.push(makeFlowEdge(opts.scriptNodeId, audioNode.id, "scriptNode"));
         created.audio += 1;

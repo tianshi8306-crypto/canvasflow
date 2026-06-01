@@ -2,6 +2,7 @@
 
 use crate::command_common::resolve_ffmpeg_bin_auto;
 use crate::db;
+use crate::project_asset_store::{self, AssetWriteContext};
 use crate::settings;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -25,7 +26,49 @@ fn sanitize_stem(name: &str) -> String {
     s
 }
 
-/// 从工程内视频提取音轨到 assets/，并登记素材索引
+fn allocate_tool_output(
+    root: &Path,
+    kind: &str,
+    ext: &str,
+    tool: &str,
+    source_stem: &str,
+) -> Result<(String, PathBuf), String> {
+    let ctx = AssetWriteContext {
+        kind,
+        source: "tools",
+        workflow: Some(tool),
+        node_id: None,
+        job_id: Some(source_stem),
+    };
+    project_asset_store::allocate_project_asset_paths(root, ext, &ctx)
+}
+
+fn finalize_tool_output(
+    root: &Path,
+    out_abs: &Path,
+    kind: &str,
+    tool: &str,
+    source_stem: &str,
+) -> Result<db::ImportedMediaItem, String> {
+    let ctx = AssetWriteContext {
+        kind,
+        source: "tools",
+        workflow: Some(tool),
+        node_id: None,
+        job_id: Some(source_stem),
+    };
+    let rel = project_asset_store::register_asset_at_path(root, out_abs, &ctx)?;
+    let conn = db::open_run_db(root)?;
+    let asset_id = db::get_asset_by_rel_path(&conn, &rel)?
+        .map(|a| a.asset_id)
+        .ok_or_else(|| format!("工具输出未登记：{rel}"))?;
+    Ok(db::ImportedMediaItem {
+        asset_id,
+        rel_path: rel,
+    })
+}
+
+/// 从工程内视频提取音轨到 `assets/gen/audio/tools/`，并登记素材索引
 #[tauri::command]
 pub fn extract_video_audio_to_assets(
     app: tauri::AppHandle,
@@ -56,15 +99,7 @@ pub fn extract_video_audio_to_assets(
         .and_then(|s| s.to_str())
         .map(sanitize_stem)
         .unwrap_or_else(|| "audio".into());
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let out_name = format!("audio-extract-{}-{}.m4a", stem, ts);
-    let assets_dir = root.join("assets");
-    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let out_abs = assets_dir.join(&out_name);
-    let rel = format!("assets/{}", out_name);
+    let (_rel, out_abs) = allocate_tool_output(&root, "audio", "m4a", "extract", &stem)?;
 
     let src_esc = escape_ffmpeg_path(&src);
     let out_esc = escape_ffmpeg_path(&out_abs);
@@ -104,23 +139,10 @@ pub fn extract_video_audio_to_assets(
         return Err("该视频没有可提取的音轨".into());
     }
 
-    let conn = db::open_run_db(&root)?;
-    let meta = crate::media::meta_json_for_av(&out_abs, "audio");
-    let asset_id = db::upsert_asset(
-        &conn,
-        &rel,
-        "audio",
-        Some("video-audio-extract"),
-        meta.as_deref(),
-    )?;
-
-    Ok(db::ImportedMediaItem {
-        asset_id,
-        rel_path: rel,
-    })
+    finalize_tool_output(&root, &out_abs, "audio", "extract", &stem)
 }
 
-/// 按入出点裁剪工程内视频，写入 assets/
+/// 按入出点裁剪工程内视频，写入 `assets/gen/video/tools/`
 #[tauri::command]
 pub fn trim_video_to_assets(
     app: tauri::AppHandle,
@@ -151,15 +173,7 @@ pub fn trim_video_to_assets(
         .and_then(|s| s.to_str())
         .map(sanitize_stem)
         .unwrap_or_else(|| "video".into());
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let out_name = format!("video-trim-{}-{}.mp4", stem, ts);
-    let assets_dir = root.join("assets");
-    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let out_abs = assets_dir.join(&out_name);
-    let rel = format!("assets/{}", out_name);
+    let (_rel, out_abs) = allocate_tool_output(&root, "video", "mp4", "trim", &stem)?;
 
     let src_esc = escape_ffmpeg_path(&src);
     let out_esc = escape_ffmpeg_path(&out_abs);
@@ -212,23 +226,10 @@ pub fn trim_video_to_assets(
         return Err("裁剪失败：输出文件过小".into());
     }
 
-    let conn = db::open_run_db(&root)?;
-    let meta = crate::media::meta_json_for_av(&out_abs, "video");
-    let asset_id = db::upsert_asset(
-        &conn,
-        &rel,
-        "video",
-        Some("video-trim"),
-        meta.as_deref(),
-    )?;
-
-    Ok(db::ImportedMediaItem {
-        asset_id,
-        rel_path: rel,
-    })
+    finalize_tool_output(&root, &out_abs, "video", "trim", &stem)
 }
 
-/// 按归一化矩形对工程内视频去字幕（delogo），写入 assets/
+/// 按归一化矩形对工程内视频去字幕（delogo），写入 `assets/gen/video/tools/`
 #[tauri::command]
 pub fn delogo_video_to_assets(
     app: tauri::AppHandle,
@@ -278,15 +279,7 @@ pub fn delogo_video_to_assets(
         .and_then(|s| s.to_str())
         .map(sanitize_stem)
         .unwrap_or_else(|| "video".into());
-    let ts = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(0);
-    let out_name = format!("video-delogo-{}-{}.mp4", stem, ts);
-    let assets_dir = root.join("assets");
-    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let out_abs = assets_dir.join(&out_name);
-    let rel = format!("assets/{}", out_name);
+    let (_rel, out_abs) = allocate_tool_output(&root, "video", "mp4", "delogo", &stem)?;
 
     let src_esc = escape_ffmpeg_path(&src);
     let out_esc = escape_ffmpeg_path(&out_abs);
@@ -318,20 +311,7 @@ pub fn delogo_video_to_assets(
         return Err("去字幕失败：输出文件过小".into());
     }
 
-    let conn = db::open_run_db(&root)?;
-    let meta = crate::media::meta_json_for_av(&out_abs, "video");
-    let asset_id = db::upsert_asset(
-        &conn,
-        &rel,
-        "video",
-        Some("video-delogo"),
-        meta.as_deref(),
-    )?;
-
-    Ok(db::ImportedMediaItem {
-        asset_id,
-        rel_path: rel,
-    })
+    finalize_tool_output(&root, &out_abs, "video", "delogo", &stem)
 }
 
 fn delogo_pixels(

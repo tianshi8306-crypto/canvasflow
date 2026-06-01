@@ -1,19 +1,16 @@
 import type { Node, NodeChange } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import { nodeLayoutDimensions } from "@/lib/nodeLayout";
-import { SIMPLE_ANCHOR_ALIGN_SNAP_PX } from "@/lib/simpleAnchorGeometry";
 
-/** 边对齐吸附阈值 */
-const SNAP_EDGE_PX = 14;
+/** 边/中心对齐吸附阈值（与 Figma 智能参考线接近） */
+export const SNAP_ALIGN_THRESHOLD_PX = 12;
 
-/** 水平中心（锚点连线）吸附阈值 */
-const SNAP_CENTER_PX = SIMPLE_ANCHOR_ALIGN_SNAP_PX;
+export type SnapGuideLine =
+  | { axis: "x"; flowPos: number; flowMin: number; flowMax: number }
+  | { axis: "y"; flowPos: number; flowMin: number; flowMax: number };
 
 export type NodeSnapVisual = {
-  /** 对齐参考线在 flow 坐标下的 y */
-  flowY: number;
-  flowXMin: number;
-  flowXMax: number;
+  guides: SnapGuideLine[];
 };
 
 export type SnapNodePositionResult = {
@@ -22,6 +19,11 @@ export type SnapNodePositionResult = {
 };
 
 type Rect = { left: number; right: number; top: number; bottom: number; cx: number; cy: number };
+
+type SnapCandidate = {
+  delta: number;
+  guide: SnapGuideLine;
+};
 
 function toRect(n: Node<FlowNodeData>): Rect {
   const { w, h } = nodeLayoutDimensions(n);
@@ -37,20 +39,35 @@ function toRect(n: Node<FlowNodeData>): Rect {
   };
 }
 
-function pickBestDelta(
-  candidates: number[],
-  threshold: number,
-): { delta: number; abs: number } {
-  let best = 0;
+function pickBestCandidate(candidates: SnapCandidate[], threshold: number): SnapCandidate | null {
+  let best: SnapCandidate | null = null;
   let bestAbs = threshold + 1;
-  for (const d of candidates) {
-    const a = Math.abs(d);
+  for (const c of candidates) {
+    const a = Math.abs(c.delta);
     if (a <= threshold && a < bestAbs) {
       bestAbs = a;
-      best = d;
+      best = c;
     }
   }
-  return { delta: best, abs: bestAbs };
+  return best;
+}
+
+function verticalGuide(x: number, yMin: number, yMax: number, extra: Rect): SnapGuideLine {
+  return {
+    axis: "x",
+    flowPos: x,
+    flowMin: Math.min(yMin, extra.top),
+    flowMax: Math.max(yMax, extra.bottom),
+  };
+}
+
+function horizontalGuide(y: number, xMin: number, xMax: number, extra: Rect): SnapGuideLine {
+  return {
+    axis: "y",
+    flowPos: y,
+    flowMin: Math.min(xMin, extra.left),
+    flowMax: Math.max(xMax, extra.right),
+  };
 }
 
 /**
@@ -59,7 +76,9 @@ function pickBestDelta(
 export function snapNodePositionChanges(
   changes: NodeChange<Node<FlowNodeData>>[],
   nodes: Node<FlowNodeData>[],
+  options?: { showGuides?: boolean },
 ): SnapNodePositionResult {
+  const showGuides = options?.showGuides !== false;
   const posIdx: number[] = [];
   const movingIds = new Set<string>();
 
@@ -127,48 +146,74 @@ export function snapNodePositionChanges(
 
   const bboxW = maxX - minX;
   const bboxH = maxY - minY;
+  const movingCx = minX + bboxW / 2;
   const movingCy = minY + bboxH / 2;
+  const moving: Rect = { left: minX, right: maxX, top: minY, bottom: maxY, cx: movingCx, cy: movingCy };
 
-  const dxCandidates: number[] = [];
-  const dyCandidates: number[] = [];
-  const centerDyMeta: { delta: number; targetCy: number; target: Rect }[] = [];
+  const dxCandidates: SnapCandidate[] = [];
+  const dyCandidates: SnapCandidate[] = [];
 
   for (const t of snapTargets) {
     dxCandidates.push(
-      t.left - minX,
-      t.right - minX,
-      t.left - maxX,
-      t.right - maxX,
-      t.cx - (minX + bboxW / 2),
+      {
+        delta: t.left - minX,
+        guide: verticalGuide(t.left, minY, maxY, t),
+      },
+      {
+        delta: t.right - minX,
+        guide: verticalGuide(t.right, minY, maxY, t),
+      },
+      {
+        delta: t.left - maxX,
+        guide: verticalGuide(t.left, minY, maxY, t),
+      },
+      {
+        delta: t.right - maxX,
+        guide: verticalGuide(t.right, minY, maxY, t),
+      },
+      {
+        delta: t.cx - movingCx,
+        guide: verticalGuide(t.cx, minY, maxY, t),
+      },
     );
-    const centerDelta = t.cy - movingCy;
     dyCandidates.push(
-      t.top - minY,
-      t.bottom - minY,
-      t.top - maxY,
-      t.bottom - maxY,
-      centerDelta,
+      {
+        delta: t.top - minY,
+        guide: horizontalGuide(t.top, minX, maxX, t),
+      },
+      {
+        delta: t.bottom - minY,
+        guide: horizontalGuide(t.bottom, minX, maxX, t),
+      },
+      {
+        delta: t.top - maxY,
+        guide: horizontalGuide(t.top, minX, maxX, t),
+      },
+      {
+        delta: t.bottom - maxY,
+        guide: horizontalGuide(t.bottom, minX, maxX, t),
+      },
+      {
+        delta: t.cy - movingCy,
+        guide: horizontalGuide(t.cy, minX, maxX, t),
+      },
     );
-    centerDyMeta.push({ delta: centerDelta, targetCy: t.cy, target: t });
   }
 
-  const dxPick = pickBestDelta(dxCandidates, SNAP_EDGE_PX);
-  const dyPick = pickBestDelta(dyCandidates, SNAP_CENTER_PX);
-
-  const dx = dxPick.delta;
-  const dy = dyPick.delta;
+  const dxPick = pickBestCandidate(dxCandidates, SNAP_ALIGN_THRESHOLD_PX);
+  const dyPick = pickBestCandidate(dyCandidates, SNAP_ALIGN_THRESHOLD_PX);
+  const dx = dxPick?.delta ?? 0;
+  const dy = dyPick?.delta ?? 0;
 
   if (dx === 0 && dy === 0) {
     return { changes, visual: null };
   }
 
-  let visual: NodeSnapVisual | null = null;
-  if (dyPick.abs > 0 && dyPick.abs <= SNAP_CENTER_PX) {
-    const matched = centerDyMeta.find((m) => m.delta === dy);
-    const flowY = matched?.targetCy ?? movingCy + dy;
-    const xMin = Math.min(minX, ...(snapTargets.map((t) => t.left)));
-    const xMax = Math.max(maxX, ...(snapTargets.map((t) => t.right)));
-    visual = { flowY, flowXMin: xMin, flowXMax: xMax };
+  const guides: SnapGuideLine[] = [];
+  if (showGuides) {
+    if (dxPick) guides.push(dxPick.guide);
+    if (dyPick) guides.push(dyPick.guide);
+    void moving;
   }
 
   const out = changes.slice();
@@ -183,5 +228,5 @@ export function snapNodePositionChanges(
       },
     };
   }
-  return { changes: out, visual };
+  return { changes: out, visual: guides.length > 0 ? { guides } : null };
 }

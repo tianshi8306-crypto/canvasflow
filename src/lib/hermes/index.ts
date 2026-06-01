@@ -5,8 +5,15 @@
  */
 
 import { setupNodeEventListener, rebuildShotNodeRegistry } from "./autoChain";
+import { initHermesCanvasAwareness } from "./initHermesCanvasAwareness";
+import { initHermesStyleAnchorRecording } from "./initHermesStyleAnchorRecording";
+import { initHermesTaskTrack } from "./initHermesTaskTrack";
+import { initHermesKnowledge } from "./knowledge/initHermesKnowledge";
+import { initHermesCanvasMcpBridge } from "./mcp/initHermesCanvasMcpBridge";
+import { syncCanvasMcpBridgeContext } from "./mcp/syncCanvasMcpBridgeContext";
 
 let cleanupFn: (() => void) | null = null;
+let mcpBridgeCleanup: (() => void) | null = null;
 
 /**
  * 初始化 Hermes 自动串联
@@ -16,12 +23,27 @@ let cleanupFn: (() => void) | null = null;
 export function initHermesAutoChain(): () => void {
   if (cleanupFn) {
     console.warn("[Hermes] 已初始化，无需重复调用");
-    return cleanupFn;
+    return () => {
+      cleanupFn?.();
+      mcpBridgeCleanup?.();
+    };
   }
 
+  initHermesTaskTrack();
+  initHermesStyleAnchorRecording();
+  initHermesCanvasAwareness();
+  initHermesKnowledge();
+  mcpBridgeCleanup = initHermesCanvasMcpBridge();
   cleanupFn = setupNodeEventListener();
-  return cleanupFn;
+  return () => {
+    cleanupFn?.();
+    mcpBridgeCleanup?.();
+    cleanupFn = null;
+    mcpBridgeCleanup = null;
+  };
 }
+
+export { syncCanvasMcpBridgeContext };
 
 /**
  * 重建 shotNodeRegistry

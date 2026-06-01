@@ -3,8 +3,11 @@ import type { Edge, Node } from "@xyflow/react";
 import type { FlowNodeData, ScriptBeat, StoryboardShot } from "@/lib/types";
 import { emptyScriptBeat } from "@/lib/scriptBeatHelpers";
 import {
+  assessBatchImageReadiness,
   assessBatchVideoReadiness,
   assessComposeExportScope,
+  formatBatchImageReadinessHint,
+  listFailedKeyframeBeatIds,
   listFailedVideoBeatIds,
 } from "./scriptProductionExport";
 
@@ -29,7 +32,19 @@ describe("scriptProductionExport", () => {
       }),
       n("v1", "videoNode", {
         params: { scriptBeatId: "b1" },
-        video: { draft: { prompt: "move" } },
+        video: {
+          draft: {
+            workflow: "text_to_video",
+            modelId: "doubao_seedance_2_0",
+            prompt: "move",
+            output: {
+              aspectRatio: "16:9",
+              resolution: "720P",
+              durationSec: 5,
+              generateAudio: true,
+            },
+          },
+        },
       }),
     ];
     const edges: Edge[] = [
@@ -61,6 +76,34 @@ describe("scriptProductionExport", () => {
     expect(r.eligible).toHaveLength(1);
     expect(r.eligible[0]?.beatId).toBe("b1");
     expect(r.skipCounts.no_video_node).toBe(1);
+  });
+
+  it("assessBatchImageReadiness counts needsChainBuild and eligible", () => {
+    const scriptId = "s1";
+    const nodes: Node<FlowNodeData>[] = [
+      n(scriptId, "scriptNode", {}),
+      n("i1", "imageNode", {
+        params: { scriptBeatId: "b1" },
+      }),
+    ];
+    const edges: Edge[] = [{ id: "e1", source: scriptId, target: "i1" }];
+    const shots: StoryboardShot[] = [
+      { scriptBeatId: "b1", visualPrompt: "scene 1", status: "generated" },
+      { scriptBeatId: "b2", visualPrompt: "scene 2", status: "generated" },
+    ];
+    const r = assessBatchImageReadiness({
+      scriptNodeId: scriptId,
+      beats,
+      shots,
+      nodes,
+      edges,
+      scriptBeatSelection: undefined,
+    });
+    if (!("canStart" in r)) throw new Error("expected readiness");
+    expect(r.needsChainBuild).toBe(1);
+    expect(r.eligible).toHaveLength(2);
+    expect(r.eligible.find((e) => e.beatId === "b1")?.imageNodeId).toBe("i1");
+    expect(formatBatchImageReadinessHint(r)).toContain("可提交 2 个");
   });
 
   it("compose export counts ready videos in scope", () => {
@@ -97,6 +140,15 @@ describe("scriptProductionExport", () => {
     const ids = listFailedVideoBeatIds([
       { scriptBeatId: "b1", visualPrompt: "x", videoStatus: "failed" },
       { scriptBeatId: "b2", visualPrompt: "y", videoStatus: "generated" },
+    ]);
+    expect(ids).toEqual(["b1"]);
+  });
+
+  it("listFailedKeyframeBeatIds returns failed storyboard image beats", () => {
+    const ids = listFailedKeyframeBeatIds([
+      { scriptBeatId: "b1", visualPrompt: "a", status: "failed" },
+      { scriptBeatId: "b2", visualPrompt: "", status: "failed" },
+      { scriptBeatId: "b3", visualPrompt: "c", status: "generated" },
     ]);
     expect(ids).toEqual(["b1"]);
   });

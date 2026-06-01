@@ -1,18 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { MentionInput, type MentionInputRef } from "@/components/nodes/MentionInput";
+import { useHermesCanvasGenFailureNotify } from "@/hooks/useHermesCanvasGenFailureNotify";
+import {
+  ImagePromptMentionInput,
+  type ImagePromptMentionInputRef,
+} from "@/components/nodes/ImagePromptMentionInput";
 import { SlashPresetPanel } from "@/components/nodes/SlashPresetPanel";
 import { ImageModelPicker } from "@/components/nodes/ImageModelPicker";
 import { ImageAspectResolutionPicker } from "@/components/nodes/ImageAspectResolutionPicker";
+import { ImageCountPicker } from "@/components/nodes/ImageCountPicker";
 import { ImageStylePickerPopover } from "@/components/nodes/ImageStylePickerPopover";
+import { ImageRefThumbStrip } from "@/components/nodes/ImageRefThumbStrip";
+import { ImageGenerationCenterCapsule } from "@/components/nodes/ImageGenerationCenterCapsule";
+import { PortalToElement } from "@/components/nodes/nodeChrome/PortalToElement";
+import { ImageGenerationStatusRail } from "@/components/nodes/ImageGenerationStatusRail";
 import { IgpGenerateButtonIcon } from "@/components/nodes/IgpGenerateButtonIcon";
-import { PanelCloseIcon, PanelExpandIcon, PanelPinIcon } from "@/components/nodes/nodePanelIcons";
+import { PanelCloseIcon, PanelExpandIcon } from "@/components/nodes/nodePanelIcons";
 import { useImageGenerationContext } from "@/hooks/useImageGenerationContext";
 import { useImageModels } from "@/hooks/useImageModels";
 import { useFocusImageNodeViewport } from "@/hooks/canvas/useFocusImageNodeViewport";
 import { useNodeStatus } from "@/hooks/useNodeStatus";
-import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import {
-  IMAGE_COUNT_OPTIONS,
   type ImageAspectId,
   type ImageResolutionTierId,
   type ImageStyleId,
@@ -32,21 +39,38 @@ import {
   stripImageStyleTokensFromPrompt,
   toggleImageStyleInPrompt,
 } from "@/lib/imageGeneration/imageStyleTokens";
+import {
+  buildImageGenValidationMessages,
+  canStartImageGeneration,
+} from "@/lib/imageGeneration/buildImageGenValidationMessages";
+import { getImageGenerationDisplayLabel } from "@/lib/imageGeneration/imageGenerationProgressDisplay";
+import { collectIncomingImagePanelItems, incomingImagePanelRefsForDisplay } from "@/lib/imageGeneration/collectIncomingImagePanelItems";
+import {
+  IMAGE_PARAM_REFERENCE_EDGE_ORDER,
+  orderIncomingImagePanelRefs,
+  readImageReferenceEdgeOrder,
+  reorderImagePanelRefEdgeOrder,
+  syncImagePanelReferenceEdgeOrder,
+} from "@/lib/imageGeneration/imageReferenceEdgeOrder";
+import { remapImagePromptRefOrder } from "@/lib/imageGeneration/imagePromptAtTokens";
+import type { ResolvedIncomingImagePanelRef, ResolvedIncomingImageRef } from "@/lib/imageGeneration/types";
 import { imageGenerationAgentRuntime } from "@/lib/nodeAgentRuntime/imageGenerationAgent";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { IMAGE_GENERATION_PROMPT_MAX_CHARS } from "@/lib/promptLimits";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
-import "./MinimalImageNode.css";
+import "./ImageGenerationPanel.css";
 
 const PARAM_IMAGE_MODEL = "imageModelId";
 const PARAM_IMAGE_COUNT = "imageCount";
 
 export type ImageGenerationPanelProps = {
   nodeId: string;
-  layout?: "empty" | "default" | "expanded";
+  /** portal：底栏；expanded：居中放大 Modal */
+  layout?: "portal" | "expanded";
   onRequestClose?: () => void;
-  onRequestDock?: () => void;
+  /** portal 布局：生成中胶囊 Portal 到预览区正中 */
+  previewOverlayEl?: HTMLElement | null;
 };
 
 /** 顶栏快捷钮图标容器：主图标 + 右下角「+」 */
@@ -182,21 +206,20 @@ function IgpTaskMetaTile({
  */
 export function ImageGenerationPanel({
   nodeId,
-  layout = "empty",
+  layout = "portal",
   onRequestClose,
-  onRequestDock,
+  previewOverlayEl = null,
 }: ImageGenerationPanelProps) {
   const isExpandedLayout = layout === "expanded";
-  const isDefaultLayout = layout === "default";
+  const isPortalLayout = !isExpandedLayout;
 
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodes = useProjectStore((s) => s.nodes);
+  const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const setStatusText = useProjectStore((s) => s.setStatusText);
 
   const setImageGenPanelExpandedNodeId = useCanvasUiStore((s) => s.setImageGenPanelExpandedNodeId);
-  const setImageGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setImageGenPanelPinnedNodeId);
-  const pinnedGenPanelId = useCanvasUiStore((s) => s.imageGenPanelPinnedNodeId);
   const markedNodeId = useCanvasUiStore((s) => s.markedNodeId);
   const setMarkedNodeId = useCanvasUiStore((s) => s.setMarkedNodeId);
 
@@ -204,7 +227,8 @@ export function ImageGenerationPanel({
   const { focusImageNodeAt200 } = useFocusImageNodeViewport();
   const { status: nodeStatus, clearStatus } = useNodeStatus(nodeId);
 
-  const mentionRef = useRef<MentionInputRef>(null);
+  const mentionRef = useRef<ImagePromptMentionInputRef>(null);
+  const refThumbElRefs = useRef(new Map<string, HTMLDivElement>());
   const styleBtnRef = useRef<HTMLButtonElement>(null);
   const cancelTokenRef = useRef({ cancelled: false });
   const genRunRef = useRef(0);
@@ -212,6 +236,10 @@ export function ImageGenerationPanel({
   const [slashCursorRect, setSlashCursorRect] = useState<DOMRect | null>(null);
   const [stylePopoverOpen, setStylePopoverOpen] = useState(false);
   const [generatingLocal, setGeneratingLocal] = useState(false);
+  const [cancelledLocal, setCancelledLocal] = useState(false);
+  const [cancellingLocal, setCancellingLocal] = useState(false);
+  const [focusedRefSourceNodeId, setFocusedRefSourceNodeId] = useState<string | null>(null);
+  const [hoveredRefSourceNodeId, setHoveredRefSourceNodeId] = useState<string | null>(null);
 
   const node = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
   const prompt = (node?.data.prompt ?? "").slice(0, IMAGE_GENERATION_PROMPT_MAX_CHARS);
@@ -225,6 +253,67 @@ export function ImageGenerationPanel({
       ? imageCountRaw
       : 1;
   const ctx = useImageGenerationContext(nodeId, prompt);
+
+  const incomingPanelRaw = useMemo(
+    () => collectIncomingImagePanelItems(nodes, edges, nodeId).items,
+    [nodes, edges, nodeId],
+  );
+
+  const savedEdgeOrder = readImageReferenceEdgeOrder(params);
+
+  const syncedEdgeOrder = useMemo(
+    () => syncImagePanelReferenceEdgeOrder(savedEdgeOrder, incomingPanelRaw),
+    [savedEdgeOrder, incomingPanelRaw],
+  );
+
+  useEffect(() => {
+    const saved = savedEdgeOrder ?? [];
+    if (
+      saved.length === syncedEdgeOrder.length &&
+      saved.every((id, i) => id === syncedEdgeOrder[i])
+    ) {
+      return;
+    }
+    const curParams =
+      useProjectStore.getState().nodes.find((n) => n.id === nodeId)?.data.params ?? {};
+    updateNodeData(
+      nodeId,
+      {
+        params: {
+          ...curParams,
+          [IMAGE_PARAM_REFERENCE_EDGE_ORDER]: syncedEdgeOrder,
+        },
+      },
+      { silent: true },
+    );
+  }, [nodeId, syncedEdgeOrder, savedEdgeOrder, updateNodeData]);
+
+  /** 按 params.referenceEdgeOrder 同步排序，不等待 async context */
+  const displayPanelItems = useMemo((): ResolvedIncomingImagePanelRef[] => {
+    const ordered = orderIncomingImagePanelRefs(incomingPanelRaw, savedEdgeOrder);
+    const forDisplay = incomingImagePanelRefsForDisplay(ordered);
+    const resolvedByEdge = new Map(ctx.resolvedRefs.map((r) => [r.edgeId, r]));
+    const out: ResolvedIncomingImagePanelRef[] = [];
+    for (const item of forDisplay) {
+      if (item.kind === "text") {
+        out.push(item);
+        continue;
+      }
+      const resolved = resolvedByEdge.get(item.edgeId);
+      if (resolved) {
+        out.push({ ...item, ...resolved, resolvedPath: resolved.resolvedPath });
+      } else if (item.path || item.assetId) {
+        out.push({ ...item, resolvedPath: item.path ?? "" });
+      }
+    }
+    return out;
+  }, [incomingPanelRaw, savedEdgeOrder, ctx.resolvedRefs]);
+
+  const displayImageRefs = useMemo(
+    (): ResolvedIncomingImageRef[] =>
+      displayPanelItems.filter((i): i is ResolvedIncomingImageRef => i.kind === "image"),
+    [displayPanelItems],
+  );
 
   const nodeLabels = useMemo(
     () => Object.fromEntries(nodes.map((n) => [n.id, n.data.label ?? n.id])),
@@ -261,8 +350,23 @@ export function ImageGenerationPanel({
   const isGenerating =
     generatingLocal || nodeStatus?.status === "running" || nodeStatus?.status === "pending";
 
+  useEffect(() => {
+    if (!isGenerating) {
+      setCancellingLocal(false);
+    }
+  }, [isGenerating]);
+
+  const generationCapsuleLabel = useMemo(
+    () =>
+      getImageGenerationDisplayLabel({
+        status: nodeStatus?.status ?? (generatingLocal ? "running" : null),
+        progress: nodeStatus?.progress,
+        cancelling: cancellingLocal,
+      }),
+    [nodeStatus?.status, nodeStatus?.progress, generatingLocal, cancellingLocal],
+  );
+
   const hasMarker = markedNodeId === nodeId;
-  const isPinned = pinnedGenPanelId === nodeId;
 
   const apiSize = useMemo(
     () =>
@@ -275,13 +379,63 @@ export function ImageGenerationPanel({
     [outputParams.aspect, outputParams.resolution, node?.data.imageWidth, node?.data.imageHeight],
   );
 
-  const canGenerate = useMemo(() => {
-    if (!projectPath || isGenerating) return false;
-    if (ctx.blockReason) return false;
-    if (!effectivePromptText) return false;
-    if (!ctx.task) return false;
-    return true;
-  }, [projectPath, isGenerating, ctx.blockReason, effectivePromptText, ctx.task]);
+  const validationMessages = useMemo(
+    () =>
+      buildImageGenValidationMessages({
+        projectPath,
+        blockReason: ctx.blockReason,
+        effectivePromptText,
+        task: ctx.task,
+        validModelId,
+        modelsLoading,
+      }),
+    [
+      projectPath,
+      ctx.blockReason,
+      effectivePromptText,
+      ctx.task,
+      validModelId,
+      modelsLoading,
+    ],
+  );
+
+  const validationValid = validationMessages.length === 0;
+
+  const isFailed = nodeStatus?.status === "failed";
+  const isCancelled = cancelledLocal && !isGenerating;
+
+  const showValidation = !isGenerating && !isFailed && !isCancelled && !validationValid;
+
+  useHermesCanvasGenFailureNotify({
+    nodeId,
+    kind: "image",
+    isFailed,
+    isGenerating,
+    error: nodeStatus?.error,
+    nodeLabel: node?.data.label,
+  });
+
+  const canGenerate = useMemo(
+    () =>
+      canStartImageGeneration({
+        projectPath,
+        blockReason: ctx.blockReason,
+        effectivePromptText,
+        task: ctx.task,
+        validModelId,
+        modelsLoading,
+        isGenerating,
+      }),
+    [
+      projectPath,
+      ctx.blockReason,
+      effectivePromptText,
+      ctx.task,
+      validModelId,
+      modelsLoading,
+      isGenerating,
+    ],
+  );
 
   useEffect(() => {
     if (modelsLoading || !defaultModel) return;
@@ -351,12 +505,15 @@ export function ImageGenerationPanel({
   );
 
   const handleCancelGenerate = useCallback(() => {
+    if (cancellingLocal) return;
+    setCancellingLocal(true);
     cancelTokenRef.current.cancelled = true;
     genRunRef.current += 1;
     clearStatus();
     setGeneratingLocal(false);
+    setCancelledLocal(true);
     setStatusText("已取消图片生成");
-  }, [clearStatus, setStatusText]);
+  }, [cancellingLocal, clearStatus, setStatusText]);
 
   const handleGenerate = useCallback(() => {
     if (isGenerating) {
@@ -383,6 +540,7 @@ export function ImageGenerationPanel({
     const runId = genRunRef.current + 1;
     genRunRef.current = runId;
     cancelTokenRef.current = { cancelled: false };
+    setCancelledLocal(false);
     setGeneratingLocal(true);
 
     const promptForAgent = stripImageStyleTokensFromPrompt(prompt).trim() || effectivePromptText;
@@ -447,34 +605,114 @@ export function ImageGenerationPanel({
     void focusImageNodeAt200(nodeId);
   }, [hasMarker, nodeId, setMarkedNodeId, focusImageNodeAt200]);
 
-  const handlePinClick = useCallback(() => {
-    setImageGenPanelPinnedNodeId(isPinned ? null : nodeId);
-  }, [isPinned, nodeId, setImageGenPanelPinnedNodeId]);
-
   const handleExpandClick = useCallback(() => {
     setImageGenPanelExpandedNodeId(nodeId);
   }, [nodeId, setImageGenPanelExpandedNodeId]);
 
-  const handleCloseDocked = useCallback(() => {
-    setImageGenPanelPinnedNodeId(null);
-    onRequestClose?.();
-  }, [onRequestClose, setImageGenPanelPinnedNodeId]);
-
   const refCount = ctx.referenceImagePaths.length;
+  const activeRefSourceNodeId = focusedRefSourceNodeId ?? hoveredRefSourceNodeId;
+
+  const handleRefSelect = useCallback((sourceNodeId: string) => {
+    setFocusedRefSourceNodeId(sourceNodeId);
+    setHoveredRefSourceNodeId(sourceNodeId);
+  }, []);
+
+  const handleRefPillActivate = useCallback((sourceNodeId: string) => {
+    setFocusedRefSourceNodeId(sourceNodeId);
+    setHoveredRefSourceNodeId(sourceNodeId);
+    const ref = displayPanelItems.find((r) => r.sourceNodeId === sourceNodeId);
+    if (ref?.edgeId) {
+      refThumbElRefs.current
+        .get(ref.edgeId)
+        ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+  }, [displayPanelItems]);
+
+  const handleRefStripReorder = useCallback(
+    (fromEdgeId: string, toEdgeId: string) => {
+      if (fromEdgeId === toEdgeId) return;
+      const displayIds = displayPanelItems.map((r) => r.edgeId);
+      const beforeImages = displayImageRefs;
+      const curSaved = readImageReferenceEdgeOrder(
+        useProjectStore.getState().nodes.find((n) => n.id === nodeId)?.data.params,
+      );
+      const newOrder = reorderImagePanelRefEdgeOrder(
+        incomingPanelRaw,
+        curSaved,
+        displayIds,
+        fromEdgeId,
+        toEdgeId,
+      );
+      const stripSet = new Set(displayIds);
+      const afterImages = newOrder
+        .filter((eid) => stripSet.has(eid))
+        .map((eid) => beforeImages.find((r) => r.edgeId === eid))
+        .filter((r): r is ResolvedIncomingImageRef => Boolean(r));
+      const curPrompt =
+        useProjectStore.getState().nodes.find((n) => n.id === nodeId)?.data.prompt ?? "";
+      const newPrompt = remapImagePromptRefOrder(curPrompt, beforeImages, afterImages, nodeLabels);
+      const curParams =
+        useProjectStore.getState().nodes.find((n) => n.id === nodeId)?.data.params ?? {};
+      const patch: { prompt?: string; params: Record<string, unknown> } = {
+        params: {
+          ...curParams,
+          [IMAGE_PARAM_REFERENCE_EDGE_ORDER]: newOrder,
+        },
+      };
+      if (newPrompt !== curPrompt) patch.prompt = newPrompt;
+      updateNodeData(nodeId, patch);
+    },
+    [displayPanelItems, displayImageRefs, incomingPanelRaw, nodeLabels, nodeId, updateNodeData],
+  );
+
+  const handleRefHoverStart = useCallback((sourceNodeId: string) => {
+    setHoveredRefSourceNodeId(sourceNodeId);
+  }, []);
+
+  const handleRefHoverEnd = useCallback(() => {
+    setHoveredRefSourceNodeId(focusedRefSourceNodeId);
+  }, [focusedRefSourceNodeId]);
+
+  const insertPromptAtToken = useCallback((token: string) => {
+    mentionRef.current?.insertAtToken(token);
+  }, []);
+
+  useEffect(() => {
+    const ids = new Set(displayPanelItems.map((r) => r.sourceNodeId));
+    if (focusedRefSourceNodeId && !ids.has(focusedRefSourceNodeId)) {
+      setFocusedRefSourceNodeId(null);
+    }
+    if (hoveredRefSourceNodeId && !ids.has(hoveredRefSourceNodeId)) {
+      setHoveredRefSourceNodeId(null);
+    }
+  }, [displayPanelItems, focusedRefSourceNodeId, hoveredRefSourceNodeId]);
+
   const textareaClass = isExpandedLayout
     ? "imageGenPanelTextarea imageGenPanelTextarea--expanded"
     : "imageGenPanelTextarea imageGenPanelTextarea--minimal";
 
+  const generationCapsule = isGenerating ? (
+    <ImageGenerationCenterCapsule
+      label={generationCapsuleLabel}
+      onCancel={handleCancelGenerate}
+      cancelling={cancellingLocal}
+    />
+  ) : null;
+
   return (
+    <>
+      {isPortalLayout ? (
+        <PortalToElement target={previewOverlayEl}>{generationCapsule}</PortalToElement>
+      ) : null}
     <div
-      className="imageGenPanel--minimal-inner"
+      className="imageGenPanel--minimal-inner nodrag nopan nowheel"
       onPointerDown={(e) => e.stopPropagation()}
     >
+      <div className={`igp-panel-main${isGenerating && isExpandedLayout ? " igp-panel--generating" : ""}`}>
+        {isExpandedLayout ? generationCapsule : null}
       {/* ── 顶栏 ── */}
       <div
-        className={`igp-header-row${layout === "empty" ? " igp-header-row--empty" : ""}${
-          isExpandedLayout ? " igp-header-row--expanded" : ""
-        }`}
+        className={`igp-header-row${isExpandedLayout ? " igp-header-row--expanded" : ""}`}
       >
         <div className="igp-header-quick">
             <button
@@ -498,12 +736,25 @@ export function ImageGenerationPanel({
               <IconMarker />
               <span>{hasMarker ? "已标记" : "标记"}</span>
             </button>
-            {(ctx.task || refCount > 0) ? (
-              <IgpTaskMetaTile task={ctx.task} refCount={refCount} />
+            {(ctx.task || refCount > 0) && displayPanelItems.length === 0 ? (
+              <IgpTaskMetaTile task={ctx.task ?? undefined} refCount={refCount} />
+            ) : null}
+            {displayPanelItems.length > 0 ? (
+              <ImageRefThumbStrip
+                targetNodeId={nodeId}
+                items={displayPanelItems}
+                activeSourceNodeId={activeRefSourceNodeId}
+                onSelect={handleRefSelect}
+                onInsertAtToken={insertPromptAtToken}
+                onHoverStart={handleRefHoverStart}
+                onHoverEnd={handleRefHoverEnd}
+                onReorder={handleRefStripReorder}
+                thumbElRefs={refThumbElRefs}
+              />
             ) : null}
           </div>
 
-        {layout === "empty" ? (
+        {isPortalLayout ? (
           <div className="igp-header-actions">
             <button
               type="button"
@@ -517,62 +768,17 @@ export function ImageGenerationPanel({
           </div>
         ) : null}
 
-        {isDefaultLayout ? (
+        {isExpandedLayout && onRequestClose ? (
           <div className="igp-header-actions">
-            <button
-              type="button"
-              className={`igp-header-icon-btn${isPinned ? " active" : ""}`}
-              title={isPinned ? "取消钉住" : "钉在节点下方"}
-              aria-label={isPinned ? "取消钉住" : "钉住面板"}
-              onClick={handlePinClick}
-            >
-              <PanelPinIcon />
-            </button>
-            <button
-              type="button"
-              className="igp-header-icon-btn igp-expand-trigger"
-              title="展开面板"
-              aria-label="展开面板"
-              onClick={handleExpandClick}
-            >
-              <PanelExpandIcon />
-            </button>
             <button
               type="button"
               className="igp-header-icon-btn"
-              title="收起面板"
-              aria-label="收起面板"
-              onClick={handleCloseDocked}
+              title="关闭 (Esc)"
+              aria-label="关闭"
+              onClick={onRequestClose}
             >
               <PanelCloseIcon />
             </button>
-          </div>
-        ) : null}
-
-        {isExpandedLayout ? (
-          <div className="igp-header-actions">
-            {onRequestDock ? (
-              <button
-                type="button"
-                className="igp-header-icon-btn"
-                title="钉回节点"
-                aria-label="钉回节点"
-                onClick={onRequestDock}
-              >
-                <PanelPinIcon />
-              </button>
-            ) : null}
-            {onRequestClose ? (
-              <button
-                type="button"
-                className="igp-header-icon-btn"
-                title="关闭 (Esc)"
-                aria-label="关闭"
-                onClick={onRequestClose}
-              >
-                <PanelCloseIcon />
-              </button>
-            ) : null}
           </div>
         ) : null}
       </div>
@@ -587,19 +793,23 @@ export function ImageGenerationPanel({
 
       {/* ── 提示词 ── */}
       <div className="igp-prompt-wrap">
-        <MentionInput
+        <ImagePromptMentionInput
           ref={mentionRef}
-          nodeId={nodeId}
           value={prompt}
           onChange={setPrompt}
-          placeholder="描述你想要生成的内容，使用 @可快速引用上传的文件，按 / 呼出指令"
-          className={textareaClass}
+          incomingRefs={displayImageRefs}
           nodeLabels={nodeLabels}
+          placeholder={
+            displayPanelItems.length > 0
+              ? "描述你想要生成的内容，@ 可引用参考图（如 @图片1，序号与顶栏一致）或 Shift+单击文本参考插入 @，按 / 呼出指令"
+              : "描述你想要生成的内容，使用 @可快速引用上传的文件，按 / 呼出指令"
+          }
+          className={`image-prompt-mention--compact ${textareaClass}`}
+          maxLength={IMAGE_GENERATION_PROMPT_MAX_CHARS}
+          activeRefSourceNodeId={activeRefSourceNodeId}
+          onRefPillActivate={handleRefPillActivate}
           onSlashTrigger={handleSlashTrigger}
         />
-        <span className="igp-counter" aria-live="polite">
-          {prompt.length}/{IMAGE_GENERATION_PROMPT_MAX_CHARS}
-        </span>
       </div>
       {slashCursorRect ? (
         <SlashPresetPanel
@@ -610,15 +820,14 @@ export function ImageGenerationPanel({
       ) : null}
 
 
-      {ctx.blockReason ? (
-        <div className="igp-feedback igp-feedback--block" role="alert">
-          {ctx.blockReason}
-        </div>
-      ) : null}
-      {!ctx.blockReason && ctx.warnMessage ? (
-        <div className="igp-feedback igp-feedback--warn">{ctx.warnMessage}</div>
-      ) : null}
-
+      <ImageGenerationStatusRail
+        isGenerating={isGenerating}
+        isCancelled={isCancelled}
+        errors={validationMessages}
+        showValidation={showValidation}
+        warnMessage={ctx.warnMessage}
+      />
+      </div>
 
       {/* ── 底栏：模型 → 比例/分辨率 → 张数 → 生成 ── */}
       <div className="igp-bottom-bar">
@@ -636,34 +845,39 @@ export function ImageGenerationPanel({
           onResolutionChange={handleResolutionChange}
         />
 
-        <select
-          className={`igp-count-select ${RF_NODE_INPUT_CLASS}`}
+        <ImageCountPicker
           value={imageCount}
-          title="生成张数"
-          aria-label="生成张数"
-          onChange={(e) =>
-            patchNodeParams({ [PARAM_IMAGE_COUNT]: Number(e.target.value) })
-          }
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          {IMAGE_COUNT_OPTIONS.map((opt) => (
-            <option key={opt.id} value={opt.id}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
+          onChange={(count) => patchNodeParams({ [PARAM_IMAGE_COUNT]: count })}
+        />
 
         <button
           type="button"
           className={`igp-generate-btn${isGenerating ? " generating" : ""}`}
-          disabled={!isGenerating && !canGenerate}
-          title={isGenerating ? "停止生成" : "生成图片"}
-          aria-label={isGenerating ? "停止生成" : "生成图片"}
+          disabled={!isGenerating && !canGenerate && !isFailed && !isCancelled}
+          title={
+            isGenerating
+              ? "停止生成"
+              : isFailed
+                ? "重试"
+                : isCancelled
+                  ? "重新生成"
+                  : "生成图片"
+          }
+          aria-label={
+            isGenerating
+              ? "停止生成"
+              : isFailed
+                ? "重试"
+                : isCancelled
+                  ? "重新生成"
+                  : "生成图片"
+          }
           onClick={handleGenerate}
         >
           <IgpGenerateButtonIcon generating={isGenerating} />
         </button>
       </div>
     </div>
+    </>
   );
 }

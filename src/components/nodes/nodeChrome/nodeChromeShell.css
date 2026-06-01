@@ -7,7 +7,7 @@
   --simple-anchor-knob: 18px;
   position: relative;
   padding: 0;
-  background: var(--bg-node, #1e1e1e);
+  background: var(--bg-node, #2b2b2b);
   border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-node, 8px);
   overflow: visible;
@@ -32,10 +32,90 @@
   position: relative;
   width: 100%;
   height: 100%;
-  background: var(--bg-node, #1e1e1e);
+  background: var(--bg-node, #2b2b2b);
   overflow: hidden;
   border-radius: 7px;
   pointer-events: none;
+}
+
+/** 预览区正中：生成进度胶囊 Portal 挂载点（参数面板通过 Portal 写入） */
+.nodeChrome-unifiedRoot {
+  position: relative;
+  overflow: visible;
+}
+
+.nodeChrome-portalScale {
+  pointer-events: auto;
+  box-sizing: border-box;
+}
+
+/* 预览区之上：顶/底栏与生成 overlay 同节点 stacking context */
+.nodeChrome-previewGenOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.nodeChrome-previewGenOverlay:not(:empty) {
+  pointer-events: auto;
+}
+
+.nodeChrome-previewGenOverlay .igpGenCenterCapsuleOverlay,
+.nodeChrome-previewGenOverlay .videoGenCenterCapsuleOverlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: rgba(14, 14, 14, 0.48);
+  backdrop-filter: blur(1px);
+}
+
+.nodeChrome-previewGenOverlay .igpGenCenterCapsule,
+.nodeChrome-previewGenOverlay .videoGenCenterCapsule {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  padding: 9px 18px 9px 20px;
+  border-radius: 999px;
+  background: rgba(64, 64, 64, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.nodeChrome-previewGenOverlay .igpGenCenterCapsule-label,
+.nodeChrome-previewGenOverlay .videoGenCenterCapsule-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.nodeChrome-previewGenOverlay .igpGenCenterCapsule-stop,
+.nodeChrome-previewGenOverlay .videoGenCenterCapsule-cancel {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.nodeChrome-previewGenOverlay .igpGenCenterCapsule-stop:hover:not(:disabled),
+.nodeChrome-previewGenOverlay .videoGenCenterCapsule-cancel:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.nodeChrome-previewGenOverlay .igpGenCenterCapsule-stop:disabled,
+.nodeChrome-previewGenOverlay .videoGenCenterCapsule-cancel:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 
 .nodeChrome-preview .nodeMutedPreview,
@@ -66,12 +146,27 @@
   pointer-events: auto;
 }
 
-.nodeChrome-placeholder svg,
-.minimal-image-placeholder svg {
-  width: clamp(56px, 20%, 88px);
-  height: clamp(56px, 20%, 88px);
-  fill: var(--text-placeholder, #616161);
-  opacity: 0.22;
+/* 主面板空态占位图（与添加节点菜单图标同源，描边图标用 currentColor） */
+.nodePanelPlaceholderIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--text-placeholder, #616161);
+  opacity: 0.25;
+  pointer-events: none;
+}
+
+.nodePanelPlaceholderIcon svg {
+  width: clamp(40px, 18%, 56px);
+  height: clamp(40px, 18%, 56px);
+}
+
+.nodeChrome-shell.selected .nodePanelPlaceholderIcon,
+.minimal-image-node.selected .nodePanelPlaceholderIcon,
+.minimal-text-node.selected .nodePanelPlaceholderIcon,
+.scriptChrome-shell.selected .nodePanelPlaceholderIcon {
+  opacity: 0.32;
 }
 
 /* 外置左上：可编辑标签 */
@@ -179,7 +274,7 @@
   padding: 6px 14px;
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
-  background: var(--bg-button, #252525);
+  background: var(--bg-node, #2b2b2b);
   color: var(--text-primary, #e0e0e0);
   font-size: 12px;
   cursor: pointer;
@@ -190,14 +285,21 @@
 
 .nodeChrome-upload-float:hover,
 .minimal-image-upload-float:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+}
+
+.nodeChrome-upload-float--iconOnly {
+  gap: 0;
+  padding: 8px 10px;
+  min-width: 36px;
+  justify-content: center;
 }
 
 /* Portal 浮层皮肤 */
 .nodeChrome--panel,
 .imageNodeChrome--minimal {
   box-sizing: border-box;
-  background: var(--bg-node-preview, #1f1f1f);
+  background: var(--gen-panel-bg, #2b2b2b);
   border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-md, 8px);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
@@ -218,4 +320,47 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* 预览顶栏 Portal 栈：功能栏 + 元信息行（视频/图片 LibTV 对齐） */
+.previewToolbarChrome--stack {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  pointer-events: auto;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.nodePreviewChromeStack {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--chrome-preview-stack-gap, 4px);
+  width: 100%;
+}
+
+.nodePreviewChromeMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 14px;
+  padding: 0 var(--chrome-meta-inset-x, 4px);
+  line-height: 1;
+}
+
+.nodePreviewChromeMeta .nodeChrome-metaStatus,
+.nodePreviewChromeMeta .minimal-image-top-right {
+  position: static;
+  top: auto;
+  right: auto;
+  flex-shrink: 0;
+}
+
+.nodePreviewChromeMeta-spacer {
+  flex: 1;
+  min-width: 0;
 }

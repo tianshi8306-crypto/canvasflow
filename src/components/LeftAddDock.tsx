@@ -1,11 +1,23 @@
-import { useCallback, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
 import type { Node } from "@xyflow/react";
 import { useReactFlow } from "@xyflow/react";
 import { useProjectStore } from "@/store/projectStore";
-import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
+import { spawnNodeInView } from "@/lib/canvasSpawnNode";
 import type { FlowNodeData } from "@/lib/types";
-import { CanvasProjectPanel } from "./CanvasProjectPanel";
+import {
+  IconMenuAudio,
+  IconMenuFfmpeg,
+  IconMenuImage,
+  IconMenuScript,
+  IconMenuText,
+  IconMenuVideo,
+} from "@/components/canvas/canvasMenuNodeIcons";
+import {
+  IconHeadsetSupport,
+  LeftAddDockSupportPopover,
+} from "@/components/LeftAddDockSupportPopover";
+import { MaterialLibraryModal } from "@/components/MaterialLibraryModal";
 
 function makeNode(type: string, data: FlowNodeData): Node<FlowNodeData> {
   return {
@@ -25,74 +37,12 @@ type Props = {
   onOpenGallery: () => void;
 };
 
-function IconLogo() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="3" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-    </svg>
-  );
-}
-
-function IconText() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 6h16M4 12h16M4 18h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IconImage() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="m8 14 3-3 4 5 3-4 4 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <circle cx="9" cy="9" r="1.5" fill="currentColor" />
-    </svg>
-  );
-}
-function IconVideo() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M10 9.5v5l4-2.5-4-2.5z" fill="currentColor" />
-    </svg>
-  );
-}
-function IconAudio() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M12 4v16M8 8v8M16 8v8M4 10v4M20 10v4"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-function IconScript() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M7 3h8l4 4v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <path d="M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
-function IconCut() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="6" cy="6" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <circle cx="18" cy="18" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M9 9l6 6M15 9l-6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
-}
+const IconText = () => <IconMenuText size={18} />;
+const IconImage = () => <IconMenuImage size={18} />;
+const IconVideo = () => <IconMenuVideo size={18} />;
+const IconAudio = () => <IconMenuAudio size={18} />;
+const IconScript = () => <IconMenuScript size={18} />;
+const IconCut = () => <IconMenuFfmpeg size={18} />;
 function IconUpload() {
   return (
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -126,6 +76,15 @@ function IconSettings() {
   );
 }
 
+function IconMaterialLibrary() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3.5" y="5.5" width="17" height="15" rx="2.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M8 3.5h8M9.5 12h5M9.5 15.5h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function DockRow({
   icon,
   label,
@@ -148,61 +107,85 @@ function DockRow({
 /** 画布左侧：折叠栏 + 展开「添加」面板（文案不含「节点」） */
 export function LeftAddDock({ open, onOpen, onClose, projectPath, onRequestUploadFiles, onOpenGallery }: Props) {
   const addNode = useProjectStore((s) => s.addNode);
-  const { getViewport } = useReactFlow();
-  const projectPanelOpen = useCanvasUiStore((s) => s.projectPanelOpen);
-  const setProjectPanelOpen = useCanvasUiStore((s) => s.setProjectPanelOpen);
+  const { screenToFlowPosition } = useReactFlow();
+  const supportBtnRef = useRef<HTMLButtonElement>(null);
+  const materialLibraryBtnRef = useRef<HTMLButtonElement>(null);
+  const [supportOpen, setSupportOpen] = useState(false);
+  const [materialLibraryOpen, setMaterialLibraryOpen] = useState(false);
 
-  const addAtCenter = useCallback(() => {
-    const vp = getViewport();
-    const cx = (window.innerWidth / 2) / vp.zoom;
-    const cy = (window.innerHeight * 0.65) / vp.zoom;
-    return { x: vp.x + cx, y: vp.y + cy };
-  }, [getViewport]);
+  const handleClosePanels = useCallback(() => {
+    setMaterialLibraryOpen(false);
+    onClose();
+  }, [onClose]);
 
   const doAdd = useCallback(
     (factory: () => Node<FlowNodeData>) => {
-      const n = factory();
-      n.position = addAtCenter();
-      addNode(n);
-      onClose();
+      spawnNodeInView(factory, {
+        screenToFlowPosition,
+        addNode,
+        getExistingNodes: () => useProjectStore.getState().nodes,
+        yRatio: 0.52,
+      });
+      handleClosePanels();
     },
-    [addAtCenter, addNode, onClose],
+    [addNode, handleClosePanels, screenToFlowPosition],
   );
+
+  const toggleSupport = useCallback(() => {
+    setMaterialLibraryOpen(false);
+    setSupportOpen((prev) => !prev);
+  }, []);
+
+  const toggleMaterialLibrary = useCallback(() => {
+    setSupportOpen(false);
+    setMaterialLibraryOpen((prev) => {
+      const next = !prev;
+      if (next) onClose();
+      return next;
+    });
+  }, [onClose]);
+
+  const handleOpenAdd = useCallback(() => {
+    setMaterialLibraryOpen(false);
+    onOpen();
+  }, [onOpen]);
 
   return (
     <div className={`leftAddDock${open ? " leftAddDock--open" : ""}`}>
       <div className="leftAddDockRail" role="toolbar" aria-label="画布工具">
-        {/* Logo 按钮 */}
-        <button
-          type="button"
-          className="leftAddDockFab leftAddDockLogoBtn"
-          onClick={() => setProjectPanelOpen(!projectPanelOpen)}
-          title="画布项目"
-        >
-          <IconLogo />
-        </button>
-
         <button
           type="button"
           className={open ? "leftAddDockFab leftAddDockFab--close" : "leftAddDockFab"}
-          onClick={open ? onClose : onOpen}
+          onClick={open ? handleClosePanels : handleOpenAdd}
           title={open ? "收起" : "添加"}
           aria-expanded={open}
         >
-          {open ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
-              <path
-                d="M6 6l12 12M18 6L6 18"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-          ) : (
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
-              <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            {open ? (
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden>
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+            ) : (
+              <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
+                <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
           )}
+        </button>
+
+        <button
+          ref={materialLibraryBtnRef}
+          type="button"
+          className={`leftAddDockFab${materialLibraryOpen ? " leftAddDockFab--active" : ""}`}
+          onClick={toggleMaterialLibrary}
+          title="素材库"
+          aria-expanded={materialLibraryOpen}
+          aria-haspopup="dialog"
+        >
+          <IconMaterialLibrary />
         </button>
 
         <button
@@ -212,6 +195,18 @@ export function LeftAddDock({ open, onOpen, onClose, projectPath, onRequestUploa
           title="设置"
         >
           <IconSettings />
+        </button>
+
+        <button
+          ref={supportBtnRef}
+          type="button"
+          className={`leftAddDockFab${supportOpen ? " leftAddDockFab--active" : ""}`}
+          onClick={toggleSupport}
+          title="技术支持"
+          aria-expanded={supportOpen}
+          aria-haspopup="dialog"
+        >
+          <IconHeadsetSupport />
         </button>
       </div>
 
@@ -263,7 +258,7 @@ export function LeftAddDock({ open, onOpen, onClose, projectPath, onRequestUploa
               label="上传"
               onClick={() => {
                 void onRequestUploadFiles();
-                onClose();
+                handleClosePanels();
               }}
             />
             <DockRow
@@ -272,16 +267,27 @@ export function LeftAddDock({ open, onOpen, onClose, projectPath, onRequestUploa
               disabled={!projectPath}
               onClick={() => {
                 onOpenGallery();
-                onClose();
+                handleClosePanels();
               }}
             />
           </div>
-          {!projectPath ? <p className="leftAddDockFootNote">打开工程后可从图库选择素材</p> : null}
+          {!projectPath ? (
+            <p className="leftAddDockFootNote">请从顶栏打开或新建工程后使用图库</p>
+          ) : null}
         </div>
       ) : null}
 
-      {/* 画布项目面板 */}
-      <CanvasProjectPanel />
+      <MaterialLibraryModal
+        open={materialLibraryOpen}
+        anchorRef={materialLibraryBtnRef}
+        onClose={() => setMaterialLibraryOpen(false)}
+      />
+
+      <LeftAddDockSupportPopover
+        open={supportOpen}
+        anchorRef={supportBtnRef}
+        onClose={() => setSupportOpen(false)}
+      />
     </div>
   );
 }

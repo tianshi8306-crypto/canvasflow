@@ -59,6 +59,14 @@ npm run quality:gate:full
 
 `quality:gate:full` = `quality:gate` + `npm run test:e2e`（会自动拉起 `npm run dev` 作为 webServer）。
 
+日常 PR 推荐（门禁 + 黄金路径 3 条 E2E）：
+
+```bash
+npm run release:check
+```
+
+发版前完整清单见 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)。
+
 ### 端到端（E2E，Playwright）
 
 首次在本机跑 E2E 前需安装浏览器内核：
@@ -66,7 +74,11 @@ npm run quality:gate:full
 ```bash
 npm run test:e2e:install
 npm run test:e2e
+# 仅黄金路径 3 条冒烟（更快）
+npm run test:e2e:golden
 ```
+
+主链路手工步骤见 [`docs/product/GOLDEN_PATH.md`](docs/product/GOLDEN_PATH.md)。
 
 CI 中会单独跑 E2E，并上传 `playwright-report` 与 `test-results` 产物；`e2e/visual-archive.spec.ts` 会附带首屏截图便于人工验收（非像素对比基线）。
 

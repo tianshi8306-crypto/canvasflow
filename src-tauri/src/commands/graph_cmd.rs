@@ -100,6 +100,8 @@ pub async fn llm_complete_text(
     state: tauri::State<'_, AppState>,
     system_prompt: Option<String>,
     user_prompt: String,
+    provider_id: Option<String>,
+    model: Option<String>,
 ) -> Result<String, String> {
     use serde_json::json;
     let s = settings::load_settings(&app)?;
@@ -110,5 +112,12 @@ pub async fn llm_complete_text(
         ]),
         _ => json!([{ "role": "user", "content": user_prompt }]),
     };
-    executor::openai_chat_completion(&state.http, &s, messages, &json!({})).await
+    let mut extra = json!({});
+    if let Some(pid) = provider_id.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        extra["providerId"] = json!(pid);
+    }
+    if let Some(m) = model.as_deref().map(str::trim).filter(|s| !s.is_empty()) {
+        extra["model"] = json!(m);
+    }
+    executor::openai_chat_completion(&state.http, &s, messages, &extra).await
 }

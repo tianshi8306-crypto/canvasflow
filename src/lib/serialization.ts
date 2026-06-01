@@ -32,6 +32,9 @@ interface CanvasV1 {
 export type CanvasProjectMeta = {
   imageNodeCounter?: number;
   videoNodeCounter?: number;
+  textNodeCounter?: number;
+  audioNodeCounter?: number;
+  scriptNodeCounter?: number;
 };
 
 /** v2 canvas（统一图片节点：imageAsset → imageNode） */
@@ -221,15 +224,47 @@ function parseCanvasMeta(raw: unknown): CanvasProjectMeta | undefined {
     typeof m.videoNodeCounter === "number" && Number.isFinite(m.videoNodeCounter)
       ? Math.max(0, Math.floor(m.videoNodeCounter))
       : undefined;
-  if (imageNodeCounter == null && videoNodeCounter == null) return undefined;
-  return { imageNodeCounter, videoNodeCounter };
+  const textNodeCounter =
+    typeof m.textNodeCounter === "number" && Number.isFinite(m.textNodeCounter)
+      ? Math.max(0, Math.floor(m.textNodeCounter))
+      : undefined;
+  const audioNodeCounter =
+    typeof m.audioNodeCounter === "number" && Number.isFinite(m.audioNodeCounter)
+      ? Math.max(0, Math.floor(m.audioNodeCounter))
+      : undefined;
+  const scriptNodeCounter =
+    typeof m.scriptNodeCounter === "number" && Number.isFinite(m.scriptNodeCounter)
+      ? Math.max(0, Math.floor(m.scriptNodeCounter))
+      : undefined;
+  if (
+    imageNodeCounter == null &&
+    videoNodeCounter == null &&
+    textNodeCounter == null &&
+    audioNodeCounter == null &&
+    scriptNodeCounter == null
+  ) {
+    return undefined;
+  }
+  return {
+    imageNodeCounter,
+    videoNodeCounter,
+    textNodeCounter,
+    audioNodeCounter,
+    scriptNodeCounter,
+  };
 }
+
+export type SerializeCanvasOptions = {
+  /** 默认 false：紧凑 JSON，自动保存更快 */
+  pretty?: boolean;
+};
 
 export function serializeCanvas(
   nodes: Node<FlowNodeData>[],
   edges: Edge[],
   viewport: Viewport,
   meta?: CanvasProjectMeta,
+  options?: SerializeCanvasOptions,
 ): string {
   const payload: CanvasV2 = {
     version: CURRENT_CANVAS_VERSION,
@@ -237,10 +272,17 @@ export function serializeCanvas(
     nodes,
     edges,
   };
-  if (meta && (meta.imageNodeCounter != null || meta.videoNodeCounter != null)) {
+  if (
+    meta &&
+    (meta.imageNodeCounter != null ||
+      meta.videoNodeCounter != null ||
+      meta.textNodeCounter != null ||
+      meta.audioNodeCounter != null ||
+      meta.scriptNodeCounter != null)
+  ) {
     payload.meta = meta;
   }
-  return JSON.stringify(payload, null, 2);
+  return JSON.stringify(payload, null, options?.pretty ? 2 : undefined);
 }
 
 export function parseCanvas(raw: string): {

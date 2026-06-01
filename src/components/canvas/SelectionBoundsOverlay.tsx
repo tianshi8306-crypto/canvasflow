@@ -18,7 +18,7 @@ export function SelectionBoundsOverlay({ marqueeActive }: Props) {
 
   useLayoutEffect(() => {
     if (selectedNodeIds.length < 2 || marqueeActive) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setRect(null);
       return;
     }

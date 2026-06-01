@@ -16,6 +16,11 @@ import {
 } from "@/lib/videoGeneration/videoAspectSize";
 
 import { defaultVideoGenerationDraft, defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
+import {
+  getVideoGenerationDisplayLabel,
+  getVideoGenerationProgressPercent,
+  isVideoGenerationInProgress,
+} from "@/lib/video/videoGenerationProgressDisplay";
 
 import type { TextToVideoAspectId } from "@/lib/videoNodeTypes";
 
@@ -27,7 +32,13 @@ import { useProjectStore } from "@/store/projectStore";
 
 import { VideoChromePreview } from "@/components/nodes/VideoChromePreview";
 
-import { NodeChromeShell, NodeMetaLabel, NodeMetaStatus } from "@/components/nodes/nodeChrome";
+import {
+  NodeChromeProvider,
+  NodeChromeShell,
+  NodeMetaLabel,
+  NodeMetaStatus,
+  NodePanelPlaceholder,
+} from "@/components/nodes/nodeChrome";
 
 import { NodeAnchors } from "./anchors";
 
@@ -54,9 +65,6 @@ export function MinimalVideoNode({
 
   const expandedGenPanelId = useCanvasUiStore((s) => s.videoGenPanelExpandedNodeId);
 
-  const pinnedGenPanelId = useCanvasUiStore((s) => s.videoGenPanelPinnedNodeId);
-
-  const setPinnedGenPanelId = useCanvasUiStore((s) => s.setVideoGenPanelPinnedNodeId);
   const videoTrimEditingNodeId = useCanvasUiStore((s) => s.videoTrimEditingNodeId);
   const setVideoTrimEditingNodeId = useCanvasUiStore((s) => s.setVideoTrimEditingNodeId);
   const videoSubtitleRegionEditingNodeId = useCanvasUiStore(
@@ -76,11 +84,7 @@ export function MinimalVideoNode({
 
   const draft = videoBlock.draft ?? defaultVideoGenerationDraft();
 
-  const [genPanelPinned, setGenPanelPinned] = useState(false);
-
-  const dockedBelow = genPanelPinned || pinnedGenPanelId === id;
-
-  const showGenPanel = expandedChrome && (!hasPath || dockedBelow) && expandedGenPanelId !== id;
+  const showGenPanel = expandedChrome && expandedGenPanelId !== id;
 
   const showPreviewToolbar = expandedChrome && hasPath;
 
@@ -88,17 +92,12 @@ export function MinimalVideoNode({
 
   useEffect(() => {
     if (!selected) {
-      setGenPanelPinned(false);
-
-      if (pinnedGenPanelId === id) setPinnedGenPanelId(null);
       if (videoTrimEditingNodeId === id) setVideoTrimEditingNodeId(null);
       if (videoSubtitleRegionEditingNodeId === id) setVideoSubtitleRegionEditingNodeId(null);
     }
   }, [
     id,
-    pinnedGenPanelId,
     selected,
-    setPinnedGenPanelId,
     setVideoTrimEditingNodeId,
     setVideoSubtitleRegionEditingNodeId,
     videoSubtitleRegionEditingNodeId,
@@ -114,6 +113,7 @@ export function MinimalVideoNode({
   );
 
   const [videoSize, setVideoSize] = useState<{ w: number; h: number } | null>(null);
+  const [previewOverlayEl, setPreviewOverlayEl] = useState<HTMLDivElement | null>(null);
 
   const previewRef = useRef<HTMLDivElement>(null);
 
@@ -194,14 +194,20 @@ export function MinimalVideoNode({
     };
   }, [selected, deleteSelection]);
 
-  const nodeStatus = data.status;
-
-  const isGenerating =
-    nodeStatus?.status === "running" &&
-    typeof nodeStatus.progress === "number" &&
-    Number.isFinite(nodeStatus.progress);
-
-  const genProgress = isGenerating ? Math.round(nodeStatus.progress!) : null;
+  const jobStatus = videoBlock.activeJob?.status;
+  const isGenerating = isVideoGenerationInProgress({ status: jobStatus });
+  const genProgressPercent = isGenerating
+    ? getVideoGenerationProgressPercent({
+        status: jobStatus,
+        progress: videoBlock.activeJob?.progress,
+      })
+    : undefined;
+  const generatingLabel = isGenerating
+    ? getVideoGenerationDisplayLabel({
+        status: jobStatus,
+        progress: videoBlock.activeJob?.progress,
+      })
+    : undefined;
 
   const dimW = videoSize?.w;
 
@@ -212,11 +218,16 @@ export function MinimalVideoNode({
   const dimsText = showDims ? `${dimW}\u00d7${dimH}` : null;
 
   return (
-    <>
+    <NodeChromeProvider>
       <NodeMetaLabel label={label} defaultLabel="视频" onCommit={commitLabel} />
 
-      {hasPath ? (
-        <NodeMetaStatus dimsText={dimsText} generating={isGenerating} progress={genProgress} />
+      {(hasPath || isGenerating) ? (
+        <NodeMetaStatus
+          dimsText={dimsText}
+          generating={isGenerating}
+          progress={genProgressPercent}
+          generatingLabel={generatingLabel}
+        />
       ) : null}
 
       {showEmptyUpload ? <VideoNodeEmptyUpload nodeId={id} /> : null}
@@ -238,11 +249,10 @@ export function MinimalVideoNode({
           />
         ) : (
           <div className="nodeChrome-placeholder minimal-video-placeholder" aria-hidden>
-            <svg viewBox="0 0 24 24" fill="#616161" aria-hidden>
-              <path d="M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 2.5v-7l-4 2.5z" />
-            </svg>
+            <NodePanelPlaceholder kind="videoNode" />
           </div>
         )}
+        <div className="nodeChrome-previewGenOverlay" ref={setPreviewOverlayEl} />
       </NodeChromeShell>
 
       <VideoPreviewToolbarPortal
@@ -257,7 +267,8 @@ export function MinimalVideoNode({
         anchorRef={previewRef}
         active={showGenPanel}
         panelRef={panelRef}
+        previewOverlayEl={previewOverlayEl}
       />
-    </>
+    </NodeChromeProvider>
   );
 }

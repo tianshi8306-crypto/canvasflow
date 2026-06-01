@@ -19,16 +19,13 @@ export async function appendNodeAgentEvent(params: {
   error?: string;
   runId?: string;
 }): Promise<string> {
-  // 若未提供 run_id，生成一个（用于单节点即席运行）
-  const effectiveRunId = params.runId ?? crypto.randomUUID();
-  await invoke<void>("append_node_agent_event", {
+  return invoke<string>("append_node_agent_event", {
     projectPath: params.projectPath,
     nodeId: params.nodeId,
     agentName: params.agentName,
     phase: params.phase,
     elapsedMs: params.elapsedMs,
     error: params.error ?? null,
-    runId: effectiveRunId,
+    runId: params.runId?.trim() ? params.runId.trim() : null,
   });
-  return effectiveRunId;
 }

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import "./TtvShared.css";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import { CAMERA_PRESETS } from "@/lib/ttvCameraPresets";
 import { cardLabelFromMove } from "@/lib/ttvCameraUi";
@@ -60,7 +61,7 @@ export function TtvCameraMovementModal({
 
   useEffect(() => {
     if (!open) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setEditorOpen(false);
        
       setEditingId(null);

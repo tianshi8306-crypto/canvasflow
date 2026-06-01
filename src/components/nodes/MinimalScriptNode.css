@@ -1,0 +1,352 @@
+/* 脚本节点 Chrome：壳 + 顶栏/底栏 Portal（共享 nodeChrome 见 nodeChrome/） */
+
+/* ── 顶栏（有内容时）── */
+.scriptPreviewToolbarPortalRoot {
+  width: max-content;
+  max-width: min(600px, 92vw);
+}
+
+.scriptPreviewToolbarChrome {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+  height: auto;
+  min-height: 0;
+  width: max-content;
+}
+
+.scriptPreviewToolbarChrome .scriptPreviewToolbar {
+  max-width: min(600px, 92vw);
+  background: var(--gen-panel-bg, #2b2b2b);
+  border: 1px solid var(--border-button);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+  padding: 4px 6px;
+}
+
+.scriptPreviewToolbar-scroll {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-wrap: nowrap;
+}
+
+.scriptPreviewToolbar-labeledBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  line-height: 1;
+  font-family: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.scriptPreviewToolbar-labeledBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.scriptPreviewToolbar-labeledBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scriptPreviewToolbar-btnIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.scriptPreviewToolbar-btnLabel {
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+
+.scriptPreviewToolbar-divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 22px;
+  margin: 0 6px;
+  background: rgba(255, 255, 255, 0.14);
+  flex-shrink: 0;
+}
+
+.scriptPreviewToolbar-iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.88);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.scriptPreviewToolbar-iconBtn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.scriptPreviewToolbar-iconBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.scriptChrome-shell.nodeChrome-shell {
+  min-width: 0;
+}
+
+.scriptChrome-preview.nodeChrome-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 8px 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: auto;
+}
+
+.scriptChrome-previewInner {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+.scriptChrome-previewInner--openFullscreen {
+  cursor: pointer;
+  border-radius: 8px;
+  outline: none;
+}
+
+.scriptChrome-previewInner--openFullscreen:hover {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.scriptChrome-previewInner--openFullscreen:focus-visible {
+  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.35);
+}
+
+.scriptChrome-themeSnippet {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.35;
+  color: #94a3b8;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 空态：与文本节点一致，仅居中占位图标 */
+.scriptChrome-placeholder.scriptChrome-emptyShell {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 12px;
+  height: 100%;
+  box-sizing: border-box;
+  pointer-events: none;
+}
+
+/* 脚本底栏 Zone A：标记按钮（尺寸在 TextNodeChrome tgp 体系内） */
+.textGenPanel--chrome.scriptGenComposer .tgp-v2-zone-a-start {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.textGenPanel--chrome.scriptGenComposer .tgp-marker-btn.tgp-marker-btn--active {
+  color: #7dd3c0;
+}
+
+/* 壳内迷你表（自 global.css 迁入） */
+.scriptNodeViewTag {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5eead4;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(20, 184, 166, 0.12);
+  border: 1px solid rgba(20, 184, 166, 0.28);
+}
+
+.scriptNodeMiniGrid {
+  flex: 1;
+  min-height: 0;
+  border: 1px solid #2a3344;
+  border-radius: 8px;
+  overflow: auto;
+  background: #0a0e14;
+  scrollbar-width: thin;
+}
+
+.scriptNodeMiniHead,
+.scriptNodeMiniRow {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 0;
+  align-items: stretch;
+  font-size: 11px;
+}
+
+.scriptNodeMiniHead {
+  background: #1a2230;
+  color: #94a3b8;
+  font-weight: 600;
+  border-bottom: 1px solid #2a3344;
+}
+
+.scriptNodeMiniHead span {
+  padding: 4px 6px;
+}
+
+.scriptNodeMiniRow {
+  border-bottom: 1px solid #1e2636;
+}
+
+.scriptNodeMiniRow:last-child {
+  border-bottom: none;
+}
+
+.scriptNodeMiniRow:nth-child(even) {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.scriptNodeMiniIdx {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  color: #cbd5e1;
+  background: var(--cf-charcoal-inset);
+  border-right: 1px solid #1e2636;
+}
+
+.scriptNodeMiniDesc {
+  padding: 4px 6px;
+  color: #b7c1d4;
+  line-height: 1.3;
+  align-self: center;
+  font-size: 10px;
+}
+
+.scriptNodeMiniFoot {
+  font-size: 10px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+.scriptChrome-floatRow {
+  position: absolute;
+  top: -40px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% + 80px);
+  pointer-events: none;
+}
+
+.scriptChrome-floatRow .nodeChrome-upload-float {
+  position: static;
+  top: auto;
+  left: auto;
+  transform: none;
+  pointer-events: auto;
+}
+
+.scriptChrome-sync-float {
+  z-index: 5;
+}
+
+.scriptChrome-ref-video-float {
+  max-width: 150px;
+}
+
+.scriptChrome-upstream-float {
+  max-width: 160px;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.scriptUpstreamPanel {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(94, 234, 212, 0.25);
+  background: rgba(20, 184, 166, 0.08);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scriptUpstreamPanel--warn {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+}
+
+.scriptUpstreamPanel-hint,
+.scriptUpstreamPanel-msg {
+  margin: 0 0 6px;
+  color: var(--muted);
+}
+
+.scriptUpstreamPanel-list {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.scriptUpstreamPanel-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.scriptUpstreamPanel-label {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.scriptUpstreamPanel-meta {
+  font-size: 11px;
+  color: #94a3b8;
+}
+
+.scriptUpstreamPanel-locateBtn {
+  padding: 2px 8px;
+  font-size: 11px;
+  min-height: 0;
+}

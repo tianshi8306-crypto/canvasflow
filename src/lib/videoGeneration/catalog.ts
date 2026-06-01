@@ -1,5 +1,14 @@
 import type { VideoGenerationWorkflow, VideoModelId } from "@/lib/videoNodeTypes";
 
+export type { VideoModelCapabilities } from "@/lib/videoGeneration/modelCapabilities";
+export {
+  formatVideoModelCapabilitySubtitle,
+  getVideoModelCapabilities,
+  isCatalogResolutionSupported,
+  normalizeVideoOutputForModel,
+  supportedCatalogResolutions,
+} from "@/lib/videoGeneration/modelCapabilities";
+
 export type VideoModelCatalogEntry = {
   id: VideoModelId;
   /** 展示名 */
@@ -10,18 +19,20 @@ export type VideoModelCatalogEntry = {
   supportedWorkflows?: VideoGenerationWorkflow[];
 };
 
-/** 视频节点模型下拉：内置项（含即梦 CLI，与 settings 自定义项合并） */
+/** 视频节点模型下拉：内置默认 2 项（与 settings 预设一致） */
 export const VIDEO_BUILTIN_MODEL_OPTIONS: { id: string; label: string }[] = [
   { id: "doubao_seedance_2_0", label: "Doubao Seedance 2.0" },
   { id: "dreamina/seedance2.0", label: "即梦 Seedance 2.0（CLI）" },
-  { id: "dreamina/seedance2.0fast", label: "即梦 Seedance 2.0 Fast（CLI）" },
-  { id: "dreamina/3.5pro", label: "即梦 3.5 Pro（CLI）" },
-  { id: "dreamina/3.0pro", label: "即梦 3.0 Pro（CLI）" },
 ];
 
 /** Mock / 文档用模型池 */
 export const VIDEO_MODEL_CATALOG: VideoModelCatalogEntry[] = [
-  { id: "doubao_seedance_2_0", label: "Doubao-Seedance-2.0", provider: "doubao" },
+  {
+    id: "doubao_seedance_2_0",
+    label: "Doubao-Seedance-2.0",
+    provider: "doubao",
+    supportedWorkflows: undefined,
+  },
   ...VIDEO_BUILTIN_MODEL_OPTIONS.filter((m) => m.id.startsWith("dreamina/")).map((m) => ({
     id: m.id,
     label: m.label.replace("（CLI）", ""),

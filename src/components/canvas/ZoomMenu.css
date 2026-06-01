@@ -1,34 +1,8 @@
-/* ── ZoomMenu ── */
-/* 使用 canvas-float-* 变量系统与 canvasPaneCtxMenu 保持一致 */
+/* 缩放菜单：壳层/行/标题与 canvasPaneCtxMenu 共用 global.css token */
 .zoomMenu {
   position: fixed;
-  background: var(--canvas-float-bg);
-  backdrop-filter: blur(var(--canvas-float-blur));
-  -webkit-backdrop-filter: blur(var(--canvas-float-blur));
-  border: 1px solid var(--canvas-float-border);
-  border-radius: var(--canvas-float-radius-lg);
-  padding: 6px 0;
   min-width: 150px;
-  box-shadow: var(--canvas-float-shadow);
-  z-index: 20;
-}
-
-.zoomMenuItem {
-  display: flex;
-  align-items: center;
-  width: 100%;
-  padding: 9px 14px;
-  border: none;
-  background: transparent;
+  z-index: var(--canvas-z-zoom-menu);
   color: var(--text);
-  font-size: 13px;
-  font-family: inherit;
-  text-align: left;
-  cursor: pointer;
-  border-radius: 0;
-  transition: background 0.12s;
-}
-
-.zoomMenuItem:hover {
-  background: var(--canvas-float-hover);
+  font: inherit;
 }

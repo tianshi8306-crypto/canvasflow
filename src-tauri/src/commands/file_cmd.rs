@@ -20,7 +20,7 @@ pub fn read_file_as_base64(path: String) -> Result<String, String> {
         Some(30 * 1024 * 1024) // 图片 30MB
     } else if matches!(ext.as_str(), "mp4" | "mov") {
         Some(50 * 1024 * 1024) // 视频 50MB
-    } else if matches!(ext.as_str(), "mp3" | "wav" | "aac" | "ogg") {
+    } else if matches!(ext.as_str(), "mp3" | "wav" | "aac" | "m4a" | "flac" | "ogg") {
         Some(15 * 1024 * 1024) // 音频 15MB
     } else {
         None // 未知类型，不限制
@@ -47,6 +47,59 @@ pub fn read_file_as_base64(path: String) -> Result<String, String> {
 #[tauri::command]
 pub fn write_file_bytes(path: String, bytes: Vec<u8>) -> Result<(), String> {
     std::fs::write(&path, &bytes).map_err(|e| format!("写入文件失败 {}：{}", path, e))
+}
+
+#[derive(serde::Serialize)]
+pub struct ExportAssetsBatchResult {
+    pub copied: Vec<String>,
+    pub skipped: Vec<String>,
+}
+
+/// 将工程内多个 assets 相对路径批量复制到工程子目录（默认 assets/export）
+#[tauri::command]
+pub fn export_project_assets_batch(
+    project_path: String,
+    rel_paths: Vec<String>,
+    dest_folder_rel: Option<String>,
+) -> Result<ExportAssetsBatchResult, String> {
+    let folder = dest_folder_rel
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "assets/export".to_string());
+    let export_dir = std::path::Path::new(&project_path).join(&folder);
+    std::fs::create_dir_all(&export_dir).map_err(|e| {
+        format!(
+            "创建导出目录失败 {}：{}",
+            export_dir.display(),
+            e
+        )
+    })?;
+    let stamp = chrono::Local::now().format("%Y%m%d_%H%M%S").to_string();
+    let mut copied = Vec::new();
+    let mut skipped = Vec::new();
+    for (i, rel) in rel_paths.iter().enumerate() {
+        let rel = rel.trim().replace('\\', "/");
+        if rel.is_empty() {
+            continue;
+        }
+        let src = std::path::Path::new(&project_path).join(&rel);
+        if !src.is_file() {
+            skipped.push(rel);
+            continue;
+        }
+        let fname = std::path::Path::new(&rel)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("asset");
+        let dest_name = format!("{stamp}_{i:02}_{fname}");
+        let dest = export_dir.join(&dest_name);
+        if std::fs::copy(&src, &dest).is_err() {
+            skipped.push(rel);
+            continue;
+        }
+        let dest_rel = format!("{}/{}", folder.trim_end_matches('/'), dest_name);
+        copied.push(dest_rel);
+    }
+    Ok(ExportAssetsBatchResult { copied, skipped })
 }
 
 /// 将工程 assets 内相对路径文件复制到用户指定路径（视频/图片下载）

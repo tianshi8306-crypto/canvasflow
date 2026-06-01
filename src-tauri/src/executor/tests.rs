@@ -148,11 +148,16 @@ async fn failed_node_aborts_run_when_abort_enabled() {
 #[tokio::test]
 async fn run_graph_emits_node_output_for_asset_nodes() {
     let dir = tempdir().expect("tempdir");
+    std::fs::create_dir_all(dir.path().join("assets")).expect("assets dir");
+    std::fs::write(dir.path().join("assets/demo.png"), b"x").expect("write");
+    let conn = db::open_run_db(dir.path()).expect("db");
+    let aid = db::upsert_asset(&conn, "assets/demo.png", "image", None, None).expect("upsert");
+
     let graph = CanvasGraph {
         nodes: vec![FlowNode {
             id: "img".into(),
             node_type: "imageNode".into(),
-            data: json!({ "path": "assets/demo.png" }),
+            data: json!({ "path": "assets/demo.png", "assetId": aid }),
         }],
         edges: vec![],
     };

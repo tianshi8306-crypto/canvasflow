@@ -1,3 +1,7 @@
+/**
+ * 侧栏 Inspector：组件与样式保留，当前未挂到 App 壳层（见 iteration-15 §0）。
+ * 运行时编辑真源：节点壳、Portal 浮层、脚本全屏与最大化 Overlay。
+ */
 import { useMemo } from "react";
 import {
   getImageEditIntent,
@@ -8,8 +12,22 @@ import {
   getImageScriptBoundPrompt,
   getImageScriptUpstreamState,
 } from "@/lib/imageGeneration/imageScriptPromptSync";
+import {
+  applyVideoPromptFromUpstreamText,
+  buildVideoPromptFromUpstreamText,
+  getVideoTextUpstreamState,
+} from "@/lib/videoGeneration/videoTextPromptSync";
+import {
+  applyVideoPromptFromUpstreamVideo,
+  buildVideoPromptFromUpstreamVideo,
+  getVideoVideoUpstreamState,
+} from "@/lib/videoGeneration/videoVideoPromptSync";
 import { scriptSyncButtonTitle } from "@/lib/incomingScriptBinding";
 import { ScriptNodeWorkbench } from "@/components/ScriptNodeWorkbench";
+import { SCRIPT_NODE_ENTRY_HINT } from "@/lib/scriptNodeCanvasEntries";
+import { ScriptUpstreamTextBanner } from "@/components/script/ScriptUpstreamTextBanner";
+import { ScriptReferenceVideoBanner } from "@/components/script/ScriptReferenceVideoBanner";
+import { ScriptHermesAutoChainControl } from "@/components/script/ScriptHermesAutoChainControl";
 import { ScriptStoryboardSection } from "@/components/ScriptStoryboardSection";
 import {
   incomingScriptUpstreamState,
@@ -17,12 +35,14 @@ import {
   orderedIncomingScriptNodeIds,
 } from "@/lib/incomingScriptBinding";
 import { normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
 import {
   AUDIO_TTS_PROMPT_MAX_CHARS,
   IMAGE_GENERATION_PROMPT_MAX_CHARS,
   VIDEO_GENERATION_DRAFT_PROMPT_MAX_CHARS,
 } from "@/lib/promptLimits";
 import { defaultVideoGenerationDraft, defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
+import { formatVideoDraftInspectorSummary } from "@/lib/video/videoInspectorSummary";
 import { useProjectStore } from "@/store/projectStore";
 
 export function Inspector() {
@@ -117,7 +137,7 @@ export function Inspector() {
       : type === "scriptNode"
         ? "脚本"
         : type === "ffmpegConcat"
-          ? "视频合成"
+          ? "剪辑"
           : type === "imageNode"
             ? "图片"
             : type === "videoNode"
@@ -133,9 +153,7 @@ export function Inspector() {
     type === "imageNode" ||
     type === "videoNode" ||
     type === "audioNode";
-  const imagePromptLen = (node.data.prompt ?? "").length;
   const audioPromptLen = (node.data.prompt ?? "").length;
-  const videoPromptLen = (node.data.video?.draft?.prompt ?? "").length;
   const scriptUpstreamState =
     type === "imageNode" || type === "audioNode" || type === "videoNode"
       ? incomingScriptUpstreamState(nodes, edges, node.id)
@@ -292,9 +310,6 @@ export function Inspector() {
             placeholder="描述待生成或编辑的画面；也可在画布图片节点展开区编辑"
             rows={5}
           />
-          <div className="fieldCounter">
-            {imagePromptLen}/{IMAGE_GENERATION_PROMPT_MAX_CHARS}
-          </div>
           <div className="inspectorWeakHint">
             编辑模式：{getImageEditIntent(node.data).active ? "开启" : "关闭"}
             {getImageEditIntent(node.data).active ? (
@@ -364,8 +379,24 @@ export function Inspector() {
       )}
 
       {type === "videoNode" && (
-        <div className="field">
-          <label>视频生成提示词（与节点内文生视频面板同步）</label>
+        <>
+          <div className="field">
+            <label>生成参数摘要</label>
+            <p className="inspectorVideoDraftSummary mono">
+              {formatVideoDraftInspectorSummary(
+                node.data.video?.draft ?? defaultVideoGenerationDraft(),
+              )}
+            </p>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => useProjectStore.getState().setSelectedNodeIds([node.id])}
+            >
+              在画布编辑
+            </button>
+          </div>
+          <div className="field">
+            <label>视频生成提示词（与节点内文生视频面板同步）</label>
           <textarea
             value={node.data.video?.draft?.prompt ?? ""}
             onChange={(e) => {
@@ -383,10 +414,66 @@ export function Inspector() {
             placeholder="描述成片内容、风格与镜头；也可在画布视频节点展开区编辑"
             rows={5}
           />
-          <div className="fieldCounter">
-            {videoPromptLen}/{VIDEO_GENERATION_DRAFT_PROMPT_MAX_CHARS}
+          <div className="inspectorScriptSyncRow">
+            <button
+              type="button"
+              className="btn"
+              disabled={!buildVideoPromptFromUpstreamVideo(nodes, edges, node.id)?.trim()}
+              title={scriptSyncButtonTitle(
+                getVideoVideoUpstreamState(nodes, edges, node.id),
+                "将上游视频节点的生成提示词同步到本节点",
+              )}
+              onClick={() => {
+                const result = applyVideoPromptFromUpstreamVideo(nodes, edges, node.id);
+                if (!result.ok) {
+                  setStatusText(result.statusMessage);
+                  return;
+                }
+                const cur = node.data.video;
+                const baseDraft = cur?.draft ?? defaultVideoGenerationDraft();
+                updateNodeData(node.id, {
+                  video: {
+                    ...defaultVideoNodePersisted(),
+                    ...cur,
+                    draft: { ...baseDraft, prompt: result.prompt },
+                  },
+                });
+                setStatusText("已从上游视频同步提示词");
+              }}
+            >
+              从上游视频同步
+            </button>
+            <button
+              type="button"
+              className="btn"
+              disabled={!buildVideoPromptFromUpstreamText(nodes, edges, node.id)?.trim()}
+              title={scriptSyncButtonTitle(
+                getVideoTextUpstreamState(nodes, edges, node.id),
+                "将上游文本节点正文注入为视频生成提示词",
+              )}
+              onClick={() => {
+                const result = applyVideoPromptFromUpstreamText(nodes, edges, node.id);
+                if (!result.ok) {
+                  setStatusText(result.statusMessage);
+                  return;
+                }
+                const cur = node.data.video;
+                const baseDraft = cur?.draft ?? defaultVideoGenerationDraft();
+                updateNodeData(node.id, {
+                  video: {
+                    ...defaultVideoNodePersisted(),
+                    ...cur,
+                    draft: { ...baseDraft, prompt: result.prompt },
+                  },
+                });
+                setStatusText("已从上游文本注入视频提示词");
+              }}
+            >
+              从文本注入
+            </button>
           </div>
-        </div>
+          </div>
+        </>
       )}
 
       {(type === "textNode" || type === "scriptNode") && (
@@ -398,6 +485,10 @@ export function Inspector() {
 
       {isScript && (
         <>
+          <p className="scriptInspectorEntryHint">{SCRIPT_NODE_ENTRY_HINT}</p>
+          <ScriptUpstreamTextBanner nodeId={node.id} variant="inline" />
+          <ScriptReferenceVideoBanner nodeId={node.id} variant="inline" />
+          <ScriptHermesAutoChainControl nodeId={node.id} />
           <ScriptNodeWorkbench
             nodeId={node.id}
             beats={node.data.scriptBeats ?? []}
@@ -416,22 +507,25 @@ export function Inspector() {
 
       {type === "ffmpegConcat" && (
         <>
+          <p className="inspectorWeakHint">
+            片段与时间线请在全屏剪辑工作台编辑；脚本分镜区「导出成片」可一键填入并导出。
+          </p>
           <div className="field">
-            <label>输入（每行一个相对路径）</label>
-            <textarea
-              className="mono"
-              value={(node.data.inputs ?? []).join("\n")}
-              onChange={(e) => {
-                const lines = e.target.value
-                  .split("\n")
-                  .map((s) => s.trim())
-                  .filter(Boolean);
-                updateNodeData(node.id, { inputs: lines });
-              }}
-            />
+            <label>时间线片段</label>
+            <span className="mono">
+              {(node.data.timelineClips?.length ?? node.data.inputs?.length ?? 0)} 段
+              {node.data.path?.trim() ? " · 已成片" : ""}
+            </span>
           </div>
+          <button
+            type="button"
+            className="btn"
+            onClick={() => useCanvasUiStore.getState().setComposeEditorNodeId(node.id)}
+          >
+            打开剪辑工作台
+          </button>
           <div className="field">
-            <label>输出（相对工程目录）</label>
+            <label>输出路径</label>
             <input
               className="mono"
               value={node.data.output ?? ""}

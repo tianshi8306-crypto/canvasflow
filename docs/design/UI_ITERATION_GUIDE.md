@@ -5,6 +5,7 @@
 ## 1. 样式与真源
 
 - **真源**：[`src/styles/global.css`](../../src/styles/global.css)（语义变量、`.nodeCard`、`.btn`、侧栏 `.panelBody` 等）。
+- **配色真源**：[`canvas-color-system.md`](./canvas-color-system.md)（深炭黑 + 柔白、连线/浮层/节点分层；迭代 UI 不得与之冲突）。
 - **约定**：新界面优先复用现有 class；若新增全局样式，集中写在 `global.css` 并简短注释用途。
 - **非目标（默认）**：多主题皮肤、组件库发包、像素级设计标注，除非单独立项。
 

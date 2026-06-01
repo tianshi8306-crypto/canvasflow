@@ -38,11 +38,23 @@ export interface ValidationWarning {
   message: string;
 }
 
+// 生成时长（单镜 Seedance 输出；Hermes / 知识库 seedance-params.md 须与此一致）
+export const SEEDANCE_OUTPUT_DURATION_MIN = 4;
+export const SEEDANCE_OUTPUT_DURATION_MAX = 15;
+const OUTPUT_DURATION_MIN = SEEDANCE_OUTPUT_DURATION_MIN;
+const OUTPUT_DURATION_MAX = SEEDANCE_OUTPUT_DURATION_MAX;
+
+/** 多模态输入上限（@ 参考）；知识库与 UI 预检对齐 */
+export const SEEDANCE_MAX_REF_IMAGES = 9;
+export const SEEDANCE_MAX_REF_VIDEOS = 3;
+export const SEEDANCE_MAX_REF_AUDIOS = 3;
+export const SEEDANCE_MAX_REF_TOTAL = 12;
+
 // 文件数量限制
-const MAX_IMAGES = 9;
-const MAX_VIDEOS = 3;
-const MAX_AUDIOS = 3;
-const MAX_TOTAL_ASSETS = 12;
+const MAX_IMAGES = SEEDANCE_MAX_REF_IMAGES;
+const MAX_VIDEOS = SEEDANCE_MAX_REF_VIDEOS;
+const MAX_AUDIOS = SEEDANCE_MAX_REF_AUDIOS;
+const MAX_TOTAL_ASSETS = SEEDANCE_MAX_REF_TOTAL;
 
 // 文件大小限制 (bytes)
 const MAX_IMAGE_SIZE = 30 * 1024 * 1024; // 30MB
@@ -57,10 +69,6 @@ const VIDEO_PIXELS_MAX = 927408;
 
 // 音频限制
 const AUDIO_DURATION_MAX = 15;
-
-// 生成时长
-const OUTPUT_DURATION_MIN = 4;
-const OUTPUT_DURATION_MAX = 15;
 
 /** 从文件扩展名推断资产类型 */
 export function inferAssetKind(fileName: string): AssetKind | null {

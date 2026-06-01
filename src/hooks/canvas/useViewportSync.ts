@@ -1,34 +1,36 @@
 import { useEffect, useRef } from "react";
 import type { Viewport } from "@xyflow/react";
+import { viewportNearlyEqual } from "@/store/projectHistory";
 
 interface UseViewportSyncOptions {
   viewport: Viewport;
   getViewport: () => Viewport;
   setViewport: (vp: Viewport) => Promise<unknown>;
+  /** 工程切换时同步一次即可；勿监听 viewport 否则 onMoveEnd ↔ setViewport 死循环 */
+  syncKey: string;
 }
 
 export function useViewportSync({
   viewport,
   getViewport,
   setViewport,
+  syncKey,
 }: UseViewportSyncOptions) {
-  /** 避免 store→setViewport 触发的 onMoveEnd 再次 commit，形成视口抖动/死循环 */
   const viewportProgrammaticSyncRef = useRef(false);
+  const viewportRef = useRef(viewport);
+  viewportRef.current = viewport;
 
   useEffect(() => {
     let cancelled = false;
+    const target = viewportRef.current;
     const cur = getViewport();
-    if (
-      Math.abs(cur.x - viewport.x) < 0.5 &&
-      Math.abs(cur.y - viewport.y) < 0.5 &&
-      Math.abs(cur.zoom - viewport.zoom) < 0.0001
-    ) {
+    if (viewportNearlyEqual(cur, target)) {
       return;
     }
     viewportProgrammaticSyncRef.current = true;
     void (async () => {
       try {
-        await setViewport(viewport);
+        await setViewport(target);
       } finally {
         window.setTimeout(() => {
           if (!cancelled) viewportProgrammaticSyncRef.current = false;
@@ -39,7 +41,7 @@ export function useViewportSync({
       cancelled = true;
       viewportProgrammaticSyncRef.current = false;
     };
-  }, [viewport, getViewport, setViewport]);
+  }, [syncKey, getViewport, setViewport]);
 
   return { viewportProgrammaticSyncRef };
 }

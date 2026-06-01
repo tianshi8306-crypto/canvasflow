@@ -6,8 +6,28 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCallback, useMemo, useState } from "react";
 import { TtvVideoRefThumb } from "@/components/nodes/TtvVideoRefThumb";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
-import { collectClipRelPaths, DEFAULT_EXPORT_PATH } from "@/lib/compose";
+import {
+  clipsToRenderPayload,
+  collectClipRelPaths,
+  composeClipToTimeline,
+  applyExportFormatToPath,
+  DEFAULT_EXPORT_PATH,
+  resolveExportFormat,
+  normalizeTimelineClips,
+  TIMELINE_EXPORT_FORMATS,
+  patchComposeNodeAfterExport,
+  timelineClipsToNodePatch,
+} from "@/lib/compose";
+import { ComposeEditorExportSettings } from "@/components/compose/ComposeEditorExportSettings";
+import {
+  exportEncodeToInvokePayload,
+  normalizeExportEncode,
+  type TimelineExportEncodeSettings,
+} from "@/lib/compose/timelineExportEncode";
+import type { TimelineExportFormat } from "@/lib/compose/timelineExportFormat";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
+import "./FFmpegConcatPanel.css";
 
 export interface FFmpegConcatPanelProps {
   nodeId: string;
@@ -75,20 +95,20 @@ interface ClipItemProps {
 
 function ClipItem({ index, path, total, onRemove, onMoveUp, onMoveDown }: ClipItemProps) {
   return (
-    <div className="ffmpegClipItem">
-      <div className="ffmpegClipIndex">
+    <div className="fcp-clip-item">
+      <div className="fcp-clip-index">
         <span>{index + 1}</span>
       </div>
-      <div className="ffmpegClipThumb">
+      <div className="fcp-clip-thumb">
         <TtvVideoRefThumb relPath={path} />
       </div>
-      <div className="ffmpegClipName mono" title={path}>
+      <div className="fcp-clip-name mono" title={path}>
         {path.split("/").pop() ?? path}
       </div>
-      <div className="ffmpegClipReorder">
+      <div className="fcp-clip-reorder">
         <button
           type="button"
-          className="ffmpegClipReorderBtn"
+          className="fcp-clip-reorder-btn"
           onClick={onMoveUp}
           disabled={index === 0}
           title="上移"
@@ -97,7 +117,7 @@ function ClipItem({ index, path, total, onRemove, onMoveUp, onMoveDown }: ClipIt
         </button>
         <button
           type="button"
-          className="ffmpegClipReorderBtn"
+          className="fcp-clip-reorder-btn"
           onClick={onMoveDown}
           disabled={index >= total - 1}
           title="下移"
@@ -107,7 +127,7 @@ function ClipItem({ index, path, total, onRemove, onMoveUp, onMoveDown }: ClipIt
       </div>
       <button
         type="button"
-        className="ffmpegClipRemove"
+        className="fcp-clip-remove"
         onClick={onRemove}
         title="移除此片段"
       >
@@ -130,17 +150,31 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
 
   const nodeData = useMemo(() => nodes.find((n) => n.id === nodeId)?.data ?? {}, [nodes, nodeId]);
 
-  const inputs: string[] = useMemo(() => nodeData.inputs ?? [], [nodeData.inputs]);
+  const timelineClips = useMemo(() => normalizeTimelineClips(nodeData), [nodeData]);
+  const inputs: string[] = useMemo(
+    () => timelineClips.map((c) => c.relPath),
+    [timelineClips],
+  );
   const output: string = useMemo(
     () => nodeData.output?.trim() || DEFAULT_EXPORT_PATH,
     [nodeData.output],
   );
+  const exportFormat = useMemo(
+    () => resolveExportFormat(nodeData, output),
+    [nodeData, output],
+  );
+  const exportEncode = useMemo(() => normalizeExportEncode(nodeData), [nodeData]);
 
-  const setInputs = useCallback(
-    (next: string[]) => {
-      updateNodeData(nodeId, { inputs: next });
+  const setClipsFromPaths = useCallback(
+    (paths: string[]) => {
+      const prevByPath = new Map(timelineClips.map((c) => [c.relPath, c]));
+      const next = paths.map((relPath) => {
+        const existing = prevByPath.get(relPath);
+        return existing ?? composeClipToTimeline({ sourceNodeId: "", relPath });
+      });
+      updateNodeData(nodeId, timelineClipsToNodePatch(next));
     },
-    [nodeId, updateNodeData],
+    [nodeId, timelineClips, updateNodeData],
   );
 
   const handleRefreshFromEdges = useCallback(
@@ -155,7 +189,7 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
         const paths = await collectClipRelPaths(nodeId, nodes, edges, projectPath, {
           sortByScript,
         });
-        setInputs(paths);
+        setClipsFromPaths(paths);
         setStatus(paths.length > 0 ? `已刷新 ${paths.length} 个片段` : "未检测到可合成的上游视频");
         setOutputReady(false);
       } catch (e) {
@@ -164,49 +198,71 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
         setRefreshing(false);
       }
     },
-    [projectPath, nodeId, nodes, edges, setInputs],
+    [projectPath, nodeId, nodes, edges, setClipsFromPaths],
   );
 
   const handleRemoveClip = useCallback(
     (index: number) => {
-      const next = [...inputs];
+      const next = [...timelineClips];
       next.splice(index, 1);
-      setInputs(next);
+      updateNodeData(nodeId, timelineClipsToNodePatch(next));
       setOutputReady(false);
     },
-    [inputs, setInputs],
+    [timelineClips, nodeId, updateNodeData],
   );
 
   const handleMoveClip = useCallback(
     (index: number, dir: -1 | 1) => {
       const target = index + dir;
-      if (target < 0 || target >= inputs.length) return;
-      const next = [...inputs];
+      if (target < 0 || target >= timelineClips.length) return;
+      const next = [...timelineClips];
       const tmp = next[index]!;
       next[index] = next[target]!;
       next[target] = tmp;
-      setInputs(next);
+      updateNodeData(nodeId, timelineClipsToNodePatch(next));
       setOutputReady(false);
     },
-    [inputs, setInputs],
+    [timelineClips, nodeId, updateNodeData],
   );
 
   const handleClearAll = useCallback(() => {
-    setInputs([]);
+    updateNodeData(nodeId, timelineClipsToNodePatch([]));
     setOutputReady(false);
     setStatus("");
-  }, [setInputs]);
+  }, [nodeId, updateNodeData]);
 
   const handleOutputChange = useCallback(
     (value: string) => {
-      updateNodeData(nodeId, { output: value });
+      updateNodeData(nodeId, {
+        output: value,
+        exportFormat: resolveExportFormat({ ...nodeData, output: value }, value),
+      });
+      setOutputReady(false);
+    },
+    [nodeId, nodeData, updateNodeData],
+  );
+
+  const handleFormatChange = useCallback(
+    (format: TimelineExportFormat) => {
+      updateNodeData(nodeId, {
+        output: applyExportFormatToPath(output, format),
+        exportFormat: format,
+      });
+      setOutputReady(false);
+    },
+    [nodeId, output, updateNodeData],
+  );
+
+  const handleExportEncodeChange = useCallback(
+    (next: TimelineExportEncodeSettings) => {
+      updateNodeData(nodeId, { exportEncode: next });
       setOutputReady(false);
     },
     [nodeId, updateNodeData],
   );
 
   const handleConcat = useCallback(async () => {
-    if (!projectPath || inputs.length === 0) return;
+    if (!projectPath || timelineClips.length === 0) return;
 
     setRunning(true);
     setStatus("正在导出成片…");
@@ -215,37 +271,43 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
     try {
       const result = await invoke<string>("render_timeline", {
         projectPath,
-        clips: inputs,
+        clips: clipsToRenderPayload(timelineClips, {}),
         outputRelPath: output,
+        encodeOptions: exportEncodeToInvokePayload(exportEncode) ?? null,
+        exportFormat,
       });
       setStatus(`完成：${result}`);
       setOutputReady(true);
-      updateNodeData(nodeId, { output: result, path: result });
+      const patch = await patchComposeNodeAfterExport(projectPath, result);
+      updateNodeData(nodeId, patch);
     } catch (e) {
       setStatus(`失败：${String(e)}`);
     } finally {
       setRunning(false);
     }
-  }, [projectPath, inputs, output, nodeId, updateNodeData]);
+  }, [projectPath, timelineClips, output, exportEncode, exportFormat, nodeId, updateNodeData]);
 
   const hasInputs = inputs.length > 0;
   const canConcat = hasInputs && !running && !refreshing && Boolean(projectPath);
 
   return (
-    <div className={`ffmpegPanel ${RF_NODE_INPUT_CLASS}`} onPointerDown={(e) => e.stopPropagation()}>
-      <div className="ffmpegPanelHead">
-        <div className="ffmpegPanelTitle">
+    <div
+      className={`ffmpegConcatPanel--minimal-inner ${RF_NODE_INPUT_CLASS}`}
+      onPointerDown={(e) => e.stopPropagation()}
+    >
+      <div className="fcp-header-row">
+        <div className="fcp-header-title">
           <IconVideo />
           <span>视频合成</span>
         </div>
-        <div className="ffmpegPanelMeta">
+        <div className="fcp-header-meta">
           <span className="mono">{inputs.length} 个片段</span>
         </div>
       </div>
 
-      <div className="ffmpegClipList">
+      <div className="fcp-clip-list">
         {inputs.length === 0 ? (
-          <div className="ffmpegClipEmpty">
+          <div className="fcp-clip-empty">
             <span>连接已出片的视频节点后，点击「从连线刷新」</span>
           </div>
         ) : (
@@ -263,10 +325,18 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
         )}
       </div>
 
-      <div className="ffmpegRefreshRow">
+      <div className="fcp-tool-row">
         <button
           type="button"
-          className="ffmpegActionBtn ffmpegActionBtn--secondary"
+          className="fcp-btn"
+          onClick={() => useCanvasUiStore.getState().setComposeEditorNodeId(nodeId)}
+          title="打开全屏时间线剪辑"
+        >
+          <span>时间线编辑</span>
+        </button>
+        <button
+          type="button"
+          className="fcp-btn"
           onClick={() => void handleRefreshFromEdges(false)}
           disabled={!projectPath || refreshing || running}
           title="从左侧连线收集视频路径"
@@ -276,7 +346,7 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
         </button>
         <button
           type="button"
-          className="ffmpegActionBtn ffmpegActionBtn--secondary"
+          className="fcp-btn"
           onClick={() => void handleRefreshFromEdges(true)}
           disabled={!projectPath || refreshing || running}
           title="刷新并按脚本镜号排序"
@@ -285,23 +355,44 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
         </button>
       </div>
 
-      <div className="ffmpegOutputSection">
-        <div className="ffmpegOutputRow">
-          <label className="ffmpegOutputLabel">输出路径</label>
-          <input
-            type="text"
-            className="ffmpegOutputInput mono"
-            value={output}
-            onChange={(e) => handleOutputChange(e.target.value)}
-            placeholder={DEFAULT_EXPORT_PATH}
-          />
-        </div>
+      <div className="fcp-output-row">
+        <label className="fcp-output-label" htmlFor={`fcp-output-${nodeId}`}>
+          输出路径
+        </label>
+        <input
+          id={`fcp-output-${nodeId}`}
+          type="text"
+          className="fcp-output-input mono"
+          value={output}
+          onChange={(e) => handleOutputChange(e.target.value)}
+          placeholder={DEFAULT_EXPORT_PATH}
+        />
+        <select
+          className="fcp-output-format"
+          value={exportFormat}
+          onChange={(e) => handleFormatChange(e.target.value as TimelineExportFormat)}
+          disabled={running}
+          aria-label="导出格式"
+        >
+          {TIMELINE_EXPORT_FORMATS.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.ext.toUpperCase()}
+            </option>
+          ))}
+        </select>
       </div>
 
-      <div className="ffmpegActions">
+      <ComposeEditorExportSettings
+        format={exportFormat}
+        encode={exportEncode}
+        onChange={handleExportEncodeChange}
+        disabled={running}
+      />
+
+      <div className="fcp-bottom-bar">
         <button
           type="button"
-          className="ffmpegActionBtn ffmpegActionBtn--secondary"
+          className="fcp-btn"
           onClick={handleClearAll}
           disabled={!hasInputs || running}
           title="清空所有片段"
@@ -312,7 +403,7 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
 
         <button
           type="button"
-          className={`ffmpegActionBtn ffmpegActionBtn--primary ${running ? "ffmpegActionBtn--running" : ""}`}
+          className={`fcp-btn fcp-btn--primary ${running ? "fcp-btn--running" : ""}`}
           onClick={() => void handleConcat()}
           disabled={!canConcat}
           title={canConcat ? "导出成片（FFmpeg 拼接）" : "请先添加视频片段"}
@@ -332,7 +423,7 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
       </div>
 
       {status ? (
-        <div className={`ffmpegStatus ${outputReady ? "ffmpegStatus--success" : ""}`}>{status}</div>
+        <div className={`fcp-status ${outputReady ? "fcp-status--success" : ""}`}>{status}</div>
       ) : null}
     </div>
   );

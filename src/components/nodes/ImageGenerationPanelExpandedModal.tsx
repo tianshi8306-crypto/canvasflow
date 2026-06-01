@@ -14,7 +14,6 @@ const EXPANDED_Z = 55;
 export function ImageGenerationPanelExpandedModal() {
   const expandedNodeId = useCanvasUiStore((s) => s.imageGenPanelExpandedNodeId);
   const setExpandedNodeId = useCanvasUiStore((s) => s.setImageGenPanelExpandedNodeId);
-  const setPinnedNodeId = useCanvasUiStore((s) => s.setImageGenPanelPinnedNodeId);
   const nodes = useProjectStore((s) => s.nodes);
 
   const node = expandedNodeId ? nodes.find((n) => n.id === expandedNodeId) : undefined;
@@ -33,10 +32,6 @@ export function ImageGenerationPanelExpandedModal() {
   }
 
   const close = () => setExpandedNodeId(null);
-  const dockToNode = () => {
-    setPinnedNodeId(expandedNodeId);
-    setExpandedNodeId(null);
-  };
 
   return createPortal(
     <div
@@ -58,7 +53,6 @@ export function ImageGenerationPanelExpandedModal() {
             nodeId={expandedNodeId}
             layout="expanded"
             onRequestClose={close}
-            onRequestDock={dockToNode}
           />
         </div>
       </div>

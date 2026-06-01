@@ -37,7 +37,11 @@ export function mergeDraftForVideoToolbarWorkflow(
           : draft.prompt;
 
   const output =
-    mode === "hd" ? { ...draft.output, resolution: "1080P" as const } : draft.output;
+    mode === "hd"
+      ? { ...draft.output, resolution: "1080P" as const }
+      : mode === "subtitle-auto"
+        ? { ...draft.output, noSubtitles: true }
+        : draft.output;
 
   return {
     ...draft,

@@ -1,12 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getVideoJobViaBridge } from "@/lib/videoGeneration";
+import { cancelVideoJobViaBridge, getVideoJobViaBridge, recoverDreaminaVideoViaBridge } from "@/lib/videoGeneration";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
+import { refreshDreaminaAuthOnGenerationFailure } from "@/lib/dreaminaAuthOnFailure";
 import { videoGenerationAgentRuntime } from "@/lib/nodeAgentRuntime/videoGenerationAgent";
 import { videoAsyncTaskAgentRuntime, type VideoAsyncConfig } from "@/lib/nodeAgentRuntime/videoAsyncTaskAgent";
-import { startVideoGenProgressTicker } from "@/lib/nodeAgentRuntime/videoGenProgress";
+import { normalizeVideoJobProgress } from "@/lib/video/normalizeVideoJobProgress";
 import { defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
 import { invoke } from "@tauri-apps/api/core";
 import type { AppSettings } from "@/lib/settingsPanelTypes";
+import { normalizeLoadedSettings } from "@/lib/settingsPanelState";
+import { getVideoModelReadinessError } from "@/lib/videoModelReadiness";
+import { listSelectableVideoModelIds } from "@/lib/videoModelMerge";
 import { useProjectStore } from "@/store/projectStore";
 
 /**
@@ -21,15 +25,17 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
   );
   const activeJob = videoBlock?.activeJob;
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const progressTickerStopRef = useRef<(() => void) | null>(null);
 
   // 缓存 Settings 中的有效模型 ID
   const [validModelIds, setValidModelIds] = useState<string[]>([]);
+  const [cancelling, setCancelling] = useState(false);
+  const [recovering, setRecovering] = useState(false);
   useEffect(() => {
     void (async () => {
       try {
         const raw = await invoke<AppSettings>("load_settings");
-        setValidModelIds((raw.videoModels ?? []).filter((m) => m.enabled).map((m) => m.model));
+        const settings = normalizeLoadedSettings(raw);
+        setValidModelIds(listSelectableVideoModelIds(settings));
       } catch {
         setValidModelIds([]);
       }
@@ -74,6 +80,23 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
         ? { ...vb, draft: { ...vb.draft, modelId: resolvedModelId } }
         : vb;
 
+    const readinessErr = await getVideoModelReadinessError(videoBlockWithResolvedModel.draft.modelId);
+    if (readinessErr) {
+      setStatusText(readinessErr);
+      updateNodeData(videoNodeId, {
+        video: {
+          ...videoBlockWithResolvedModel,
+          activeJob: {
+            id: "",
+            status: "failed",
+            error: readinessErr,
+            modelId: videoBlockWithResolvedModel.draft.modelId,
+          },
+        },
+      });
+      return;
+    }
+
     try {
       if (asyncCfg && typeof asyncCfg === "object") {
         await runNodeTaskAgent(
@@ -96,35 +119,7 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
     } catch {
       // runNodeTaskAgent 已统一写入失败状态
     }
-  }, [projectPath, setStatusText, updateNodeData, videoNodeId]);
-
-  useEffect(() => {
-    if (!videoNodeId || !projectPath) {
-      progressTickerStopRef.current?.();
-      progressTickerStopRef.current = null;
-      return;
-    }
-    const st = activeJob?.status;
-    const jobRunning = st === "queued" || st === "running";
-    if (!jobRunning) {
-      progressTickerStopRef.current?.();
-      progressTickerStopRef.current = null;
-      return;
-    }
-    if (!progressTickerStopRef.current) {
-      progressTickerStopRef.current = startVideoGenProgressTicker({
-        nodeId: videoNodeId,
-        projectPath,
-        updateNodeData,
-        setStatusText,
-        cancelToken: { cancelled: false },
-      });
-    }
-    return () => {
-      progressTickerStopRef.current?.();
-      progressTickerStopRef.current = null;
-    };
-  }, [activeJob?.status, projectPath, setStatusText, updateNodeData, videoNodeId]);
+  }, [projectPath, resolveModelId, setStatusText, updateNodeData, videoNodeId]);
 
   useEffect(() => {
     if (!videoNodeId || !activeJob?.id) {
@@ -145,41 +140,25 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
         if (!vb0) return;
 
         if (snap.status === "queued" || snap.status === "running") {
-          const polledProgress =
-            typeof snap.progress === "number" && Number.isFinite(snap.progress)
-              ? Math.round(Math.min(99, Math.max(0, snap.progress)))
-              : undefined;
+          const polledProgress = normalizeVideoJobProgress(snap.progress);
           updateNodeData(videoNodeId, {
             video: {
               ...vb0,
               activeJob: {
                 id: snap.id,
                 status: snap.status,
-                progress: snap.progress,
+                ...(polledProgress != null ? { progress: polledProgress } : {}),
                 modelId: snap.modelId,
                 error: snap.error ?? null,
                 startedAt: vb0.activeJob?.startedAt,
               },
             },
-            ...(polledProgress != null
-              ? {
-                  status: {
-                    status: "running" as const,
-                    updatedAt: Date.now(),
-                    agentName: "视频",
-                    phase: "poll",
-                    progress: polledProgress,
-                  },
-                }
-              : {}),
           });
           return;
         }
 
         if (snap.status === "succeeded") {
           clearPoll();
-          progressTickerStopRef.current?.();
-          progressTickerStopRef.current = null;
           const rel = snap.resultRelPath?.trim();
           const source = snap.source ?? "bridge";
           updateNodeData(videoNodeId, {
@@ -202,9 +181,10 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
         }
 
         if (snap.status === "failed" || snap.status === "cancelled") {
+          if (snap.status === "failed") {
+            refreshDreaminaAuthOnGenerationFailure(snap.modelId);
+          }
           clearPoll();
-          progressTickerStopRef.current?.();
-          progressTickerStopRef.current = null;
           updateNodeData(videoNodeId, {
             status: undefined,
             video: {
@@ -233,7 +213,111 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
     return () => clearPoll();
   }, [activeJob?.id, activeJob?.status, clearPoll, setStatusText, updateNodeData, videoNodeId]);
 
+  const cancelGeneration = useCallback(async () => {
+    if (!videoNodeId || !activeJob?.id) return;
+    const jobId = activeJob.id;
+    setCancelling(true);
+    try {
+      clearPoll();
+      await cancelVideoJobViaBridge(jobId);
+      const node = useProjectStore.getState().nodes.find((n) => n.id === videoNodeId);
+      const vb0 = node?.data.video;
+      if (!vb0) return;
+      updateNodeData(videoNodeId, {
+        status: undefined,
+        video: {
+          ...vb0,
+          activeJob: {
+            id: jobId,
+            status: "cancelled",
+            modelId: activeJob.modelId,
+            error: null,
+          },
+        },
+      });
+      setStatusText("已取消视频生成");
+    } catch (e) {
+      setStatusText(`取消失败：${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setCancelling(false);
+    }
+  }, [activeJob?.id, activeJob?.modelId, clearPoll, setStatusText, updateNodeData, videoNodeId]);
+
+  const recoverDreaminaVideo = useCallback(
+    async (submitId: string) => {
+      if (!videoNodeId || !projectPath) {
+        setStatusText("请先打开工程");
+        return;
+      }
+      const trimmed = submitId.trim();
+      if (!trimmed) {
+        setStatusText("缺少即梦 submit_id，无法取回");
+        return;
+      }
+      const node = useProjectStore.getState().nodes.find((n) => n.id === videoNodeId);
+      const vb0 = node?.data.video ?? defaultVideoNodePersisted();
+      setRecovering(true);
+      try {
+        const snap = await recoverDreaminaVideoViaBridge({
+          projectPath,
+          nodeId: videoNodeId,
+          submitId: trimmed,
+          modelId: vb0.draft.modelId,
+          workflow: vb0.draft.workflow,
+        });
+        if (snap.status === "succeeded" && snap.resultRelPath?.trim()) {
+          const rel = snap.resultRelPath.trim();
+          updateNodeData(videoNodeId, {
+            path: rel,
+            status: undefined,
+            video: {
+              ...vb0,
+              source: "generation",
+              activeJob: undefined,
+            },
+          });
+          setStatusText("已从即梦取回成片并写入视频节点");
+          return;
+        }
+        if (snap.status === "running" || snap.status === "queued") {
+          updateNodeData(videoNodeId, {
+            video: {
+              ...vb0,
+              activeJob: {
+                id: trimmed,
+                status: snap.status === "queued" ? "queued" : "running",
+                modelId: vb0.draft.modelId,
+                error: snap.error ?? null,
+                startedAt: new Date().toISOString(),
+              },
+            },
+          });
+          setStatusText(snap.error ?? "即梦任务仍在处理，请稍后再试取回");
+          return;
+        }
+        updateNodeData(videoNodeId, {
+          status: undefined,
+          video: {
+            ...vb0,
+            activeJob: {
+              id: trimmed,
+              status: "failed",
+              modelId: vb0.draft.modelId,
+              error: snap.error ?? "取回即梦成片失败",
+            },
+          },
+        });
+        setStatusText(snap.error ?? "取回即梦成片失败");
+      } catch (e) {
+        setStatusText(`取回失败：${e instanceof Error ? e.message : String(e)}`);
+      } finally {
+        setRecovering(false);
+      }
+    },
+    [projectPath, setStatusText, updateNodeData, videoNodeId],
+  );
+
   const busy = Boolean(activeJob?.status === "queued" || activeJob?.status === "running");
 
-  return { startGeneration, busy, activeJob };
+  return { startGeneration, cancelGeneration, recoverDreaminaVideo, busy, cancelling, recovering, activeJob };
 }

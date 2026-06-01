@@ -1,9 +1,18 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import { isTauri } from "@tauri-apps/api/core";
+import { clampContextMenuPosition } from "@/lib/clampFloatingUi";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import "./CanvasProjectPanel.css";
+
+const PANEL_WIDTH = 260;
+const PANEL_MAX_HEIGHT = 320;
+
+type Props = {
+  /** 左侧 Dock「画布项目」触发钮，用于锚定浮层位置 */
+  anchorRef: RefObject<HTMLElement | null>;
+};
 
 function IconNew() {
   return (
@@ -93,7 +102,16 @@ function PanelRow({
   );
 }
 
-export function CanvasProjectPanel() {
+function anchorPanelPosition(anchor: HTMLElement): { left: number; top: number } {
+  const rect = anchor.getBoundingClientRect();
+  const gap = 8;
+  const rawLeft = rect.right + gap;
+  const rawTop = rect.top;
+  const clamped = clampContextMenuPosition(rawLeft, rawTop, PANEL_WIDTH, PANEL_MAX_HEIGHT);
+  return { left: clamped.x, top: clamped.y };
+}
+
+export function CanvasProjectPanel({ anchorRef }: Props) {
   const projectPath = useProjectStore((s) => s.projectPath);
   const newProject = useProjectStore((s) => s.newProject);
   const openProject = useProjectStore((s) => s.openProject);
@@ -101,6 +119,28 @@ export function CanvasProjectPanel() {
   const saveProjectAs = useProjectStore((s) => s.saveProjectAs);
   const projectPanelOpen = useCanvasUiStore((s) => s.projectPanelOpen);
   const setProjectPanelOpen = useCanvasUiStore((s) => s.setProjectPanelOpen);
+
+  const [panelPos, setPanelPos] = useState<{ left: number; top: number } | null>(null);
+
+  const syncPanelPosition = useCallback(() => {
+    const anchor = anchorRef.current;
+    if (!anchor) return;
+    setPanelPos(anchorPanelPosition(anchor));
+  }, [anchorRef]);
+
+  useLayoutEffect(() => {
+    if (!projectPanelOpen) {
+      setPanelPos(null);
+      return;
+    }
+    syncPanelPosition();
+    window.addEventListener("resize", syncPanelPosition);
+    window.addEventListener("scroll", syncPanelPosition, true);
+    return () => {
+      window.removeEventListener("resize", syncPanelPosition);
+      window.removeEventListener("scroll", syncPanelPosition, true);
+    };
+  }, [projectPanelOpen, syncPanelPosition]);
 
   const handleNew = useCallback(async () => {
     setProjectPanelOpen(false);
@@ -117,13 +157,11 @@ export function CanvasProjectPanel() {
     await saveProject();
   }, [saveProject, setProjectPanelOpen]);
 
-  // 另存为：选择新位置保存工程
   const handleSaveAs = useCallback(async () => {
     setProjectPanelOpen(false);
     await saveProjectAs();
   }, [saveProjectAs, setProjectPanelOpen]);
 
-  // 保存并关闭：保存后关闭窗口
   const handleSaveAndClose = useCallback(async () => {
     setProjectPanelOpen(false);
     if (projectPath) {
@@ -143,29 +181,36 @@ export function CanvasProjectPanel() {
 
   const projectName = projectPath ? projectPath.split(/[/\\]/).pop() : null;
 
-  // 点击外部或按 Escape 关闭
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!projectPanelOpen) return;
-    const handleClickOutside = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+    const handlePointerDown = (e: PointerEvent) => {
+      const target = e.target as Node;
+      if (anchorRef.current?.contains(target)) return;
+      if (panelRef.current && !panelRef.current.contains(target)) {
         setProjectPanelOpen(false);
       }
     };
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape") setProjectPanelOpen(false);
     };
-    document.addEventListener("pointerdown", handleClickOutside);
+    document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleEscape);
     return () => {
-      document.removeEventListener("pointerdown", handleClickOutside);
+      document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [projectPanelOpen, setProjectPanelOpen]);
+  }, [anchorRef, projectPanelOpen, setProjectPanelOpen]);
 
   return createPortal(
-    projectPanelOpen ? (
-      <div ref={panelRef} className="canvasProjectPanel open" role="dialog" aria-label="画布项目">
+    projectPanelOpen && panelPos ? (
+      <div
+        ref={panelRef}
+        className="canvasProjectPanel open"
+        role="dialog"
+        aria-label="画布项目"
+        style={{ left: panelPos.left, top: panelPos.top }}
+      >
         {projectName && (
           <div className="cppProjectName">
             <span className="cppProjectNameLabel">当前工程</span>

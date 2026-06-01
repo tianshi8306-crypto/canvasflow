@@ -1,28 +1,27 @@
 /**
  * 极简音频节点：预览随画布缩放；顶栏/ATP Portal 固定尺寸
  */
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FlowNodeData } from "@/lib/types";
 import { computeAudioNodeFrameSize } from "@/lib/audioNodeFrameSize";
 import { isPassiveAudioAsset } from "@/lib/audioNodeContainerMode";
-import { useTextNodeFrameResize } from "@/hooks/useTextNodeFrameResize";
+import { GEN_PANEL_CHROME_WIDTH } from "@/hooks/useNodeGenerationChrome";
 import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
-import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
-import { NodeChromeShell, NodeMetaLabel, NodeMetaStatus } from "@/components/nodes/nodeChrome";
+import { MinimalAudioWavePlayer } from "@/components/nodes/MinimalAudioWavePlayer";
+import {
+  NodeChromeProvider,
+  NodeChromeShell,
+  NodeMetaLabel,
+  NodeMetaStatus,
+  NodePanelPlaceholder,
+} from "@/components/nodes/nodeChrome";
 import { NodeAnchors } from "./anchors";
 import { AudioNodeEmptyUpload } from "./AudioNodeEmptyUpload";
 import { AudioPreviewToolbarPortal } from "./AudioPreviewToolbarPortal";
 import { AudioTtsPanelPortal } from "./AudioTtsPanelPortal";
-import { TextNodeResizeHandle } from "./TextNodeResizeHandle";
 import "./AudioNodeChrome.css";
-import "./TextNodeChrome.css";
-
-type AudioChromeParams = {
-  chromeWidth?: number;
-  chromeHeight?: number;
-};
 
 interface MinimalAudioNodeProps {
   id: string;
@@ -58,29 +57,12 @@ export function MinimalAudioNode({ id, data, selected = false }: MinimalAudioNod
   const isAtpExpandedModal = expandedAtpId === id;
 
   const showAtpPortal =
-    expandedChrome &&
-    !isAtpExpandedModal &&
-    (pinned || userOpened || !hasAsset);
+    expandedChrome && !isAtpExpandedModal && (pinned || userOpened);
 
   const showPreviewToolbar = expandedChrome && hasAsset;
   const showEmptyUpload = expandedChrome && !hasAsset;
 
-  const params =
-    data.params && typeof data.params === "object"
-      ? (data.params as AudioChromeParams)
-      : {};
-
-  const frameSize = useMemo(
-    () =>
-      computeAudioNodeFrameSize({
-        chromeWidth: params.chromeWidth,
-        chromeHeight: params.chromeHeight,
-      }),
-    [params.chromeHeight, params.chromeWidth],
-  );
-
-  const showResizeHandle = expandedChrome && selected;
-  const { onResizePointerDown } = useTextNodeFrameResize(id, showResizeHandle);
+  const frameSize = computeAudioNodeFrameSize();
 
   const previewRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -98,23 +80,21 @@ export function MinimalAudioNode({ id, data, selected = false }: MinimalAudioNod
     }
   }, [id, pinnedAtpId, selected, setPinnedAtpId]);
 
-  const openAtp = useCallback(() => {
+  const [playbackRate, setPlaybackRate] = useState(1);
+
+  useEffect(() => {
+    if (!selected || !expandedChrome || hasAsset || isAtpExpandedModal) return;
+    if (audioTtsPanelNodeId === id) return;
     setAudioTtsPanelNodeId(id);
-  }, [id, setAudioTtsPanelNodeId]);
-
-  const pinAtp = useCallback(() => {
-    setPinnedAtpId(id);
-    setAudioTtsPanelNodeId(id);
-  }, [id, setAudioTtsPanelNodeId, setPinnedAtpId]);
-
-  const unpinAtp = useCallback(() => {
-    if (pinnedAtpId === id) setPinnedAtpId(null);
-  }, [id, pinnedAtpId, setPinnedAtpId]);
-
-  const closeAtp = useCallback(() => {
-    if (audioTtsPanelNodeId === id) setAudioTtsPanelNodeId(null);
-    if (pinnedAtpId === id) setPinnedAtpId(null);
-  }, [audioTtsPanelNodeId, id, pinnedAtpId, setAudioTtsPanelNodeId, setPinnedAtpId]);
+  }, [
+    audioTtsPanelNodeId,
+    expandedChrome,
+    hasAsset,
+    id,
+    isAtpExpandedModal,
+    selected,
+    setAudioTtsPanelNodeId,
+  ]);
 
   useEffect(() => {
     if (!selected) return;
@@ -155,10 +135,13 @@ export function MinimalAudioNode({ id, data, selected = false }: MinimalAudioNod
   const genProgress = isGenerating ? Math.round(nodeStatus.progress!) : null;
 
   return (
-    <>
-      <NodeMetaLabel label={label} defaultLabel="音频" onCommit={commitLabel} />
-
-      <NodeMetaStatus dimsText={null} generating={isGenerating} progress={genProgress} />
+    <NodeChromeProvider>
+      {!showPreviewToolbar ? (
+        <>
+          <NodeMetaLabel label={label} defaultLabel="音频" onCommit={commitLabel} />
+          <NodeMetaStatus dimsText={null} generating={isGenerating} progress={genProgress} />
+        </>
+      ) : null}
 
       {showEmptyUpload ? <AudioNodeEmptyUpload nodeId={id} /> : null}
 
@@ -180,64 +163,46 @@ export function MinimalAudioNode({ id, data, selected = false }: MinimalAudioNod
                 </span>
               ) : null}
               <div className="minimal-audio-content">
-                <NodeMediaPreview relPath={mediaPath} assetId={mediaAssetId} kind="audio" />
+                <MinimalAudioWavePlayer
+                  nodeId={id}
+                  relPath={mediaPath}
+                  assetId={mediaAssetId}
+                  playbackRate={playbackRate}
+                  showReplace={expandedChrome}
+                />
               </div>
             </>
           ) : (
-            <div className="nodeChrome-placeholder minimal-audio-placeholder">
-              <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden>
-                <path
-                  d="M9 17V6.5l10-2.2V13"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M7 17.5a2.5 2.5 0 0 0 5 0v-1.5a2.5 2.5 0 0 0-5 0v1.5Z"
-                  fill="currentColor"
-                  fillOpacity="0.25"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                />
-                <path
-                  d="M15 14.5a2.5 2.5 0 0 0 5 0v-1.5a2.5 2.5 0 0 0-5 0v1.5Z"
-                  fill="currentColor"
-                  fillOpacity="0.25"
-                  stroke="currentColor"
-                  strokeWidth="1"
-                />
-              </svg>
-              <span className="minimal-audio-placeholder-hint">点击上传或拖入音频</span>
+            <div className="nodeChrome-placeholder minimal-audio-placeholder" aria-hidden>
+              <NodePanelPlaceholder kind="audioNode" />
             </div>
           )}
-          {showResizeHandle ? (
-            <TextNodeResizeHandle onResizePointerDown={onResizePointerDown} />
-          ) : null}
         </div>
       </NodeChromeShell>
 
       <AudioPreviewToolbarPortal
-        nodeId={id}
         anchorRef={previewRef}
         active={showPreviewToolbar}
         hasLocalAudio={hasAsset}
-        onOpenAtp={openAtp}
+        mediaPath={mediaPath}
+        mediaAssetId={mediaAssetId}
+        playbackRate={playbackRate}
+        onPlaybackRateChange={setPlaybackRate}
         toolbarRef={previewToolbarRef}
+        label={label}
+        onCommitLabel={commitLabel}
+        generating={isGenerating}
+        progress={genProgress}
       />
 
       <AudioTtsPanelPortal
         nodeId={id}
         anchorRef={previewRef}
         active={showAtpPortal}
-        panelWidth={frameSize.width}
+        panelWidth={GEN_PANEL_CHROME_WIDTH}
         panelRef={panelRef}
-        showChromeHead
         onRequestExpand={() => setExpandedAtpId(id)}
-        onRequestPin={pinAtp}
-        onRequestUnpin={pinned ? unpinAtp : undefined}
-        onRequestClose={closeAtp}
       />
-    </>
+    </NodeChromeProvider>
   );
 }

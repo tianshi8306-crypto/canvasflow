@@ -1,3 +1,12 @@
+import {
+  SCRIPT_DRAFT_BUTTON_LABEL,
+  SCRIPT_DRAFT_BUTTON_TITLE,
+} from "@/lib/scriptNodeActionLabels";
+import {
+  SCRIPT_ENTRY_FULLSCREEN_LABEL,
+  SCRIPT_ENTRY_FULLSCREEN_TITLE,
+} from "@/lib/scriptNodeCanvasEntries";
+
 type Props = {
   view: "table" | "card";
   setView: (view: "table" | "card") => void;
@@ -40,12 +49,17 @@ export function ScriptWorkbenchPrimaryActions({
         type="button"
         className="btn btnPrimary"
         onClick={onOpenFullscreen}
-        title="在大窗口中编辑表格（Esc 关闭）"
+        title={SCRIPT_ENTRY_FULLSCREEN_TITLE}
       >
-        全屏表格
+        {SCRIPT_ENTRY_FULLSCREEN_LABEL}
       </button>
-      <button type="button" className="btn btnPrimary" onClick={onDraftFromTheme}>
-        根据主题生成草案
+      <button
+        type="button"
+        className="btn"
+        onClick={onDraftFromTheme}
+        title={SCRIPT_DRAFT_BUTTON_TITLE}
+      >
+        {SCRIPT_DRAFT_BUTTON_LABEL}
       </button>
       <button
         type="button"

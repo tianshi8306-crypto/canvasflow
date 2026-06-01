@@ -25,8 +25,79 @@ export function patchRow(rows: ScriptBeat[], idx: number, key: ScriptBeatStringK
   return rows.map((r, i) => (i === idx ? { ...r, [key]: value } : r));
 }
 
+export function createEmptyScriptRole(): ScriptRole {
+  return {
+    id: crypto.randomUUID(),
+    name: "",
+    description: "",
+    imagePath: "",
+    reference: "",
+    action: "",
+    emotion: "",
+    lines: "",
+  };
+}
+
+/** 将 `characters[]` 写回 beat，并同步 character1/2 与对白等 legacy 列（表格角色图列与卡片一致） */
+export function applyCharactersToBeat(beat: ScriptBeat, roles: ScriptRole[]): ScriptBeat {
+  const r1 = roles[0];
+  const r2 = roles[1];
+  return {
+    ...beat,
+    characters: roles,
+    character1: r1?.name ?? "",
+    character1Desc: r1?.description ?? "",
+    character1Image: r1?.imagePath ?? "",
+    character2: r2?.name ?? "",
+    character2Desc: r2?.description ?? "",
+    character2Image: r2?.imagePath ?? "",
+    characterAction: r1?.action ?? "",
+    emotion: r1?.emotion ?? "",
+    dialogue: r1?.lines ?? "",
+  };
+}
+
+export function getBeatRoles(beat: ScriptBeat): ScriptRole[] {
+  const fromArray = beat.characters ?? [];
+  if (fromArray.length > 0) return fromArray;
+  const out: ScriptRole[] = [];
+  if ((beat.character1 ?? "").trim() || (beat.character1Desc ?? "").trim()) {
+    out.push({
+      id: crypto.randomUUID(),
+      name: beat.character1 ?? "",
+      description: beat.character1Desc ?? "",
+      imagePath: beat.character1Image ?? "",
+      reference: "",
+      action: beat.characterAction ?? "",
+      emotion: beat.emotion ?? "",
+      lines: beat.dialogue ?? "",
+    });
+  }
+  if ((beat.character2 ?? "").trim() || (beat.character2Desc ?? "").trim()) {
+    out.push({
+      id: crypto.randomUUID(),
+      name: beat.character2 ?? "",
+      description: beat.character2Desc ?? "",
+      imagePath: beat.character2Image ?? "",
+      reference: "",
+      action: "",
+      emotion: "",
+      lines: "",
+    });
+  }
+  return out;
+}
+
+export function summarizeScriptRoles(beat: ScriptBeat): string {
+  const roles = getBeatRoles(beat).filter((r) => (r.name ?? "").trim() || (r.imagePath ?? "").trim());
+  if (roles.length === 0) return "无角色";
+  const first = roles[0]!;
+  const head = (first.name ?? "").trim() || "未命名";
+  return roles.length === 1 ? head : `${head} 等 ${roles.length} 人`;
+}
+
 export function patchRowCharacters(rows: ScriptBeat[], idx: number, roles: ScriptRole[]): ScriptBeat[] {
-  return rows.map((r, i) => (i === idx ? { ...r, characters: roles } : r));
+  return rows.map((r, i) => (i === idx ? applyCharactersToBeat(r, roles) : r));
 }
 
 export function serializeCharacters(roles: ScriptRole[] | undefined): string {

@@ -120,6 +120,24 @@ describe("resolveImageGenerationContext", () => {
     expect(ctx.aggregatedPrompt).toBe("");
   });
 
+  it("resolves upstream refs for panel strip even without prompt", async () => {
+    const target = node("T", "imageNode", { prompt: "" });
+    const r1 = node("R1", "imageNode", { path: "a.png" }, 0);
+    const r2 = node("R2", "imageNode", { path: "b.png" }, 10);
+    const ctx = await resolveImageGenerationContext(
+      [target, r1, r2],
+      [edge("R1", "T"), edge("R2", "T")],
+      "T",
+      PROJECT,
+    );
+    expect(ctx.blockReason).toBeNull();
+    expect(ctx.aggregatedPrompt).toBe("");
+    expect(ctx.task).toBe("multi_ref_fusion");
+    expect(ctx.resolvedRefs).toHaveLength(2);
+    expect(ctx.resolvedRefs.map((r) => r.resolvedPath)).toEqual(["a.png", "b.png"]);
+    expect(ctx.referenceImagePaths).toEqual(["a.png", "b.png"]);
+  });
+
   it("image_to_image with one upstream ref", async () => {
     const target = node("T", "imageNode", { prompt: "gen" });
     const ref = node("R", "imageNode", { path: "assets/ref.png" }, 0);

@@ -1,17 +1,24 @@
+mod asset_migration;
+mod canvas_asset_backfill;
+mod canvas_mcp_bridge;
 mod command_common;
+mod hermes_knowledge;
 mod compose_concat;
+mod timeline_trim;
 mod commands;
 mod db;
 mod dreamina_cli;
 mod dreamina_gen;
 pub mod executor;
 pub mod graph;
+mod mcp_stdio;
 mod media;
+mod project_asset_store;
 pub mod settings;
 mod vault;
 
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 pub struct AppState {
     pub http: reqwest::Client,
@@ -51,8 +58,15 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(app_state)
         .manage(dreamina_state)
+        .manage(Arc::new(canvas_mcp_bridge::CanvasMcpBridge::new()))
+        .setup(|app| {
+            canvas_mcp_bridge::start_canvas_mcp_bridge(app.handle().clone());
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             commands::settings_cmd::load_settings,
             commands::settings_cmd::save_settings,
@@ -64,6 +78,7 @@ pub fn run() {
             commands::project_cmd::ensure_project_structure,
             commands::project_cmd::read_canvasflow_json,
             commands::project_cmd::write_canvasflow_json,
+            commands::project_cmd::write_canvasflow_json_bytes,
             commands::runs_cmd::list_runs,
             commands::runs_cmd::list_run_events,
             commands::runs_cmd::append_agent_event,
@@ -73,15 +88,36 @@ pub fn run() {
             commands::assets_cmd::get_asset_by_rel_path,
             commands::assets_cmd::import_media_files,
             commands::assets_cmd::sync_assets_index,
+            commands::assets_cmd::migrate_legacy_assets,
+            commands::assets_cmd::backfill_canvas_asset_ids,
             commands::timeline_cmd::render_timeline,
             commands::graph_cmd::execute_graph,
             commands::graph_cmd::execute_graph_with_patch,
             commands::graph_cmd::execute_subgraph,
             commands::graph_cmd::execute_subgraph_with_patch,
             commands::graph_cmd::llm_complete_text,
+            commands::hermes_cmd::hermes_chat_stream,
+            commands::hermes_cmd::hermes_enhance,
+            commands::hermes_cmd::hermes_plan,
+            commands::hermes_cmd::hermes_orb_suggest,
+            commands::hermes_mcp_cmd::hermes_mcp_list_tools,
+            commands::hermes_mcp_cmd::hermes_mcp_call_tool,
+            commands::hermes_mcp_cmd::hermes_mcp_probe_server,
+            commands::canvas_mcp_bridge_cmd::canvas_mcp_bridge_status,
+            commands::canvas_mcp_bridge_cmd::canvas_mcp_bridge_set_context,
+            commands::canvas_mcp_bridge_cmd::canvas_mcp_tool_result,
+            commands::hermes_knowledge_cmd::hermes_knowledge_search,
+            commands::hermes_knowledge_cmd::hermes_knowledge_reindex,
+            commands::hermes_knowledge_cmd::hermes_knowledge_format_user_tip,
+            commands::hermes_knowledge_cmd::hermes_knowledge_save_user_tip,
+            commands::hermes_knowledge_cmd::hermes_knowledge_list_user_tips,
+            commands::hermes_knowledge_cmd::hermes_knowledge_reindex_user_project,
+            commands::hermes_knowledge_cmd::hermes_knowledge_memory_paths,
+            commands::hermes_knowledge_cmd::hermes_knowledge_migrate_user_memory,
             commands::prompt_reverse_cmd::reverse_prompt_from_media,
             commands::media_gen_cmd::generate_image_asset,
             commands::media_gen_cmd::generate_tts_asset,
+            commands::media_gen_cmd::transcribe_speech_audio,
             commands::media_gen_cmd::test_image_model_connection,
             commands::generic_api_cmd::generic_async_api_submit,
             commands::generic_api_cmd::generic_async_api_poll,
@@ -89,11 +125,24 @@ pub fn run() {
             commands::video_cmd::video_gen_start,
             commands::video_cmd::video_gen_get_job,
             commands::video_cmd::video_gen_cancel,
+            commands::video_cmd::video_gen_recover_dreamina,
+            commands::video_cmd::test_video_model_connection,
             commands::project_cmd::open_project_dir,
+            commands::project_cmd::write_project_rel_text_file,
+            commands::project_cmd::read_project_rel_text_file,
+            commands::project_cmd::probe_project_rel_media,
+            commands::project_cmd::probe_project_rel_image,
+            commands::project_cmd::list_project_rel_dir_files,
+            commands::script_document_cmd::extract_script_document,
+            commands::script_document_cmd::extract_script_document_bytes,
+            commands::project_cmd::list_group_template_summaries,
+            commands::project_cmd::list_workflow_summaries,
+            commands::project_cmd::delete_project_rel_file,
             commands::file_cmd::read_file_as_base64,
             commands::file_cmd::write_file_bytes,
             commands::file_cmd::write_file_base64,
             commands::file_cmd::copy_project_file,
+            commands::file_cmd::export_project_assets_batch,
             commands::video_tools_cmd::extract_video_audio_to_assets,
             commands::video_tools_cmd::trim_video_to_assets,
             commands::video_tools_cmd::delogo_video_to_assets,

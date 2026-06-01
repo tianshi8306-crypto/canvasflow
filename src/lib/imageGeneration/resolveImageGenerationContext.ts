@@ -3,14 +3,22 @@ import type { FlowNodeData } from "@/lib/types";
 import { orderedIncomingScriptNodeIds } from "@/lib/incomingScriptBinding";
 import { resolveAssetRelPath } from "@/shared/api/assets";
 import { aggregateImagePrompt } from "@/lib/imageGeneration/aggregateImagePrompt";
-import { collectIncomingImageRefs } from "@/lib/imageGeneration/collectIncomingImageRefs";
+import { collectIncomingImagePanelItems, imagePanelItemsToIncomingRefs } from "@/lib/imageGeneration/collectIncomingImagePanelItems";
+import {
+  orderIncomingImagePanelRefs,
+  readImageReferenceEdgeOrder,
+} from "@/lib/imageGeneration/imageReferenceEdgeOrder";
 import { detectImageTask } from "@/lib/imageGeneration/detectImageTask";
 import {
   appendImageEditPromptSuffix,
   getImageEditIntent,
   resolveLocalNodeImagePath,
 } from "@/lib/imageGeneration/imageEditIntent";
-import type { ImageGenerationContext, ResolvedIncomingImageRef } from "@/lib/imageGeneration/types";
+import type {
+  ImageGenerationContext,
+  IncomingImageRef,
+  ResolvedIncomingImageRef,
+} from "@/lib/imageGeneration/types";
 
 /** 为 true 时允许多图融合 task 下发 API */
 export const IMAGE_MULTI_REF_API_READY = true;
@@ -32,7 +40,7 @@ const WARN = {
 
 async function resolveIncomingRefs(
   projectPath: string | null | undefined,
-  refs: ReturnType<typeof collectIncomingImageRefs>["refs"],
+  refs: IncomingImageRef[],
 ): Promise<{ resolved: ResolvedIncomingImageRef[]; resolveFailed: boolean }> {
   const resolved: ResolvedIncomingImageRef[] = [];
   let resolveFailed = false;
@@ -78,14 +86,19 @@ export async function resolveImageGenerationContext(
     return { ...empty, blockReason: BLOCK.MULTI_SCRIPT };
   }
 
-  const { refs: incomingImageRefs, truncated: refsTruncated } = collectIncomingImageRefs(
+  const { items: rawPanelItems, imagesTruncated: refsTruncated } = collectIncomingImagePanelItems(
     nodes,
     edges,
     targetNodeId,
   );
+  const orderedPanelItems = orderIncomingImagePanelRefs(
+    rawPanelItems,
+    readImageReferenceEdgeOrder(target.data.params),
+  );
+  const incomingImageRefs = imagePanelItemsToIncomingRefs(orderedPanelItems).slice(0, 4);
 
   const editIntent = getImageEditIntent(target.data);
-  let { prompt: aggregatedPrompt, textTruncated } = aggregateImagePrompt(nodes, edges, targetNodeId);
+  const { prompt: aggregatedPrompt, textTruncated } = aggregateImagePrompt(nodes, edges, targetNodeId);
 
   const warnParts: string[] = [];
   if (refsTruncated) warnParts.push(WARN.REF_TRUNCATED);
@@ -126,19 +139,42 @@ export async function resolveImageGenerationContext(
 
   const warnMessage = warnParts.length > 0 ? warnParts.join(" ") : null;
 
+  const { resolved, resolveFailed } = await resolveIncomingRefs(projectPath, incomingImageRefs);
+  const referenceImagePaths = resolved.map((r) => r.resolvedPath);
+  const { task, referenceImagePaths: taskPaths } = detectImageTask(referenceImagePaths);
+
   if (!aggregatedPrompt) {
+    if (incomingImageRefs.length === 0) {
+      return {
+        ...empty,
+        incomingImageRefs,
+        aggregatedPrompt,
+        warnMessage,
+      };
+    }
+
+    if (resolveFailed && referenceImagePaths.length === 0) {
+      return {
+        incomingImageRefs,
+        resolvedRefs: resolved,
+        aggregatedPrompt: "",
+        task: null,
+        referenceImagePaths: [],
+        blockReason: BLOCK.RESOLVE_FAILED,
+        warnMessage,
+      };
+    }
+
     return {
-      ...empty,
       incomingImageRefs,
-      aggregatedPrompt,
+      resolvedRefs: resolved,
+      aggregatedPrompt: "",
+      task: referenceImagePaths.length > 0 ? task : null,
+      referenceImagePaths: taskPaths,
+      blockReason: null,
       warnMessage,
     };
   }
-
-  const { resolved, resolveFailed } = await resolveIncomingRefs(projectPath, incomingImageRefs);
-  const referenceImagePaths = resolved.map((r) => r.resolvedPath);
-
-  const { task, referenceImagePaths: taskPaths } = detectImageTask(referenceImagePaths);
 
   if (resolveFailed && referenceImagePaths.length === 0 && incomingImageRefs.length > 0) {
     return {

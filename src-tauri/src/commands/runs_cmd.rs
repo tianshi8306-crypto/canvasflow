@@ -47,20 +47,15 @@ pub fn append_node_agent_event(
     elapsed_ms: i64,
     error: Option<String>,
     run_id: Option<String>,
-) -> Result<(), String> {
+) -> Result<String, String> {
     let path = std::path::PathBuf::from(project_path);
     let conn = db::open_run_db(&path)?;
 
-    // 若未提供 run_id，创建临时单节点 run
     let actual_run_id = match &run_id {
-        Some(rid) if !rid.is_empty() => rid.clone(),
-        _ => {
-            let tmp_run_id = uuid::Uuid::new_v4().to_string();
-            db::insert_run(&conn, &tmp_run_id)?;
-            db::mark_run_running(&conn, &tmp_run_id)?;
-            tmp_run_id
-        }
+        Some(rid) if !rid.trim().is_empty() => rid.trim().to_string(),
+        _ => uuid::Uuid::new_v4().to_string(),
     };
+    db::ensure_run_exists(&conn, &actual_run_id)?;
 
     let payload = serde_json::json!({
         "agentName": agent_name,
@@ -70,5 +65,6 @@ pub fn append_node_agent_event(
     });
     let node = node_id.trim();
     let node_id_opt = if node.is_empty() { None } else { Some(node) };
-    db::log_event(&conn, &actual_run_id, node_id_opt, "agent_phase", &payload)
+    db::log_event(&conn, &actual_run_id, node_id_opt, "agent_phase", &payload)?;
+    Ok(actual_run_id)
 }

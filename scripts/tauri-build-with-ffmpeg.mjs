@@ -53,9 +53,19 @@ function ffmpegExeName() {
 }
 
 function getDownloadPlan() {
+  const key = platformKey();
+  const inCi = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+
+  if (inCi && (key === "linux-x64" || key === "darwin-arm64" || key === "darwin-x64")) {
+    return {
+      kind: "system",
+      url: "",
+      extractHint: "CI：从系统 PATH / Homebrew 复制 ffmpeg",
+    };
+  }
+
   // 说明：
   // - 这里的 URL 可能会随上游变动；若下载失败，请手动放置 ffmpeg 到 src-tauri/bin/ 并重试。
-  const key = platformKey();
   if (key === "win32-x64") {
     return {
       kind: "zip",
@@ -122,6 +132,63 @@ function findFileRecursive(dir, fileName) {
   return null;
 }
 
+function copySystemFfmpeg(target) {
+  if (os.platform() === "linux") {
+    run("bash", ["-lc", `cp "$(command -v ffmpeg)" "${target}" && chmod +x "${target}"`]);
+    return target;
+  }
+  if (os.platform() === "darwin") {
+    run("bash", [
+      "-lc",
+      `FFMPEG="$(brew --prefix ffmpeg 2>/dev/null)/bin/ffmpeg"; if [ ! -x "$FFMPEG" ]; then FFMPEG="$(command -v ffmpeg)"; fi; cp "$FFMPEG" "${target}" && chmod +x "${target}"`,
+    ]);
+    return target;
+  }
+  die("[ffmpeg] CI system copy unsupported on this platform");
+}
+
+function patchTauriExternalBinPermanent() {
+  if (!exists(TAURI_CONF)) die(`[tauri] missing ${TAURI_CONF}`);
+  const conf = readJson(TAURI_CONF);
+  conf.bundle = conf.bundle ?? {};
+  conf.bundle.externalBin = ["bin/ffmpeg"];
+  writeJson(TAURI_CONF, conf);
+  console.log("[tauri] patched tauri.conf.json (externalBin enabled, permanent for CI)");
+}
+
+function ciTargetTriples() {
+  const key = platformKey();
+  if (key === "darwin-arm64") {
+    return ["aarch64-apple-darwin", "x86_64-apple-darwin"];
+  }
+  if (key === "darwin-x64") {
+    return ["x86_64-apple-darwin"];
+  }
+  if (key === "linux-x64") {
+    return ["x86_64-unknown-linux-gnu"];
+  }
+  if (key === "win32-x64") {
+    return ["x86_64-pc-windows-msvc"];
+  }
+  return [];
+}
+
+function ensureCiTargetCopies(baseBin) {
+  const triples = ciTargetTriples();
+  if (!triples.length) return;
+  const ext = os.platform() === "win32" ? ".exe" : "";
+  const baseName = path.basename(baseBin, ext);
+  const dir = path.dirname(baseBin);
+  for (const triple of triples) {
+    const suffixed = path.join(dir, `${baseName}-${triple}${ext}`);
+    if (!exists(suffixed)) {
+      fs.copyFileSync(baseBin, suffixed);
+      if (os.platform() !== "win32") fs.chmodSync(suffixed, 0o755);
+      console.log(`[ffmpeg] copied ${baseBin} → ${suffixed}`);
+    }
+  }
+}
+
 function ensureBundledFfmpeg() {
   ensureDir(BIN_DIR);
   const exe = ffmpegExeName();
@@ -132,6 +199,11 @@ function ensureBundledFfmpeg() {
   }
 
   const plan = getDownloadPlan();
+  if (plan.kind === "system") {
+    copySystemFfmpeg(target);
+    console.log(`[ffmpeg] installed ${target} from system`);
+    return target;
+  }
   if (plan.kind === "manual") {
     die(
       `[ffmpeg] 未找到 ${target}。\n` +
@@ -228,6 +300,14 @@ function main() {
   }
 
   ensureBundledFfmpeg();
+
+  if (args.has("--ci-prep")) {
+    const bin = ensureBundledFfmpeg();
+    ensureCiTargetCopies(bin);
+    patchTauriExternalBinPermanent();
+    console.log("[tauri] CI release prep complete");
+    return;
+  }
 
   if (args.has("--skip-build")) {
     console.log("[tauri] --skip-build set, ffmpeg prepared only");

@@ -14,7 +14,8 @@ type FocusPartnerOptions = {
 };
 
 /**
- * 选中关联节点、适配视口，并按类型打开对应生成底栏（音频 TTS / 视频·图片生成面板钉住）。
+ * 选中关联节点、适配视口；音频类型额外打开 TTS 底栏。
+ * 图片/视频节点选中即显示生成底栏，无需 pin。
  */
 export function useFocusLinkedPartnerNode() {
   const nodes = useProjectStore((s) => s.nodes);
@@ -22,8 +23,6 @@ export function useFocusLinkedPartnerNode() {
   const setStatusText = useProjectStore((s) => s.setStatusText);
   const setAudioTtsPanelNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelNodeId);
   const setAudioTtsPanelPinnedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelPinnedNodeId);
-  const setVideoGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setVideoGenPanelPinnedNodeId);
-  const setImageGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setImageGenPanelPinnedNodeId);
   const { fitViewToNode } = useFitView();
 
   const focusPartnerNode = useCallback(
@@ -43,10 +42,6 @@ export function useFocusLinkedPartnerNode() {
       if (kind === "audio") {
         setAudioTtsPanelNodeId(partnerNodeId);
         setAudioTtsPanelPinnedNodeId(partnerNodeId);
-      } else if (kind === "video") {
-        setVideoGenPanelPinnedNodeId(partnerNodeId);
-      } else if (kind === "image") {
-        setImageGenPanelPinnedNodeId(partnerNodeId);
       }
 
       await fitViewToNode(partnerNodeId);
@@ -58,10 +53,8 @@ export function useFocusLinkedPartnerNode() {
       nodes,
       setAudioTtsPanelNodeId,
       setAudioTtsPanelPinnedNodeId,
-      setImageGenPanelPinnedNodeId,
       setSelectedNodeIds,
       setStatusText,
-      setVideoGenPanelPinnedNodeId,
     ],
   );
 

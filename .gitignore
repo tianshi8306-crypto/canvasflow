@@ -8,7 +8,21 @@ src-tauri/target
 *.log
 .env
 .env.*
-package-lock.json
+.tauri/*.key
+.ssh/
 .cursor/
 .cursorignore
 .cursorignore.txt
+docs/recovered/
+# 厂商参考手册体积过大，仅保留在 docs/recovered/ 本地
+docs/*.pdf
+docs/*.docx
+.claude/
+.workbuddy/
+tsconfig.tsbuildinfo
+src/3.png
+.lint-out.txt
+nul
+.gitcommitmsg*.txt
+.revert-actions.ts
+src/styles/global.css.before-*

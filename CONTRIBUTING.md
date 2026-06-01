@@ -35,7 +35,8 @@
   - 必要时更新 `RELEASE_CHECKLIST.md`
 
 ## 6. 最小质量门禁
-- 合入前至少应通过 `npm run quality:gate`（含 lint / typecheck / vitest 覆盖率 / rust 测试）。
+- 合入前推荐 **`npm run release:check`**（`quality:gate` + 黄金路径 E2E 3 条）；最快仅门禁：`npm run quality:gate`。
+- 发版或大改画布/工程/导出：另按 [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) **B 档** + [`docs/product/GOLDEN_PATH.md`](docs/product/GOLDEN_PATH.md) 手工验收。
 - 无自动化测试时，必须补充可复现的手工验证说明。
 
 ## 7. 迭代文档规范

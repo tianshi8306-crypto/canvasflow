@@ -7,10 +7,11 @@ import { ApiKeyInput } from "@/components/ApiKeyInput";
 import { DreaminaLoginPanel } from "@/components/DreaminaLoginPanel";
 import { getProviderMeta, type ProviderId } from "@/lib/providers";
 import {
-  checkDreaminaAuthState,
   clearDreaminaToken,
   type DreaminaAuthState,
 } from "@/lib/dreaminaAuth";
+import { readDreaminaAuthFromCache } from "@/lib/dreaminaAuthCache";
+import { DREAMINA_AUTH_UPDATED_EVENT } from "@/lib/dreaminaAuthOnFailure";
 
 type Props = {
   providerId: ProviderId;
@@ -19,11 +20,15 @@ type Props = {
     apiKey: string;
     modelApiKey: string;
     enabled: boolean;
+    model?: string;
+    priority?: number;
   };
   hasKey: boolean;
   hasModelKey: boolean;
   testStatus?: "pending" | "testing" | "pass" | "fail";
   testMessage?: string;
+  /** 文本 / 脚本 / LLM 节点：展示模型 ID、优先级与启用开关 */
+  chatMode?: boolean;
   onConfigChange: (patch: Partial<Props["config"]>) => void;
   onApiKeyChange: (field: "apiKey" | "modelApiKey", value: string) => void;
   onDreaminaAuthChange?: (state: DreaminaAuthState) => void;
@@ -72,6 +77,7 @@ export function ProviderCard({
   hasModelKey,
   testStatus,
   testMessage,
+  chatMode = false,
   onConfigChange,
   onApiKeyChange,
   onDreaminaAuthChange,
@@ -83,14 +89,20 @@ export function ProviderCard({
   const supportsModelKey = meta?.supportsModelKey ?? false;
   const isDreamina = providerId === "dreamina";
 
-  const [dreaminaAuth, setDreaminaAuth] = useState<DreaminaAuthState | null>(null);
+  const [dreaminaAuth, setDreaminaAuth] = useState<DreaminaAuthState | null>(() =>
+    isDreamina ? readDreaminaAuthFromCache() : null,
+  );
 
   useEffect(() => {
     if (!isDreamina) return;
-    checkDreaminaAuthState(false).then((state) => {
+    const onUpdated = (event: Event) => {
+      const state = (event as CustomEvent<DreaminaAuthState>).detail;
+      if (!state) return;
       setDreaminaAuth(state);
       onDreaminaAuthChange?.(state);
-    });
+    };
+    window.addEventListener(DREAMINA_AUTH_UPDATED_EVENT, onUpdated);
+    return () => window.removeEventListener(DREAMINA_AUTH_UPDATED_EVENT, onUpdated);
   }, [isDreamina, onDreaminaAuthChange]);
 
   const handleDreaminaAuthChange = useCallback(
@@ -130,6 +142,17 @@ export function ProviderCard({
           <span className="settings-card-badge">{getProviderBadge(providerId)}</span>
         )}
         <span className="settings-card-title">{label}</span>
+        {chatMode ? (
+          <label className="settingsProviderToggle settingsProviderToggle--inline">
+            <input
+              type="checkbox"
+              checked={config.enabled}
+              onChange={(e) => onConfigChange({ enabled: e.target.checked })}
+            />
+            <span className="settingsProviderToggleSwitch" />
+            <span>启用</span>
+          </label>
+        ) : null}
         <StatusIcon status={testStatus} />
         {getKeyUrl && !isDreamina && (
           <a
@@ -202,6 +225,34 @@ export function ProviderCard({
           />
         </div>
       )}
+
+      {chatMode ? (
+        <>
+          <div className="settingsField">
+            <label className="settingsFieldLabel">模型 ID（必填）</label>
+            <span className="settingsFieldHint">出现在文本 / 脚本 / LLM 节点的模型下拉中，如 gpt-4o-mini</span>
+            <input
+              className="settingsInput mono"
+              value={config.model ?? ""}
+              placeholder="gpt-4o-mini"
+              onChange={(e) => onConfigChange({ model: e.target.value })}
+            />
+          </div>
+          <div className="settingsField">
+            <label className="settingsFieldLabel">优先级</label>
+            <span className="settingsFieldHint">数字越小越优先；多服务商时用于自动路由</span>
+            <input
+              type="number"
+              className="settingsInput"
+              value={config.priority ?? 100}
+              onChange={(e) => {
+                const v = Number(e.target.value);
+                onConfigChange({ priority: Number.isFinite(v) ? v : 100 });
+              }}
+            />
+          </div>
+        </>
+      ) : null}
 
       {testStatus === "fail" && testMessage && (
         <div className="settings-test-error">{testMessage}</div>

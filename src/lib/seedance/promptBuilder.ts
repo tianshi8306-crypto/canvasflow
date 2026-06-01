@@ -2,7 +2,8 @@
  * Seedance @语法适配层
  *
  * 解析 prompt 中的 @引用：
- * - @图N、@视频N、@音频N（索引形式）
+ * - @图片N、@视频N、@声音N（N = 生成面板参考条顺序）
+ * - @图N、@音频N（旧版按类型计数，仍兼容）
  * - @素材名（名称形式，自动识别类型）
  *
  * 将引用替换为描述性文字，并提取对应的 asset 路径。
@@ -26,16 +27,83 @@ export interface NamedAsset {
   name: string;
   path: string;
   kind: "image" | "video" | "audio";
+  /** 无扩展名简称、源节点标签等，用于强制匹配连线素材 */
+  aliases?: string[];
 }
 
-/** @图N 正则：匹配 @图1、@图2 等 */
-const AT_IMAGE_REGEX = /@图(\d+)/g;
-/** @视频N 正则：匹配 @视频1、@视频2 等 */
+export function assetFileBaseName(pathOrName: string): string {
+  return pathOrName.split(/[/\\]/).pop()?.trim() ?? "";
+}
+
+export function assetNameStem(name: string): string {
+  const base = assetFileBaseName(name);
+  return base.replace(/\.[^.]+$/, "");
+}
+
+function spansOverlap(start: number, end: number, ref: ParsedAtReference): boolean {
+  return start < ref.endIndex && end > ref.startIndex;
+}
+
+/** @图片N：N 为参考条顺序（与面板缩略图序号一致） */
+const AT_IMAGE_REGEX = /@图片(\d+)/g;
 const AT_VIDEO_REGEX = /@视频(\d+)/g;
-/** @音频N 正则：匹配 @音频1、@音频2 等 */
-const AT_AUDIO_REGEX = /@音频(\d+)/g;
-/** @素材名 正则：匹配 @任意名称（不含空格），如 @女孩.png、@背景音乐 */
-const AT_NAMED_REGEX = /@([^\s，。！？!?,."']+)/g;
+const AT_AUDIO_REGEX = /@声音(\d+)/g;
+/** 旧版 @图N / @音频N：按类型内序号（无 panelOrder 时回退） */
+const AT_IMAGE_LEGACY_REGEX = /@图(\d+)/g;
+const AT_AUDIO_LEGACY_REGEX = /@音频(\d+)/g;
+/** @素材名 正则：匹配 @文件名（允许扩展名中的 `.`） */
+const AT_NAMED_REGEX = /@([^\s，。！？!?,。"'\n]+)/g;
+
+/** LibTV / 分镜导出：{{Portrait 4}}、{{mixed 5}} 等 */
+const BRACE_REF_REGEX = /\{\{\s*([^}]+?)\s*\}\}/g;
+
+function parseBraceRefInner(inner: string): { kind: AtReferenceKind; index: number } | null {
+  const t = inner.trim();
+  let m: RegExpExecArray | null;
+  if ((m = /^portrait\s*(\d+)$/i.exec(t))) return { kind: "image", index: parseInt(m[1], 10) };
+  if ((m = /^mixed\s*(\d+)$/i.exec(t))) return { kind: "image", index: parseInt(m[1], 10) };
+  if ((m = /^图片\s*(\d+)$/.exec(t))) return { kind: "image", index: parseInt(m[1], 10) };
+  if ((m = /^图\s*(\d+)$/.exec(t))) return { kind: "image", index: parseInt(m[1], 10) };
+  if ((m = /^视频\s*(\d+)$/.exec(t))) return { kind: "video", index: parseInt(m[1], 10) };
+  if ((m = /^声音\s*(\d+)$/.exec(t))) return { kind: "audio", index: parseInt(m[1], 10) };
+  return null;
+}
+
+function parseBraceReferences(prompt: string): ParsedAtReference[] {
+  const refs: ParsedAtReference[] = [];
+  BRACE_REF_REGEX.lastIndex = 0;
+  let match: RegExpExecArray | null;
+  while ((match = BRACE_REF_REGEX.exec(prompt)) !== null) {
+    const parsed = parseBraceRefInner(match[1]);
+    if (!parsed || parsed.index < 1) continue;
+    const start = match.index;
+    const end = start + match[0].length;
+    if (refs.some((r) => spansOverlap(start, end, r))) continue;
+    refs.push({
+      kind: parsed.kind,
+      index: parsed.index,
+      fullMatch: match[0],
+      startIndex: start,
+      endIndex: end,
+    });
+  }
+  return refs;
+}
+
+/** 参考条序号 token：@图片N / @文本N 或 {{Portrait N}} / {{mixed N}} */
+export function isPanelOrderReferenceToken(fullMatch: string): boolean {
+  if (
+    /^@图片\d+$/.test(fullMatch) ||
+    /^@视频\d+$/.test(fullMatch) ||
+    /^@声音\d+$/.test(fullMatch) ||
+    /^@文本\d+$/.test(fullMatch)
+  ) {
+    return true;
+  }
+  const brace = /^\{\{\s*([^}]+?)\s*\}\}$/.exec(fullMatch.trim());
+  if (!brace) return false;
+  return parseBraceRefInner(brace[1]) !== null;
+}
 
 /**
  * 从名称推断素材类型
@@ -48,68 +116,84 @@ function inferKindFromName(name: string): "image" | "video" | "audio" | null {
   return null;
 }
 
+function resolveNamedRefKind(
+  name: string,
+  namedAssets?: NamedAsset[],
+): AtReferenceKind | null {
+  const fromExt = inferKindFromName(name);
+  if (fromExt) return fromExt;
+  if (!namedAssets?.length) return null;
+  const asset = findAssetByName(name, namedAssets);
+  return asset?.kind ?? null;
+}
+
 /**
  * 解析 prompt 中的所有 @引用（支持索引和名称两种形式）
+ * @param namedAssets 传入时，@名称 可匹配连线素材（含无扩展名、节点标签）
  */
-export function parseAtReferences(prompt: string): ParsedAtReference[] {
+export function parseAtReferences(prompt: string, namedAssets?: NamedAsset[]): ParsedAtReference[] {
   const refs: ParsedAtReference[] = [];
   let match: RegExpExecArray | null;
 
-  // 解析 @图N
-  AT_IMAGE_REGEX.lastIndex = 0;
-  while ((match = AT_IMAGE_REGEX.exec(prompt)) !== null) {
-    refs.push({
-      kind: "image",
-      index: parseInt(match[1], 10),
-      fullMatch: match[0],
-      startIndex: match.index,
-      endIndex: match.index + match[0].length,
-    });
-  }
+  const pushIndexed = (
+    regex: RegExp,
+    kind: AtReferenceKind,
+  ) => {
+    regex.lastIndex = 0;
+    while ((match = regex.exec(prompt)) !== null) {
+      const start = match.index;
+      const end = start + match[0].length;
+      if (refs.some((r) => spansOverlap(start, end, r))) continue;
+      refs.push({
+        kind,
+        index: parseInt(match[1], 10),
+        fullMatch: match[0],
+        startIndex: start,
+        endIndex: end,
+      });
+    }
+  };
 
-  // 解析 @视频N
-  AT_VIDEO_REGEX.lastIndex = 0;
-  while ((match = AT_VIDEO_REGEX.exec(prompt)) !== null) {
-    refs.push({
-      kind: "video",
-      index: parseInt(match[1], 10),
-      fullMatch: match[0],
-      startIndex: match.index,
-      endIndex: match.index + match[0].length,
-    });
-  }
+  pushIndexed(AT_IMAGE_REGEX, "image");
+  pushIndexed(AT_VIDEO_REGEX, "video");
+  pushIndexed(AT_AUDIO_REGEX, "audio");
 
-  // 解析 @音频N
-  AT_AUDIO_REGEX.lastIndex = 0;
-  while ((match = AT_AUDIO_REGEX.exec(prompt)) !== null) {
-    refs.push({
-      kind: "audio",
-      index: parseInt(match[1], 10),
-      fullMatch: match[0],
-      startIndex: match.index,
-      endIndex: match.index + match[0].length,
-    });
-  }
+  pushIndexed(AT_IMAGE_LEGACY_REGEX, "image");
+  pushIndexed(AT_AUDIO_LEGACY_REGEX, "audio");
 
   // 解析 @素材名（按名称引用）
   AT_NAMED_REGEX.lastIndex = 0;
   while ((match = AT_NAMED_REGEX.exec(prompt)) !== null) {
     const name = match[1];
-    // 跳过已经是 @图N/@视频N/@音频N 的情况
-    if (/^图\d+$/.test(name) || /^视频\d+$/.test(name) || /^音频\d+$/.test(name)) {
+    if (
+      /^图片\d+$/.test(name) ||
+      /^图\d+$/.test(name) ||
+      /^视频\d+$/.test(name) ||
+      /^声音\d+$/.test(name) ||
+      /^音频\d+$/.test(name)
+    ) {
       continue;
     }
-    const kind = inferKindFromName(name);
-    if (kind) {
-      refs.push({
-        kind,
-        index: 0, // 名称形式没有索引
-        name,
-        fullMatch: match[0],
-        startIndex: match.index,
-        endIndex: match.index + match[0].length,
-      });
-    }
+    const start = match.index;
+    const end = start + match[0].length;
+    if (refs.some((r) => spansOverlap(start, end, r))) continue;
+
+    const kind = resolveNamedRefKind(name, namedAssets);
+    if (!kind) continue;
+
+    refs.push({
+      kind,
+      index: 0,
+      name,
+      fullMatch: match[0],
+      startIndex: start,
+      endIndex: end,
+    });
+  }
+
+  for (const ref of parseBraceReferences(prompt)) {
+    if (refs.some((r) => spansOverlap(ref.startIndex, ref.endIndex, r))) continue;
+    refs.push(ref);
   }
 
   return refs;
@@ -157,16 +241,27 @@ function replaceAtRefs(prompt: string, refs: ParsedAtReference[]): string {
 /**
  * 按名称查找素材
  */
-function findAssetByName(name: string, namedAssets: NamedAsset[]): NamedAsset | undefined {
-  // 精确匹配
-  const exact = namedAssets.find((a) => a.name === name);
-  if (exact) return exact;
-  // 去除扩展名后匹配
-  const nameWithoutExt = name.replace(/\.[^.]+$/, "");
-  return namedAssets.find((a) => {
-    const aName = a.name.replace(/\.[^.]+$/, "");
-    return aName === nameWithoutExt;
+function assetNameMatchesQuery(asset: NamedAsset, query: string): boolean {
+  const q = query.trim();
+  if (!q) return false;
+  if (asset.name === q) return true;
+
+  const qStem = assetNameStem(q);
+  const aStem = assetNameStem(asset.name);
+  if (qStem && (aStem === qStem || asset.name === qStem || q === aStem)) return true;
+
+  return (asset.aliases ?? []).some((alias) => {
+    const aliasTrim = alias.trim();
+    if (!aliasTrim) return false;
+    if (aliasTrim === q) return true;
+    const aliasStem = assetNameStem(aliasTrim);
+    return aliasStem === q || aliasStem === qStem || aliasTrim === qStem;
   });
+}
+
+/** 按文件名、无扩展名简称、aliases（如源节点标签）匹配连线素材 */
+export function findAssetByName(name: string, namedAssets: NamedAsset[]): NamedAsset | undefined {
+  return namedAssets.find((a) => assetNameMatchesQuery(a, name));
 }
 
 /**
@@ -187,7 +282,7 @@ export function buildSeedancePrompt(
   videoPaths: string[];
   audioPaths: string[];
 } {
-  const refs = parseAtReferences(prompt);
+  const refs = parseAtReferences(prompt, namedAssets);
   const expandedPrompt = replaceAtRefs(prompt, refs);
 
   // 按引用索引分组
@@ -253,24 +348,132 @@ export function buildSeedancePrompt(
  * @param videoPaths - 参考视频路径列表（按 @视频1、@视频2 顺序）
  * @param audioPaths - 参考音频路径列表（按 @音频1、@音频2 顺序）
  */
+function pushUnique(list: string[], path: string) {
+  if (path && !list.includes(path)) list.push(path);
+}
+
+function isPanelOrderSlotToken(fullMatch: string): boolean {
+  return isPanelOrderReferenceToken(fullMatch);
+}
+
+/** prompt 含 @ 引用时，仅收集被点名的路径（索引 + 文件名） */
+export type PanelOrderedRef = {
+  slot: number;
+  kind: AtReferenceKind;
+  path: string;
+};
+
+function collectAtRefPaths(
+  refs: ParsedAtReference[],
+  imagePaths: string[],
+  videoPaths: string[],
+  audioPaths: string[],
+  namedAssets?: NamedAsset[],
+  panelOrder?: PanelOrderedRef[],
+): { imagePaths: string[]; videoPaths: string[]; audioPaths: string[] } | null {
+  const active = refs.filter(
+    (r) => (!r.name && r.index > 0) || (r.name && namedAssets && namedAssets.length > 0),
+  );
+  if (active.length === 0) return null;
+
+  const images: string[] = [];
+  const videos: string[] = [];
+  const audios: string[] = [];
+
+  for (const ref of active) {
+    if (ref.name && namedAssets) {
+      const asset = findAssetByName(ref.name, namedAssets);
+      if (!asset) continue;
+      switch (asset.kind) {
+        case "image":
+          pushUnique(images, asset.path);
+          break;
+        case "video":
+          pushUnique(videos, asset.path);
+          break;
+        case "audio":
+          pushUnique(audios, asset.path);
+          break;
+      }
+      continue;
+    }
+    if (panelOrder?.length && isPanelOrderSlotToken(ref.fullMatch)) {
+      const panelHit = panelOrder.find(
+        (p) => p.slot === ref.index && p.kind === ref.kind,
+      );
+      if (panelHit?.path) {
+        switch (panelHit.kind) {
+          case "image":
+            pushUnique(images, panelHit.path);
+            break;
+          case "video":
+            pushUnique(videos, panelHit.path);
+            break;
+          case "audio":
+            pushUnique(audios, panelHit.path);
+            break;
+        }
+      }
+      continue;
+    }
+
+    const idx = ref.index - 1;
+    switch (ref.kind) {
+      case "image": {
+        const path = imagePaths[idx];
+        if (path) pushUnique(images, path);
+        break;
+      }
+      case "video": {
+        const path = videoPaths[idx];
+        if (path) pushUnique(videos, path);
+        break;
+      }
+      case "audio": {
+        const path = audioPaths[idx];
+        if (path) pushUnique(audios, path);
+        break;
+      }
+    }
+  }
+
+  return { imagePaths: images, videoPaths: videos, audioPaths: audios };
+}
+
 export function buildSeedancePromptSimple(
   prompt: string,
   imagePaths?: string[],
   videoPaths?: string[],
   audioPaths?: string[],
+  namedAssets?: NamedAsset[],
+  panelOrder?: PanelOrderedRef[],
 ): {
   expandedPrompt: string;
   imagePaths: string[];
   videoPaths: string[];
   audioPaths: string[];
 } {
-  const refs = parseAtReferences(prompt);
+  const refs = parseAtReferences(prompt, namedAssets);
   const expandedPrompt = replaceAtRefs(prompt, refs);
+
+  const imgs = imagePaths ?? [];
+  const vids = videoPaths ?? [];
+  const auds = audioPaths ?? [];
+  const fromRefs = collectAtRefPaths(refs, imgs, vids, auds, namedAssets, panelOrder);
+
+  if (fromRefs) {
+    return {
+      expandedPrompt,
+      imagePaths: fromRefs.imagePaths,
+      videoPaths: fromRefs.videoPaths,
+      audioPaths: fromRefs.audioPaths,
+    };
+  }
 
   return {
     expandedPrompt,
-    imagePaths: imagePaths ?? [],
-    videoPaths: videoPaths ?? [],
-    audioPaths: audioPaths ?? [],
+    imagePaths: imgs,
+    videoPaths: vids,
+    audioPaths: auds,
   };
 }

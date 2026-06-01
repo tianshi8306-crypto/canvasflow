@@ -15,6 +15,8 @@ npm run test:rust    # Cargo tests (src-tauri)
 npm run test:e2e     # Playwright E2E (first run: npm run test:e2e:install)
 npm run quality:gate # Fast gate: typecheck + lint + vitest + rust tests
 npm run quality:gate:full  # Full gate: quality:gate + e2e
+npm run release:check  # quality:gate + golden-path E2E (recommended before PR)
+npm run release:check:full  # Same as quality:gate:full
 ```
 
 ## Architecture

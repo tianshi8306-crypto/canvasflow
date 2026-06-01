@@ -1,6 +1,6 @@
 use crate::commands::types::DownloadAssetResponse;
 use crate::db;
-use crate::media;
+use crate::project_asset_store::{self, AssetWriteContext};
 use crate::AppState;
 use std::path::PathBuf;
 
@@ -72,7 +72,7 @@ fn validate_url_hostname(url_str: &str) -> Result<String, String> {
     Ok(host.to_string())
 }
 
-/// 下载远程文件到工程 `assets/`，并登记到素材库（runs.db.assets）。用于视频/图片/音频等 URL 结果落盘。
+/// 下载远程 URL 到 `assets/gen/{kind}/{source}/` 并登记素材库。
 #[tauri::command]
 pub async fn download_remote_asset_to_project(
     state: tauri::State<'_, AppState>,
@@ -124,35 +124,22 @@ pub async fn download_remote_asset_to_project(
         "audio" => "mp3",
         _ => "bin",
     };
-    let file_name = format!(
-        "{}_{}_{}.{}",
-        kind,
-        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
-        &uuid::Uuid::new_v4().to_string()[..8],
-        ext
-    );
-    let assets_dir = root.join("assets");
-    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let out = assets_dir.join(&file_name);
-    std::fs::write(&out, &bytes).map_err(|e| format!("保存文件失败：{}", e))?;
-
-    let rel = format!("assets/{}", file_name);
-    let conn = db::open_run_db(&root)?;
-    let meta_json = match kind.as_str() {
-        "image" => media::meta_json_for_image(&out),
-        "video" => media::meta_json_for_av(&out, "video"),
-        "audio" => media::meta_json_for_av(&out, "audio"),
-        _ => None,
+    let source = source_label
+        .as_deref()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or("download");
+    let ctx = AssetWriteContext {
+        kind: kind.as_str(),
+        source,
+        workflow: None,
+        node_id: None,
+        job_id: None,
     };
-    let aid = db::upsert_asset(
-        &conn,
-        &rel,
-        kind.as_str(),
-        source_label.as_deref(),
-        meta_json.as_deref(),
-    )?;
+    let rel = project_asset_store::write_bytes_to_project_asset(&root, &bytes, ext, &ctx)?;
+    let conn = db::open_run_db(&root)?;
+    let asset_id = db::get_asset_by_rel_path(&conn, &rel)?.map(|a| a.asset_id);
     Ok(DownloadAssetResponse {
         rel_path: rel,
-        asset_id: Some(aid),
+        asset_id,
     })
 }

@@ -223,3 +223,168 @@ export function buildTextPromptFromScriptBinding(
   const content = (scriptNode.data.prompt ?? "").trim();
   return content.length > 0 ? content : null;
 }
+
+const TEXT_UPSTREAM_TYPES = new Set<Node<FlowNodeData>["type"]>(["textNode", "llm"]);
+
+export function textContentFromUpstreamNode(data: FlowNodeData): string {
+  const prompt = (data.prompt ?? "").trim();
+  const params = paramsRecord(data);
+  const modelInput = (params.textModelInput ?? "").toString().trim();
+  return modelInput || prompt;
+}
+
+/** 目标节点是否连接了上游文本类节点（含仅禁用连线）。 */
+export function incomingTextUpstreamState(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  targetNodeId: string,
+): IncomingScriptUpstreamState {
+  let hasAny = false;
+  let hasEnabled = false;
+  for (const e of edges) {
+    if (e.target !== targetNodeId) continue;
+    const source = nodes.find((n) => n.id === e.source);
+    if (!source?.type || !TEXT_UPSTREAM_TYPES.has(source.type)) continue;
+    hasAny = true;
+    if (!isEdgeDisabled(e)) {
+      hasEnabled = true;
+      break;
+    }
+  }
+  if (hasEnabled) return "enabled";
+  if (hasAny) return "disabled_only";
+  return "none";
+}
+
+/** 合并上游文本节点正文（拓扑序，多段以空行分隔）。 */
+export function buildMergedPromptFromUpstreamText(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  targetNodeId: string,
+): string | null {
+  const textIds = orderedIncomingTextNodeIds(nodes, edges, targetNodeId);
+  const parts: string[] = [];
+  for (const id of textIds) {
+    const upstream = nodes.find((n) => n.id === id);
+    if (!upstream?.type || !TEXT_UPSTREAM_TYPES.has(upstream.type)) continue;
+    const content = textContentFromUpstreamNode(upstream.data);
+    if (content) parts.push(content);
+  }
+  const merged = parts.join("\n\n").trim();
+  return merged.length > 0 ? merged : null;
+}
+
+/** 指向 `targetNodeId` 的上游文本类节点 id（拓扑序）。 */
+export function orderedIncomingTextNodeIds(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  targetNodeId: string,
+): string[] {
+  const order = topologicalOrderIds(nodes, edges);
+  if (!order) return [];
+  const rank = new Map(order.map((id, i) => [id, i]));
+  const seen = new Set<string>();
+  const pairs: { r: number; id: string }[] = [];
+  for (const e of edges) {
+    if (isEdgeDisabled(e)) continue;
+    if (e.target !== targetNodeId) continue;
+    if (e.targetHandle && e.targetHandle !== "in") continue;
+    const n = nodes.find((x) => x.id === e.source);
+    if (!n?.type || !TEXT_UPSTREAM_TYPES.has(n.type)) continue;
+    if (seen.has(e.source)) continue;
+    seen.add(e.source);
+    pairs.push({ r: rank.get(e.source) ?? 0, id: e.source });
+  }
+  pairs.sort((a, b) => a.r - b.r);
+  return pairs.map((p) => p.id);
+}
+
+/** 合并上游文本节点正文，写入脚本节点主题 prompt。 */
+export function buildScriptPromptFromUpstreamText(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  scriptNodeId: string,
+): string | null {
+  const node = nodes.find((n) => n.id === scriptNodeId);
+  if (node?.type !== "scriptNode") return null;
+  const textIds = orderedIncomingTextNodeIds(nodes, edges, scriptNodeId);
+  const parts: string[] = [];
+  for (const id of textIds) {
+    const upstream = nodes.find((n) => n.id === id);
+    if (!upstream?.type || !TEXT_UPSTREAM_TYPES.has(upstream.type)) continue;
+    const content = textContentFromUpstreamNode(upstream.data);
+    if (content) parts.push(content);
+  }
+  const merged = parts.join("\n\n").trim();
+  return merged.length > 0 ? merged : null;
+}
+
+export function audioContentFromUpstreamNode(data: FlowNodeData): string {
+  return (data.prompt ?? "").trim();
+}
+
+/** 目标节点是否连接了上游音频节点（含仅禁用连线）。 */
+export function incomingAudioUpstreamState(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  targetNodeId: string,
+): IncomingScriptUpstreamState {
+  let hasAny = false;
+  let hasEnabled = false;
+  for (const e of edges) {
+    if (e.target !== targetNodeId) continue;
+    const source = nodes.find((n) => n.id === e.source);
+    if (source?.type !== "audioNode") continue;
+    hasAny = true;
+    if (!isEdgeDisabled(e)) {
+      hasEnabled = true;
+      break;
+    }
+  }
+  if (hasEnabled) return "enabled";
+  if (hasAny) return "disabled_only";
+  return "none";
+}
+
+/** 指向 `targetNodeId` 的上游 audioNode id（拓扑序）。 */
+export function orderedIncomingAudioNodeIds(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  targetNodeId: string,
+): string[] {
+  const order = topologicalOrderIds(nodes, edges);
+  if (!order) return [];
+  const rank = new Map(order.map((id, i) => [id, i]));
+  const seen = new Set<string>();
+  const pairs: { r: number; id: string }[] = [];
+  for (const e of edges) {
+    if (isEdgeDisabled(e)) continue;
+    if (e.target !== targetNodeId) continue;
+    if (e.targetHandle && e.targetHandle !== "in") continue;
+    const n = nodes.find((x) => x.id === e.source);
+    if (n?.type !== "audioNode") continue;
+    if (seen.has(e.source)) continue;
+    seen.add(e.source);
+    pairs.push({ r: rank.get(e.source) ?? 0, id: e.source });
+  }
+  pairs.sort((a, b) => a.r - b.r);
+  return pairs.map((p) => p.id);
+}
+
+/** 合并上游音频节点 TTS 文案（拓扑序，多段以空行分隔）。 */
+export function buildMergedPromptFromUpstreamAudio(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  targetNodeId: string,
+): string | null {
+  const audioIds = orderedIncomingAudioNodeIds(nodes, edges, targetNodeId);
+  const parts: string[] = [];
+  for (const id of audioIds) {
+    const upstream = nodes.find((n) => n.id === id);
+    if (upstream?.type !== "audioNode") continue;
+    const content = audioContentFromUpstreamNode(upstream.data);
+    if (content) parts.push(content);
+  }
+  const merged = parts.join("\n\n").trim();
+  return merged.length > 0 ? merged : null;
+}

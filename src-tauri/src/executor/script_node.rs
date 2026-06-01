@@ -9,11 +9,42 @@ use std::path::Path;
 use super::graph_flow::{
     incoming_reference_video_paths_ordered, incoming_texts_ordered_with_prompt_fallback,
 };
+use crate::media::{probe_media, MediaMeta};
 use super::llm::openai_chat_completion;
 use super::script_parse::{
     detect_style_from_text, normalize_script_beats, parse_script_beats_from_raw_llm, parse_style_profile,
     script_enums_config, style_profile_directive, style_profile_name, ScriptBeatOut, ScriptStyleProfile,
 };
+
+fn media_meta_suffix(meta: &MediaMeta) -> String {
+    let mut parts: Vec<String> = Vec::new();
+    if let (Some(w), Some(h)) = (meta.width, meta.height) {
+        parts.push(format!("{}×{}", w, h));
+    }
+    if let Some(d) = meta.duration_sec {
+        parts.push(format!("{:.1}s", d));
+    }
+    if parts.is_empty() {
+        String::new()
+    } else {
+        format!(" [{}]", parts.join(", "))
+    }
+}
+
+fn format_reference_video_path_lines(project_root: &Path, paths: &[String]) -> Vec<String> {
+    paths
+        .iter()
+        .enumerate()
+        .map(|(i, rel)| {
+            let abs = project_root.join(rel);
+            let suffix = probe_media(&abs)
+                .ok()
+                .map(|m| media_meta_suffix(&m))
+                .unwrap_or_default();
+            format!("{}. {}{}", i + 1, rel, suffix)
+        })
+        .collect()
+}
 
 pub(crate) async fn run_script_node(
     http: &reqwest::Client,
@@ -42,14 +73,9 @@ pub(crate) async fn run_script_node(
     let body_for_parse = if has_upstream_text {
         upstream_joined.clone()
     } else if !video_paths.is_empty() {
-        let path_lines = video_paths
-            .iter()
-            .enumerate()
-            .map(|(i, p)| format!("{}. {}", i + 1, p))
-            .collect::<Vec<_>>()
-            .join("\n");
+        let path_lines = format_reference_video_path_lines(project_root, &video_paths).join("\n");
         format!(
-            "（当前未连接上游文本节点：请结合下方【解析要求】与参考视频路径，按工业分镜规范输出结构化结果；若仅凭路径无法还原画面，请在 storyboardPrompt 中合理推断并注明依据为「参考视频元信息」。）\n\n【参考视频路径】\n{}",
+            "（当前未连接上游文本节点：请结合下方【解析要求】与参考视频路径，按工业分镜规范输出结构化结果；若仅凭路径无法还原画面，请在 storyboardPrompt 中合理推断并注明依据为「参考视频元信息（ffprobe）」。）\n\n【参考视频路径】\n{}",
             path_lines
         )
     } else {
@@ -60,13 +86,11 @@ pub(crate) async fn run_script_node(
         if paths.is_empty() {
             return String::new();
         }
-        let lines = paths
-            .iter()
-            .enumerate()
-            .map(|(i, p)| format!("{}. {}", i + 1, p))
-            .collect::<Vec<_>>()
-            .join("\n");
-        format!("\n\n【参考视频】\n{}", lines)
+        let lines = format_reference_video_path_lines(project_root, paths).join("\n");
+        format!(
+            "\n\n【参考视频】（路径 + ffprobe 元信息；非画面理解）\n{}",
+            lines
+        )
     };
 
     let user = if has_upstream_text {
@@ -151,6 +175,16 @@ cameraMove 仅可取：__CAMERA_MOVE_OPTIONS__
         { "role": "system", "content": system },
         { "role": "user", "content": user }
     ]);
+    let provider_id = params
+        .get("providerId")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
+    let model_override = params
+        .get("model")
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty());
     db::log_event(
         conn,
         run_id,
@@ -160,7 +194,10 @@ cameraMove 仅可取：__CAMERA_MOVE_OPTIONS__
             "sourceLen": body_for_parse.len(),
             "styleProfile": style_profile_name(style),
             "hasUpstreamText": has_upstream_text,
-            "videoRefCount": video_paths.len()
+            "videoRefCount": video_paths.len(),
+            "referenceVideoPaths": video_paths,
+            "providerId": provider_id,
+            "model": model_override
         }),
     )?;
 

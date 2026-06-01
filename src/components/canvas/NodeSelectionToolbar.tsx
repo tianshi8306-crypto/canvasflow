@@ -2,6 +2,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from "react";
 import { useReactFlow } from "@xyflow/react";
 import { useProjectStore } from "@/store/projectStore";
 import { getUndoRedoAvailability } from "@/store/projectStore";
+import { CANVAS_Z } from "@/components/canvas/menuConstants";
 
 export function NodeSelectionToolbar() {
   const selectedNodeIds = useProjectStore((s) => s.selectedNodeIds);
@@ -20,16 +21,18 @@ export function NodeSelectionToolbar() {
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
-  // 单节点选中时显示
+  // 单节点选中时显示（分组态由 GroupToolbar 承接，不叠通用胶囊条）
   const visible = selectedNodeIds.length === 1;
 
-  // 判断是否是图片节点
   const selectedNode = visible ? nodes.find((n) => n.id === selectedNodeIds[0]) : null;
   const usesNodeChrome =
+    selectedNode?.type === "group" ||
     selectedNode?.type === "imageNode" ||
     selectedNode?.type === "videoNode" ||
     selectedNode?.type === "textNode" ||
-    selectedNode?.type === "audioNode";
+    selectedNode?.type === "audioNode" ||
+    selectedNode?.type === "scriptNode" ||
+    selectedNode?.type === "ffmpegConcat";
 
   const updatePos = useCallback(() => {
     if (selectedNodeIds.length !== 1) {
@@ -47,7 +50,7 @@ export function NodeSelectionToolbar() {
   }, [flowToScreenPosition, getNodesBounds, selectedNodeIds]);
 
   useLayoutEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     updatePos();
   }, [updatePos, viewport, selectedNodeIds, nodes]);
 
@@ -99,7 +102,7 @@ export function NodeSelectionToolbar() {
         left: pos.left,
         top: pos.top,
         transform: "translate(-50%, -100%)",
-        zIndex: 45,
+        zIndex: CANVAS_Z.toolbar,
       }}
       role="toolbar"
       aria-label="节点操作"

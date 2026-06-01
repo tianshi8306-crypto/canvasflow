@@ -21,9 +21,19 @@ type Props = {
   beats: ScriptBeat[];
   shots: StoryboardShot[] | undefined;
   projectPath: string | null;
+  selectedIds: string[];
+  onToggleSelect: (beatId: string) => void;
+  /** 从脚本表定位高亮对应卡片 */
+  highlightBeatId?: string | null;
+  /** 分镜失败时跳回脚本表 */
+  onLocateBeatInScript?: (beatId: string) => void;
+  /** 本机选图（分镜图 assets） */
+  onPickImage?: (beatId: string) => void;
+  /** 在创意视图网格中聚焦该镜头 */
+  onFocusStoryboardBeat?: (beatId: string) => void;
 };
 
-function PlaceholderThumb() {
+function PlaceholderThumb({ onPickImage }: { onPickImage?: () => void }) {
   return (
     <div className="scriptCreativeThumbPlaceholder">
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -36,12 +46,27 @@ function PlaceholderThumb() {
         <circle cx="9" cy="8" r="1.5" fill="currentColor" />
       </svg>
       <span>暂无图片</span>
+      {onPickImage ? (
+        <button type="button" className="scriptCreativePickBtn" onClick={onPickImage}>
+          本机选图
+        </button>
+      ) : null}
     </div>
   );
 }
 
 /** 全屏「创意视图」：按镜头分镜缩略图网格展示 */
-export function ScriptCreativeViewGrid({ beats, shots, projectPath }: Props) {
+export function ScriptCreativeViewGrid({
+  beats,
+  shots,
+  projectPath,
+  selectedIds,
+  onToggleSelect,
+  highlightBeatId,
+  onLocateBeatInScript,
+  onPickImage,
+  onFocusStoryboardBeat,
+}: Props) {
   const beatsNorm = useMemo(() => normalizeScriptBeats(beats), [beats]);
   const shotByBeat = useMemo(() => {
     const m = new Map<string, StoryboardShot>();
@@ -56,7 +81,9 @@ export function ScriptCreativeViewGrid({ beats, shots, projectPath }: Props) {
 
   if (rows.length === 0) {
     return (
-      <div className="scriptCreativeEmpty">暂无镜头条目。请在侧栏「脚本工作台」添加或生成脚本。</div>
+      <div className="scriptCreativeEmpty">
+        暂无镜头条目。请切换到「脚本」视图添加镜头，或使用顶栏 AI 解析生成。
+      </div>
     );
   }
 
@@ -75,13 +102,38 @@ export function ScriptCreativeViewGrid({ beats, shots, projectPath }: Props) {
         const status = shot?.status ?? "idle";
         const isGenerating = status === "generating";
         const isFailed = status === "failed";
+        const isSelected = selectedIds.includes(beat.id);
+        const isHighlighted = highlightBeatId === beat.id;
 
         return (
-          <div key={beat.id} className={`scriptCreativeCard${isGenerating ? " scriptCreativeCard--generating" : ""}${isFailed ? " scriptCreativeCard--failed" : ""}`} role="listitem">
+          <div
+            key={beat.id}
+            data-beat-id={beat.id}
+            className={[
+              "scriptCreativeCard",
+              isSelected ? "scriptCreativeCard--selected" : "",
+              isGenerating ? "scriptCreativeCard--generating" : "",
+              isFailed ? "scriptCreativeCard--failed" : "",
+              isHighlighted ? "scriptCreativeCard--highlight" : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
+            role="listitem"
+          >
             <div className="scriptCreativeCardTop">
-              <span className="scriptCreativeCardNo mono">{shotNo}</span>
+              <label className="scriptCreativeSelect" title="与脚本表、分镜区勾选一致">
+                <input
+                  type="checkbox"
+                  checked={isSelected}
+                  onChange={() => onToggleSelect(beat.id)}
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <span className="scriptCreativeCardNo mono">{shotNo}</span>
+              </label>
               <span className="scriptCreativeCardDur mono">{dur}</span>
-              {isGenerating ? <span className="storyboardStatusBadge storyboardStatusBadge--generating">生成中</span> : null}
+              {isGenerating ? (
+                <span className="storyboardStatusBadge storyboardStatusBadge--generating">生成中</span>
+              ) : null}
               {isFailed ? (
                 <span className="storyboardStatusBadge storyboardStatusBadge--failed" title={shot?.error}>
                   失败{shot?.retryCount ? ` · ${shot.retryCount}` : ""}
@@ -90,9 +142,20 @@ export function ScriptCreativeViewGrid({ beats, shots, projectPath }: Props) {
             </div>
             <div className="scriptCreativeThumb">
               {imgSrc ? (
-                <img src={imgSrc} alt="" loading="lazy" />
+                <>
+                  <img src={imgSrc} alt="" loading="lazy" />
+                  {onPickImage ? (
+                    <button
+                      type="button"
+                      className="scriptCreativeThumbAction"
+                      onClick={() => onPickImage(beat.id)}
+                    >
+                      换图
+                    </button>
+                  ) : null}
+                </>
               ) : (
-                <PlaceholderThumb />
+                <PlaceholderThumb onPickImage={onPickImage ? () => onPickImage(beat.id) : undefined} />
               )}
             </div>
             {tags.length > 0 ? (
@@ -107,6 +170,32 @@ export function ScriptCreativeViewGrid({ beats, shots, projectPath }: Props) {
             <p className="scriptCreativeDesc">{clip(desc, 160)}</p>
             {shotLabel ? <div className="scriptCreativeTech mono">{shotLabel}</div> : null}
             <div className="scriptCreativeSceneFoot">{sceneLabel}</div>
+            <div className="scriptCreativeCardActions">
+              {onFocusStoryboardBeat ? (
+                <button
+                  type="button"
+                  className="scriptCreativeActionBtn"
+                  title="在本视图滚动并高亮该镜头卡片"
+                  onClick={() => onFocusStoryboardBeat(beat.id)}
+                >
+                  聚焦镜头
+                </button>
+              ) : null}
+              {isFailed && onLocateBeatInScript ? (
+                <button
+                  type="button"
+                  className="scriptCreativeActionBtn"
+                  onClick={() => onLocateBeatInScript(beat.id)}
+                >
+                  定位镜头
+                </button>
+              ) : null}
+            </div>
+            {isFailed && shot?.error ? (
+              <p className="scriptCreativeFailMsg mono" title={shot.error}>
+                {clip(shot.error, 120)}
+              </p>
+            ) : null}
           </div>
         );
       })}

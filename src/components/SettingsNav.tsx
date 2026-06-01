@@ -1,6 +1,6 @@
 import { memo, type ReactNode } from "react";
 
-export type SettingsCategory = "general" | "models" | "canvas" | "about";
+export type SettingsCategory = "general" | "models" | "agent" | "canvas" | "about";
 
 type Props = {
   activeCategory: SettingsCategory;
@@ -36,6 +36,22 @@ function IconModels() {
   );
 }
 
+function IconAgent() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="9.5" cy="11" r="1" fill="currentColor" />
+      <circle cx="14.5" cy="11" r="1" fill="currentColor" />
+      <path
+        d="M9 15.5c.8.7 1.7 1 3 1s2.2-.3 3-1"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
 function IconCanvas() {
   return (
     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
@@ -59,6 +75,7 @@ function IconAbout() {
 const navItems: NavItem[] = [
   { id: "general", label: "常规", icon: <IconGeneral /> },
   { id: "models", label: "模型", icon: <IconModels /> },
+  { id: "agent", label: "Agent", icon: <IconAgent /> },
   { id: "canvas", label: "画布", icon: <IconCanvas /> },
   { id: "about", label: "关于", icon: <IconAbout /> },
 ];

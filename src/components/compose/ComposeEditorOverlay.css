@@ -1,0 +1,1229 @@
+.composeEditorBackdrop {
+
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 96;
+
+  background: #0d0d0d;
+
+  display: flex;
+
+  flex-direction: column;
+
+}
+
+
+
+.composeEditorShell {
+
+  display: flex;
+
+  flex-direction: column;
+
+  flex: 1;
+
+  min-height: 0;
+
+  background: #141414;
+
+  color: #f0f0f0;
+
+}
+
+
+
+/* —— 顶栏：标题 + 导出 + 关闭 —— */
+
+.composeEditorTop {
+
+  flex: 0 0 auto;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 12px;
+
+  padding: 0 16px;
+
+  height: 48px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  background: #1a1a1a;
+
+}
+
+
+
+.composeEditorTitle {
+
+  flex: 1;
+
+  min-width: 0;
+
+  margin: 0;
+
+  font-size: 15px;
+
+  font-weight: 600;
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+  white-space: nowrap;
+
+}
+
+
+
+.composeEditorTopActions {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 10px;
+
+  flex-shrink: 0;
+
+}
+
+
+
+.composeEditorTopLink {
+
+  padding: 6px 10px;
+
+  border: none;
+
+  background: transparent;
+
+  color: rgba(255, 255, 255, 0.55);
+
+  font-size: 12px;
+
+  cursor: pointer;
+
+  border-radius: 6px;
+
+}
+
+
+
+.composeEditorTopLink:hover {
+
+  color: rgba(255, 255, 255, 0.9);
+
+  background: rgba(255, 255, 255, 0.06);
+
+}
+
+
+
+.composeEditorExportGroup {
+
+  display: inline-flex;
+
+  align-items: stretch;
+
+  border-radius: 8px;
+
+  overflow: hidden;
+
+  background: #f3f3f3;
+
+}
+
+
+
+.composeEditorExportBtn {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  gap: 4px;
+
+  padding: 7px 12px 7px 16px;
+
+  border: none;
+
+  border-radius: 0;
+
+  background: transparent;
+
+  color: #141414;
+
+  font-size: 13px;
+
+  font-weight: 600;
+
+  cursor: pointer;
+
+}
+
+
+
+.composeEditorExportFormat {
+
+  max-width: 108px;
+
+  padding: 0 8px;
+
+  border: none;
+
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+
+  background: rgba(0, 0, 0, 0.04);
+
+  color: #333;
+
+  font-size: 11px;
+
+  font-weight: 500;
+
+  cursor: pointer;
+
+}
+
+
+
+.composeEditorExportFormat:disabled {
+
+  opacity: 0.45;
+
+  cursor: not-allowed;
+
+}
+
+
+
+.composeEditorExportWrap {
+
+  position: relative;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: flex-end;
+
+  gap: 6px;
+
+}
+
+
+
+.composeEditorExportGear {
+
+  padding: 0 8px;
+
+  border: none;
+
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+
+  background: rgba(0, 0, 0, 0.04);
+
+  color: #444;
+
+  font-size: 14px;
+
+  line-height: 1;
+
+  cursor: pointer;
+
+}
+
+
+
+.composeEditorExportGear--open {
+
+  background: rgba(0, 0, 0, 0.1);
+
+  color: #111;
+
+}
+
+
+
+.composeEditorExportGear:disabled {
+
+  opacity: 0.45;
+
+  cursor: not-allowed;
+
+}
+
+
+
+.composeEditorExportSettings {
+
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 8px 12px;
+
+  padding: 8px 10px;
+
+  border-radius: 8px;
+
+  background: rgba(0, 0, 0, 0.55);
+
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+
+}
+
+
+
+.composeEditorExportSettingsField {
+
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 4px;
+
+  font-size: 10px;
+
+  color: rgba(255, 255, 255, 0.55);
+
+}
+
+
+
+.composeEditorExportSettingsHint {
+
+  align-self: center;
+
+  font-size: 10px;
+
+  color: rgba(255, 255, 255, 0.45);
+
+  white-space: nowrap;
+
+}
+
+
+
+.composeEditorExportSettingsField select {
+
+  min-width: 9rem;
+
+  padding: 4px 8px;
+
+  border-radius: 6px;
+
+  border: 1px solid rgba(255, 255, 255, 0.15);
+
+  background: rgba(255, 255, 255, 0.08);
+
+  color: rgba(255, 255, 255, 0.92);
+
+  font-size: 11px;
+
+}
+
+
+
+.composeEditorExportBtn:hover:not(:disabled) {
+
+  background: #fff;
+
+}
+
+
+
+.composeEditorExportBtn:disabled {
+
+  opacity: 0.4;
+
+  cursor: not-allowed;
+
+}
+
+
+
+.composeEditorExportBtn--running {
+
+  cursor: wait;
+
+  opacity: 0.85;
+
+}
+
+
+
+.composeEditorCloseBtn {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 36px;
+
+  height: 36px;
+
+  border: none;
+
+  border-radius: 8px;
+
+  background: transparent;
+
+  color: rgba(255, 255, 255, 0.7);
+
+  cursor: pointer;
+
+}
+
+
+
+.composeEditorCloseBtn:hover {
+
+  background: rgba(255, 255, 255, 0.08);
+
+  color: #fff;
+
+}
+
+
+
+/* —— 主区：上预览 + 下时间线 —— */
+
+.composeEditorMain {
+
+  flex: 1 1 auto;
+
+  min-height: 0;
+
+  display: flex;
+
+  flex-direction: column;
+
+}
+
+
+
+.composeEditorPreview {
+
+  flex: 1 1 58%;
+
+  min-height: 200px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  padding: 12px 20px 8px;
+
+  background: #0a0a0a;
+
+}
+
+
+
+.composeEditorPreviewStage {
+
+  width: 100%;
+
+  height: 100%;
+
+  max-width: 1280px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+}
+
+
+
+.composeEditorPreviewInner {
+
+  width: 100%;
+
+  height: 100%;
+
+  max-height: 100%;
+
+  aspect-ratio: 16 / 9;
+
+  border-radius: 4px;
+
+  background: #000;
+
+  overflow: hidden;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  cursor: pointer;
+
+  outline: none;
+
+}
+
+
+
+.composeEditorPreviewInner:focus-visible {
+
+  box-shadow: 0 0 0 2px rgba(20, 184, 166, 0.55);
+
+}
+
+
+
+.composeEditorPreviewEmpty {
+
+  color: rgba(255, 255, 255, 0.4);
+
+  font-size: 14px;
+
+  text-align: center;
+
+  padding: 24px;
+
+}
+
+
+
+.composeEditorPreviewEmptyHint {
+
+  margin: 8px 0 0;
+
+  font-size: 12px;
+
+  color: rgba(255, 255, 255, 0.28);
+
+}
+
+
+
+.composeEditorVideo {
+
+  width: 100%;
+
+  height: 100%;
+
+  object-fit: contain;
+
+  background: #000;
+
+}
+
+
+
+/* —— 时间线坞 —— */
+
+.composeEditorTimelineDock {
+
+  flex: 0 0 auto;
+
+  min-height: 220px;
+
+  max-height: 42vh;
+
+  display: flex;
+
+  flex-direction: column;
+
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+
+  background: #1c1c1c;
+
+}
+
+
+
+.composeTimelineToolbar {
+
+  flex: 0 0 auto;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 8px;
+
+  padding: 6px 12px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+
+  min-height: 40px;
+
+}
+
+
+
+.composeTimelineToolbarGroup {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 4px;
+
+}
+
+
+
+.composeTimelineToolbarGroup--center {
+
+  flex: 1;
+
+  justify-content: center;
+
+  gap: 10px;
+
+}
+
+
+
+.composeTimelineToolbarDivider {
+
+  width: 1px;
+
+  height: 20px;
+
+  background: rgba(255, 255, 255, 0.12);
+
+  margin: 0 4px;
+
+}
+
+
+
+.composeTimelineIconBtn {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 32px;
+
+  height: 32px;
+
+  border: none;
+
+  border-radius: 6px;
+
+  background: transparent;
+
+  color: rgba(255, 255, 255, 0.72);
+
+  cursor: pointer;
+
+}
+
+
+
+.composeTimelineIconBtn:hover:not(:disabled) {
+
+  background: rgba(255, 255, 255, 0.08);
+
+  color: #fff;
+
+}
+
+
+
+.composeTimelineIconBtn:disabled {
+
+  opacity: 0.28;
+
+  cursor: not-allowed;
+
+}
+
+
+
+.composeTimelineIconBtn--danger:hover:not(:disabled) {
+
+  color: #f87171;
+
+  background: rgba(248, 113, 113, 0.12);
+
+}
+
+
+
+.composeTimelineIconBtn--active {
+
+  color: #5eead4;
+
+  background: rgba(20, 184, 166, 0.15);
+
+}
+
+
+
+.composeTimelinePlayBtn {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 36px;
+
+  height: 36px;
+
+  border: none;
+
+  border-radius: 50%;
+
+  background: rgba(255, 255, 255, 0.1);
+
+  color: #fff;
+
+  cursor: pointer;
+
+}
+
+
+
+.composeTimelinePlayBtn:hover:not(:disabled) {
+
+  background: rgba(255, 255, 255, 0.18);
+
+}
+
+
+
+.composeTimelinePlayBtn:disabled {
+
+  opacity: 0.35;
+
+  cursor: not-allowed;
+
+}
+
+
+
+.composeTimelineTime {
+
+  font-size: 13px;
+
+  font-weight: 500;
+
+  color: rgba(255, 255, 255, 0.88);
+
+  font-variant-numeric: tabular-nums;
+
+  min-width: 96px;
+
+  text-align: center;
+
+}
+
+
+
+.composeTimelineClipHint {
+
+  font-size: 11px;
+
+  color: rgba(255, 255, 255, 0.35);
+
+}
+
+
+
+.composeTimelineZoomSlider {
+
+  width: 88px;
+
+  height: 4px;
+
+  accent-color: #14b8a6;
+
+  cursor: pointer;
+
+}
+
+
+
+.composeTimelineMenuWrap {
+
+  position: relative;
+
+}
+
+
+
+.composeTimelineMenuBackdrop {
+
+  position: fixed;
+
+  inset: 0;
+
+  z-index: 1;
+
+}
+
+
+
+.composeTimelineMenu {
+
+  position: absolute;
+
+  right: 0;
+
+  top: calc(100% + 4px);
+
+  z-index: 2;
+
+  min-width: 168px;
+
+  padding: 4px;
+
+  border-radius: 8px;
+
+  background: #2a2a2a;
+
+  border: 1px solid rgba(255, 255, 255, 0.1);
+
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+
+}
+
+
+
+.composeTimelineMenu button {
+
+  display: block;
+
+  width: 100%;
+
+  padding: 8px 12px;
+
+  border: none;
+
+  border-radius: 6px;
+
+  background: transparent;
+
+  color: rgba(255, 255, 255, 0.88);
+
+  font-size: 12px;
+
+  text-align: left;
+
+  cursor: pointer;
+
+}
+
+
+
+.composeTimelineMenu button:hover:not(:disabled) {
+
+  background: rgba(255, 255, 255, 0.08);
+
+}
+
+
+
+.composeTimelineMenu button:disabled {
+
+  opacity: 0.35;
+
+  cursor: not-allowed;
+
+}
+
+
+
+.composeTimelineMenuItem--active {
+
+  color: #7ee8d8;
+
+}
+
+
+
+/* —— 时间线条带 —— */
+
+.composeTimelineSection {
+
+  flex: 1 1 auto;
+
+  min-height: 0;
+
+  display: flex;
+
+  flex-direction: row;
+
+  padding: 0 8px 8px;
+
+  gap: 0;
+
+}
+
+
+
+.composeTimelineTrackLabelCol {
+
+  flex: 0 0 36px;
+
+  display: flex;
+
+  align-items: flex-end;
+
+  padding-bottom: 28px;
+
+}
+
+
+
+.composeTimelineTrackLabelIcon {
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 28px;
+
+  height: 28px;
+
+  color: rgba(255, 255, 255, 0.45);
+
+}
+
+
+
+.composeTimelineScroll {
+
+  flex: 1 1 auto;
+
+  min-width: 0;
+
+  overflow-x: auto;
+
+  overflow-y: hidden;
+
+  cursor: crosshair;
+
+}
+
+
+
+.composeTimelineScrollInner {
+
+  position: relative;
+
+  min-height: 120px;
+
+}
+
+
+
+.composeTimelineRuler {
+
+  position: relative;
+
+  height: 24px;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+
+  margin-bottom: 4px;
+
+}
+
+
+
+.composeTimelineRulerTick {
+
+  position: absolute;
+
+  top: 4px;
+
+  transform: translateX(-50%);
+
+  font-size: 10px;
+
+  color: rgba(255, 255, 255, 0.38);
+
+  font-variant-numeric: tabular-nums;
+
+  pointer-events: none;
+
+}
+
+
+
+.composeTimelineTrackLane {
+
+  position: relative;
+
+  min-height: 72px;
+
+  background: rgba(0, 0, 0, 0.25);
+
+  border-radius: 4px;
+
+}
+
+
+
+.composeTimelinePlayhead {
+
+  position: absolute;
+
+  top: 0;
+
+  bottom: 0;
+
+  width: 2px;
+
+  margin-left: -1px;
+
+  background: #fff;
+
+  pointer-events: none;
+
+  z-index: 4;
+
+}
+
+
+
+.composeTimelinePlayhead--ruler {
+
+  bottom: auto;
+
+  height: 24px;
+
+}
+
+
+
+.composeTimelinePlayheadKnob {
+
+  position: absolute;
+
+  top: 0;
+
+  left: 50%;
+
+  transform: translate(-50%, -30%);
+
+  width: 10px;
+
+  height: 10px;
+
+  border-radius: 50%;
+
+  background: #fff;
+
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.4);
+
+}
+
+
+
+.composeTimelineClips {
+
+  display: flex;
+
+  align-items: stretch;
+
+  min-height: 72px;
+
+}
+
+
+
+.composeTimelineClip {
+
+  position: relative;
+
+  flex: 0 0 auto;
+
+  min-height: 72px;
+
+  overflow: hidden;
+
+  cursor: grab;
+
+  border-right: 1px solid rgba(0, 0, 0, 0.5);
+
+  background: #252525;
+
+}
+
+
+
+.composeTimelineClip:active {
+
+  cursor: grabbing;
+
+}
+
+
+
+.composeTimelineClip--selected {
+
+  outline: 1px solid rgba(20, 184, 166, 0.65);
+
+  outline-offset: -1px;
+
+  z-index: 2;
+
+}
+
+
+
+.composeTimelineFilmstrip {
+
+  display: flex;
+
+  height: 100%;
+
+  min-height: 72px;
+
+}
+
+
+
+.composeTimelineFilmstripCell {
+
+  flex: 1 1 0;
+
+  min-width: 40px;
+
+  overflow: hidden;
+
+  border-right: 1px solid rgba(0, 0, 0, 0.35);
+
+}
+
+
+
+.composeTimelineFilmstripCell:last-child {
+
+  border-right: none;
+
+}
+
+
+
+.composeTimelineFilmstripCell .textNodeTtvRefVideoThumb,
+
+.composeTimelineFilmstripCell .nodeMutedPreview {
+
+  width: 100%;
+
+  height: 100%;
+
+  object-fit: cover;
+
+  display: block;
+
+  font-size: 9px;
+
+}
+
+
+
+.composeTimelineClipSelectionBar {
+
+  position: absolute;
+
+  left: 0;
+
+  right: 0;
+
+  bottom: 0;
+
+  height: 3px;
+
+  background: #14b8a6;
+
+  pointer-events: none;
+
+  z-index: 3;
+
+}
+
+
+
+.composeTimelineEmpty {
+
+  flex: 1;
+
+  margin: 8px 12px 12px;
+
+  min-height: 80px;
+
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+
+  border-radius: 6px;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  font-size: 12px;
+
+  color: rgba(255, 255, 255, 0.32);
+
+  text-align: center;
+
+  padding: 12px;
+
+}
+
+
+
+.composeEditorStatus {
+
+  flex: 0 0 auto;
+
+  margin: 0 12px 8px;
+
+  font-size: 11px;
+
+  color: #f87171;
+
+  padding: 6px 10px;
+
+  border-radius: 6px;
+
+  background: rgba(248, 113, 113, 0.08);
+
+}
+
+
+
+.composeEditorStatus--ok {
+
+  color: #86efac;
+
+  background: rgba(134, 239, 172, 0.08);
+
+}
+
+

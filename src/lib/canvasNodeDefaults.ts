@@ -7,7 +7,7 @@ import { useProjectStore } from "@/store/projectStore";
  */
 export const newNodeDataByType = {
   textNode: (): FlowNodeData => ({
-    label: "文本",
+    label: useProjectStore.getState().nextTextNodeLabel(),
     prompt: "",
     params: {},
   }),
@@ -24,18 +24,24 @@ export const newNodeDataByType = {
     video: defaultVideoNodePersisted(),
   }),
   audioNode: (): FlowNodeData => ({
-    label: "音频",
+    label: useProjectStore.getState().nextAudioNodeLabel(),
     path: "",
     params: {},
     prompt: "",
   }),
   scriptNode: (): FlowNodeData => ({
-    label: "分镜脚本",
+    label: useProjectStore.getState().nextScriptNodeLabel(),
     prompt: "",
   }),
   ffmpegConcat: (): FlowNodeData => ({
-    label: "视频合成",
+    label: "剪辑",
+    timelineClips: [],
     inputs: [],
     output: "assets/exports/final.mp4",
+  }),
+  llm: (): FlowNodeData => ({
+    label: "LLM",
+    prompt: "",
+    params: {},
   }),
 } as const;

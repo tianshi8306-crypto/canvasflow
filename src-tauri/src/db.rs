@@ -110,6 +110,22 @@ pub fn insert_run(conn: &Connection, run_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// 写入 run_events 前确保 runs 行存在（单节点即席运行可能先拿到 run_id 再落库）
+pub fn ensure_run_exists(conn: &Connection, run_id: &str) -> Result<(), String> {
+    let exists: bool = conn
+        .query_row(
+            "SELECT 1 FROM runs WHERE id = ?1 LIMIT 1",
+            params![run_id],
+            |_| Ok(true),
+        )
+        .unwrap_or(false);
+    if exists {
+        return Ok(());
+    }
+    insert_run(conn, run_id)?;
+    mark_run_running(conn, run_id)
+}
+
 pub fn mark_run_running(conn: &Connection, run_id: &str) -> Result<(), String> {
     conn.execute(
         "UPDATE runs SET status = 'running' WHERE id = ?1",
@@ -333,6 +349,66 @@ pub fn list_assets(conn: &Connection, limit: i64) -> Result<Vec<AssetSummary>, S
     Ok(out)
 }
 
+/// 将素材索引从旧 rel_path 迁移到新 rel_path，保留 asset_id。
+pub fn relocate_asset_rel_path(
+    conn: &Connection,
+    old_rel: &str,
+    new_rel: &str,
+    media_type: &str,
+    source: Option<&str>,
+    meta_json: Option<&str>,
+) -> Result<Option<String>, String> {
+    if old_rel == new_rel {
+        return get_asset_by_rel_path(conn, old_rel).map(|row| row.map(|r| r.asset_id));
+    }
+    if get_asset_by_rel_path(conn, new_rel)?.is_some() {
+        return Err(format!("目标路径已有素材索引：{new_rel}"));
+    }
+    let Some(row) = get_asset_by_rel_path(conn, old_rel)? else {
+        return Ok(None);
+    };
+    conn.execute(
+        "UPDATE assets SET rel_path = ?1, media_type = ?2, source = COALESCE(?3, source), meta_json = COALESCE(?4, meta_json) WHERE rel_path = ?5",
+        params![new_rel, media_type, source, meta_json, old_rel],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(Some(row.asset_id))
+}
+
+/// 查找已落盘的 AI 生成物（按 jobId 短码或完整 id 匹配路径/meta）
+pub fn find_gen_asset_by_job_id(
+    conn: &Connection,
+    media_type: &str,
+    job_id: &str,
+) -> Result<Option<String>, String> {
+    let trimmed = job_id.trim();
+    if trimmed.is_empty() {
+        return Ok(None);
+    }
+    let token: String = trimmed
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(8)
+        .collect();
+    if token.is_empty() {
+        return Ok(None);
+    }
+    let path_like = format!("%_{token}_%");
+    let meta_like = format!("%{trimmed}%");
+    let sql = "SELECT rel_path FROM assets
+               WHERE media_type = ?1
+                 AND rel_path LIKE 'assets/%'
+                 AND rel_path LIKE '%/gen/%'
+                 AND (rel_path LIKE ?2 OR meta_json LIKE ?3)
+               ORDER BY created_at DESC
+               LIMIT 1";
+    match conn.query_row(sql, params![media_type, path_like, meta_like], |row| row.get(0)) {
+        Ok(rel) => Ok(Some(rel)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -411,5 +487,42 @@ mod tests {
             .expect("get path")
             .expect("some");
         assert_eq!(by_path.asset_id, aid);
+    }
+
+    #[test]
+    fn ensure_run_exists_before_log_event() {
+        let dir = tempdir().expect("tempdir");
+        let root = dir.path();
+        let conn = open_run_db(root).expect("open_run_db");
+        let run_id = "adhoc-video-run";
+        ensure_run_exists(&conn, run_id).expect("ensure");
+        log_event(
+            &conn,
+            run_id,
+            Some("node-1"),
+            "agent_phase",
+            &serde_json::json!({ "phase": "execute" }),
+        )
+        .expect("log");
+        let events = list_run_events(&conn, run_id).expect("events");
+        assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn find_gen_asset_by_job_token_in_path() {
+        let dir = tempdir().expect("tempdir");
+        let conn = open_run_db(dir.path()).expect("db");
+        upsert_asset(
+            &conn,
+            "assets/video/gen/dreamina/dreamina_t2v_20260530_f64d4c23_node_na_abcd.mp4",
+            "video",
+            Some("dreamina"),
+            Some(r#"{"jobId":"f64d4c23-d334-415a-bb2f-0383ee8544aa"}"#),
+        )
+        .expect("upsert");
+        let found = find_gen_asset_by_job_id(&conn, "video", "f64d4c23-d334-415a-bb2f-0383ee8544aa")
+            .expect("find")
+            .expect("some");
+        assert!(found.contains("f64d4c23"));
     }
 }

@@ -1,9 +1,8 @@
 //! 即梦 CLI 图片/视频生成（submit + query_result 轮询）
 
 use crate::commands::types::{VideoGenerationStartRequest, VideoJobSnapshot};
-use crate::db;
 use crate::dreamina_cli::{ensure_command_path, run_dreamina_command, DreaminaCliState};
-use crate::media;
+use crate::project_asset_store::{self, AssetWriteContext};
 use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -320,11 +319,27 @@ fn extract_outputs(data: &Value, download_dir: Option<&Path>) -> Vec<MediaOutput
                 }
             }
             Value::Object(map) => {
-                let url = ["url", "image_url", "video_url", "cover_url", "coverUrl", "src"]
-                    .iter()
-                    .find_map(|k| map.get(*k).and_then(|v| v.as_str()))
-                    .map(|s| s.trim().to_string())
-                    .filter(|s| !s.is_empty());
+                let url = [
+                    "url",
+                    "image_url",
+                    "video_url",
+                    "cover_url",
+                    "coverUrl",
+                    "src",
+                    "common_url",
+                    "commonUrl",
+                    "download_url",
+                    "downloadUrl",
+                    "play_url",
+                    "playUrl",
+                    "origin_url",
+                    "originUrl",
+                    "uri",
+                ]
+                .iter()
+                .find_map(|k| map.get(*k).and_then(|v| v.as_str()))
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
                 let local = ["local_path", "localPath", "path", "file_path", "filePath"]
                     .iter()
                     .find_map(|k| map.get(*k).and_then(|v| v.as_str()))
@@ -335,20 +350,10 @@ fn extract_outputs(data: &Value, download_dir: Option<&Path>) -> Vec<MediaOutput
                 }
                 for (key, child) in map {
                     let lower = key.to_lowercase();
-                    if lower.contains("input") || lower.contains("reference") || lower.contains("prompt")
-                    {
+                    if lower.contains("input") || lower.contains("reference") || lower.contains("prompt") {
                         continue;
                     }
-                    if lower.contains("output")
-                        || lower.contains("result")
-                        || lower.contains("image")
-                        || lower.contains("video")
-                        || lower.contains("media")
-                        || lower.contains("file")
-                        || lower.contains("url")
-                    {
-                        visit(child, depth + 1, push);
-                    }
+                    visit(child, depth + 1, push);
                 }
             }
             _ => {}
@@ -356,6 +361,24 @@ fn extract_outputs(data: &Value, download_dir: Option<&Path>) -> Vec<MediaOutput
     }
 
     visit(data, 0, &mut push);
+
+    for pointer in [
+        "/content/video_url",
+        "/content/url",
+        "/output/video_url",
+        "/output/url",
+        "/data/content/video_url",
+        "/data/output/video_url",
+        "/result/video_url",
+        "/video_url",
+    ] {
+        if let Some(url) = data.pointer(pointer).and_then(|v| v.as_str()) {
+            let trimmed = url.trim();
+            if !trimmed.is_empty() {
+                push(Some(trimmed.to_string()), None);
+            }
+        }
+    }
 
     if let Some(dir) = download_dir {
         if dir.is_dir() {
@@ -427,12 +450,24 @@ fn is_transient_query_error(output: &str) -> bool {
     if text.is_empty() {
         return false;
     }
+    if is_retryable_jimeng_error(output) {
+        return true;
+    }
     [
         "timeout", "timed out", "超时", "网络", "network", "connect", "connection", "socket",
         "econn", "enotfound", "temporary", "暂时", "busy", "503", "502", "504", "429",
     ]
     .iter()
     .any(|h| text.contains(h))
+}
+
+/// 1310 等：提交/查询瞬时失败，但 submit_id 已创建且可能已扣费，应继续轮询
+fn is_retryable_jimeng_error(text: &str) -> bool {
+    let t = text.to_lowercase();
+    t.contains("exceedconcurrencylimit")
+        || t.contains("ret=1310")
+        || t.contains("ret:1310")
+        || t.contains("1310")
 }
 
 fn to_query_phase(gen_status: &str, outputs: &[MediaOutput]) -> &'static str {
@@ -483,9 +518,12 @@ fn submit_task(
         .unwrap_or_else(|| "即梦提交失败".to_string());
 
     if let Some(id) = submit_id {
-        if gen_status != "failed" {
-            return Ok(id);
+        if gen_status == "failed" {
+            eprintln!(
+                "[dreamina] submit 响应为 failed 但存在 submit_id={id}，继续轮询取回成片: {fail_reason}"
+            );
         }
+        return Ok(id);
     }
 
     if !result.ok || gen_status == "failed" {
@@ -557,8 +595,17 @@ fn query_once(
             None
         },
     );
-    let phase = to_query_phase(&gen_status, &outputs);
+    let mut phase = to_query_phase(&gen_status, &outputs);
     let fail_reason = extract_fail_reason(&data);
+    if phase == "failed" {
+        if let Some(ref reason) = fail_reason {
+            if is_transient_query_error(reason) {
+                phase = "pending";
+            }
+        } else if !result.ok && is_transient_query_error(output_text) {
+            phase = "pending";
+        }
+    }
     Ok(QueryResult {
         phase,
         outputs,
@@ -675,35 +722,58 @@ fn pick_first_output(outputs: &[MediaOutput], prefer_video: bool) -> Option<Path
     }
 }
 
-fn copy_to_project_asset(
-    project_path: &Path,
-    source: &Path,
-    kind: &str,
-) -> Result<String, String> {
-    let assets_dir = project_path.join("assets");
-    fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let ext = source
-        .extension()
-        .and_then(|e| e.to_str())
-        .unwrap_or(if kind == "video" { "mp4" } else { "png" });
-    let prefix = if kind == "video" { "dreamina_vid" } else { "dreamina_img" };
-    let file_name = format!(
-        "{}_{}.{}",
-        prefix,
-        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
-        ext
-    );
-    let dest = assets_dir.join(&file_name);
-    fs::copy(source, &dest).map_err(|e| format!("复制生成结果失败：{e}"))?;
-    let rel = format!("assets/{file_name}");
-    let conn = db::open_run_db(project_path)?;
-    let meta = if kind == "video" {
-        media::meta_json_for_av(&dest, "video")
-    } else {
-        media::meta_json_for_image(&dest)
+fn pick_first_output_url(outputs: &[MediaOutput], prefer_video: bool) -> Option<String> {
+    let exts_video = [".mp4", ".mov", ".webm", ".mkv"];
+    let exts_image = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
+    let pick = |exts: &[&str]| {
+        outputs.iter().find_map(|o| {
+            o.url.as_ref().and_then(|u| {
+                let lower = u.to_lowercase();
+                if exts.iter().any(|e| lower.contains(e)) {
+                    Some(u.clone())
+                } else {
+                    None
+                }
+            })
+        })
     };
-    let _ = db::upsert_asset(&conn, &rel, kind, Some("dreamina"), meta.as_deref())?;
-    Ok(rel)
+    if prefer_video {
+        pick(&exts_video)
+            .or_else(|| pick(&exts_image))
+            .or_else(|| outputs.iter().find_map(|o| o.url.clone()))
+    } else {
+        pick(&exts_image)
+            .or_else(|| pick(&exts_video))
+            .or_else(|| outputs.iter().find_map(|o| o.url.clone()))
+    }
+}
+
+fn resolve_video_output_to_project(
+    http: &reqwest::Client,
+    outputs: &[MediaOutput],
+    project_path: &Path,
+    task_type: &str,
+    submit_id: &str,
+    node_id: Option<&str>,
+    workflow: Option<&str>,
+) -> Result<String, String> {
+    let ctx = AssetWriteContext {
+        kind: "video",
+        source: "dreamina",
+        workflow,
+        node_id,
+        job_id: Some(submit_id),
+    };
+    if let Some(local) = pick_first_output(outputs, true) {
+        return project_asset_store::copy_file_to_project_asset(project_path, &local, &ctx);
+    }
+    if let Some(url) = pick_first_output_url(outputs, true) {
+        let dl_dir = build_download_dir(task_type, submit_id);
+        fs::create_dir_all(&dl_dir).map_err(|e| e.to_string())?;
+        let local = block_on_download(http, &url, &dl_dir)?;
+        return project_asset_store::copy_file_to_project_asset(project_path, &local, &ctx);
+    }
+    Err("即梦未返回可下载的视频文件".into())
 }
 
 /// 即梦文生图 / 图生图：提交后轮询直至完成，返回工程相对路径。
@@ -787,7 +857,14 @@ pub async fn generate_image_via_cli(
         }
         downloaded = true;
         if let Some(local) = pick_first_output(&q.outputs, false) {
-            return copy_to_project_asset(&project, &local, "image");
+            let ctx = AssetWriteContext {
+                kind: "image",
+                source: "dreamina",
+                workflow: None,
+                node_id: None,
+                job_id: Some(submit_id.as_str()),
+            };
+            return project_asset_store::copy_file_to_project_asset(&project, &local, &ctx);
         }
         if attempt + 1 >= IMAGE_POLL_MAX {
             break;
@@ -953,19 +1030,35 @@ pub async fn poll_video_via_cli(
     project_path: &str,
     model_id: &str,
     workflow: &str,
+    node_id: Option<&str>,
 ) -> Result<VideoJobSnapshot, String> {
     let command_path = ensure_command_path(http)?;
-    let task_type = resolve_video_subcommand(workflow).unwrap_or("text2video");
-    let q = query_once(&command_path, submit_id, task_type, true)?;
-
     let id = submit_id.to_string();
     let model_id = model_id.to_string();
+
+    if let Some(existing) = project_asset_store::find_existing_gen_asset_by_job_id(
+        Path::new(project_path),
+        "video",
+        submit_id,
+    )? {
+        return Ok(VideoJobSnapshot {
+            id,
+            status: "succeeded".into(),
+            progress: Some(1.0),
+            error: None,
+            model_id,
+            result_rel_path: Some(existing),
+        });
+    }
+
+    let task_type = resolve_video_subcommand(workflow).unwrap_or("text2video");
+    let q = query_once(&command_path, submit_id, task_type, true)?;
 
     if q.phase == "pending" {
         return Ok(VideoJobSnapshot {
             id,
-            status: "running".into(),
-            progress: Some(0.5),
+            status: "queued".into(),
+            progress: None,
             error: None,
             model_id,
             result_rel_path: None,
@@ -973,6 +1066,17 @@ pub async fn poll_video_via_cli(
     }
 
     if q.phase == "failed" {
+        let reason = q.fail_reason.as_deref().unwrap_or("");
+        if is_transient_query_error(reason) {
+            return Ok(VideoJobSnapshot {
+                id,
+                status: "running".into(),
+                progress: None,
+                error: None,
+                model_id,
+                result_rel_path: None,
+            });
+        }
         return Ok(VideoJobSnapshot {
             id,
             status: "failed".into(),
@@ -983,24 +1087,161 @@ pub async fn poll_video_via_cli(
         });
     }
 
-    if let Some(local) = pick_first_output(&q.outputs, true) {
-        let rel = copy_to_project_asset(Path::new(project_path), &local, "video")?;
-        return Ok(VideoJobSnapshot {
-            id,
-            status: "succeeded".into(),
-            progress: Some(1.0),
-            error: None,
-            model_id,
-            result_rel_path: Some(rel),
-        });
+    if q.phase == "success" || !q.outputs.is_empty() {
+        match resolve_video_output_to_project(
+            http,
+            &q.outputs,
+            Path::new(project_path),
+            &task_type,
+            submit_id,
+            node_id,
+            Some(workflow),
+        ) {
+            Ok(rel) => {
+                return Ok(VideoJobSnapshot {
+                    id,
+                    status: "succeeded".into(),
+                    progress: Some(1.0),
+                    error: None,
+                    model_id,
+                    result_rel_path: Some(rel),
+                });
+            }
+            Err(e) => {
+                eprintln!("[dreamina] 视频已就绪但落盘失败 submit_id={submit_id}: {e}");
+                return Ok(VideoJobSnapshot {
+                    id,
+                    status: "running".into(),
+                    progress: None,
+                    error: Some(format!("视频已生成，下载落盘失败：{e}")),
+                    model_id,
+                    result_rel_path: None,
+                });
+            }
+        }
     }
 
     Ok(VideoJobSnapshot {
         id,
         status: "running".into(),
-        progress: Some(0.7),
+        progress: None,
         error: None,
         model_id,
         result_rel_path: None,
+    })
+}
+
+/// 按 submit_id 从即梦取回已在网页端成功的成片（用于提交阶段误报失败、或下载漏接）
+pub async fn recover_dreamina_video_job(
+    http: &reqwest::Client,
+    submit_id: &str,
+    project_path: &str,
+    model_id: &str,
+    workflow_hint: Option<&str>,
+    node_id: Option<&str>,
+) -> Result<VideoJobSnapshot, String> {
+    let command_path = ensure_command_path(http)?;
+    let id = submit_id.trim().to_string();
+    if id.is_empty() {
+        return Err("submitId 不能为空".into());
+    }
+
+    if let Some(existing) = project_asset_store::find_existing_gen_asset_by_job_id(
+        Path::new(project_path),
+        "video",
+        &id,
+    )? {
+        return Ok(VideoJobSnapshot {
+            id: id.clone(),
+            status: "succeeded".into(),
+            progress: Some(1.0),
+            error: None,
+            model_id: model_id.to_string(),
+            result_rel_path: Some(existing),
+        });
+    }
+
+    let mut task_types: Vec<String> = Vec::new();
+    if let Some(w) = workflow_hint {
+        if let Ok(t) = resolve_video_subcommand(w.trim()) {
+            task_types.push(t.to_string());
+        }
+    }
+    for t in ["text2video", "image2video", "frames2video", "multimodal2video"] {
+        if !task_types.iter().any(|x| x == t) {
+            task_types.push(t.to_string());
+        }
+    }
+
+    let mut last_err = String::new();
+    for task_type in task_types {
+        eprintln!("[dreamina] recover submit_id={id} task_type={task_type}");
+        let q = match query_once(&command_path, &id, &task_type, true) {
+            Ok(v) => v,
+            Err(e) => {
+                last_err = e;
+                continue;
+            }
+        };
+
+        if q.phase == "pending" {
+            return Ok(VideoJobSnapshot {
+                id: id.clone(),
+                status: "running".into(),
+                progress: None,
+                error: Some("即梦任务仍在处理中，请稍后再试取回".into()),
+                model_id: model_id.to_string(),
+                result_rel_path: None,
+            });
+        }
+
+        if q.phase == "failed" {
+            if let Some(ref reason) = q.fail_reason {
+                if is_transient_query_error(reason) {
+                    return Ok(VideoJobSnapshot {
+                        id: id.clone(),
+                        status: "running".into(),
+                        progress: None,
+                        error: Some("即梦查询暂时失败，请稍后重试取回".into()),
+                        model_id: model_id.to_string(),
+                        result_rel_path: None,
+                    });
+                }
+                last_err = reason.clone();
+            }
+            continue;
+        }
+
+        if q.phase == "success" || !q.outputs.is_empty() {
+            match resolve_video_output_to_project(
+                http,
+                &q.outputs,
+                Path::new(project_path),
+                &task_type,
+                &id,
+                node_id,
+                Some(workflow_hint.unwrap_or(&task_type)),
+            ) {
+                Ok(rel) => {
+                    return Ok(VideoJobSnapshot {
+                        id: id.clone(),
+                        status: "succeeded".into(),
+                        progress: Some(1.0),
+                        error: None,
+                        model_id: model_id.to_string(),
+                        result_rel_path: Some(rel),
+                    });
+                }
+                Err(e) => {
+                    last_err = e;
+                }
+            }
+        }
+    }
+
+    Err(if last_err.is_empty() {
+        "未在即梦查询到可下载的成片，请确认 submit_id 与当前登录账号一致".into()
+    } else {
+        format!("取回即梦成片失败：{last_err}")
     })
 }
