@@ -52,7 +52,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "RWs7y+spT1v0BP3yORWK7Jz49NlzEpSsmhHWZIzSlNanpihKh0Y0hhuD",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE5ODY5MEZEQzdCNjFGNDQKUldSRUg3YkgvWkNHcWE3QnJ1b3VCallQbXFSclZvLy9nL3Y3WjVqc3VDMS9ibzdacWUxR0Z2VzgK",
       "endpoints": [
         "https://github.com/tianshi8306-crypto/vibevideo/releases/latest/download/latest.json"
       ],
