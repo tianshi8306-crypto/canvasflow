@@ -156,6 +156,39 @@ function patchTauriExternalBinPermanent() {
   console.log("[tauri] patched tauri.conf.json (externalBin enabled, permanent for CI)");
 }
 
+function ciTargetTriples() {
+  const key = platformKey();
+  if (key === "darwin-arm64") {
+    return ["aarch64-apple-darwin", "x86_64-apple-darwin"];
+  }
+  if (key === "darwin-x64") {
+    return ["x86_64-apple-darwin"];
+  }
+  if (key === "linux-x64") {
+    return ["x86_64-unknown-linux-gnu"];
+  }
+  if (key === "win32-x64") {
+    return ["x86_64-pc-windows-msvc"];
+  }
+  return [];
+}
+
+function ensureCiTargetCopies(baseBin) {
+  const triples = ciTargetTriples();
+  if (!triples.length) return;
+  const ext = os.platform() === "win32" ? ".exe" : "";
+  const baseName = path.basename(baseBin, ext);
+  const dir = path.dirname(baseBin);
+  for (const triple of triples) {
+    const suffixed = path.join(dir, `${baseName}-${triple}${ext}`);
+    if (!exists(suffixed)) {
+      fs.copyFileSync(baseBin, suffixed);
+      if (os.platform() !== "win32") fs.chmodSync(suffixed, 0o755);
+      console.log(`[ffmpeg] copied ${baseBin} → ${suffixed}`);
+    }
+  }
+}
+
 function ensureBundledFfmpeg() {
   ensureDir(BIN_DIR);
   const exe = ffmpegExeName();
@@ -269,7 +302,8 @@ function main() {
   ensureBundledFfmpeg();
 
   if (args.has("--ci-prep")) {
-    ensureBundledFfmpeg();
+    const bin = ensureBundledFfmpeg();
+    ensureCiTargetCopies(bin);
     patchTauriExternalBinPermanent();
     console.log("[tauri] CI release prep complete");
     return;
