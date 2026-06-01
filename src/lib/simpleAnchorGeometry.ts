@@ -4,8 +4,11 @@ import { nodeLayoutDimensions } from "@/lib/nodeLayout";
 /** 极简锚点圆钮直径（与 CSS --simple-anchor-knob 一致） */
 export const SIMPLE_ANCHOR_KNOB = 18;
 
-/** 锚点圆钮与预览面板（节点外缘）之间的间距 */
-export const SIMPLE_ANCHOR_EDGE_GAP = 6;
+/** 交互圆钮相对节点边框的外移距离（仅视觉/命中，连线落点在边框） */
+export const SIMPLE_ANCHOR_VISUAL_OUTSET = 6;
+
+/** @deprecated 连线已贴边框，保留别名避免旧引用报错 */
+export const SIMPLE_ANCHOR_EDGE_GAP = SIMPLE_ANCHOR_VISUAL_OUTSET;
 
 /** 指针进入该半径（px）时，锚点磁吸到鼠标位置 */
 export const SIMPLE_ANCHOR_MAGNET_RADIUS = 44;
@@ -13,32 +16,27 @@ export const SIMPLE_ANCHOR_MAGNET_RADIUS = 44;
 /** 水平中心对齐吸附阈值（拖拽节点） */
 export const SIMPLE_ANCHOR_ALIGN_SNAP_PX = 28;
 
-const KNOB_R = SIMPLE_ANCHOR_KNOB / 2;
-
-/** 热区内锚点默认位置（knob-wrap 的 left/top，非圆心） */
+/** 热区内交互圆钮默认位置（居中于外侧热区，不贴节点边框） */
 export function getSimpleAnchorRestingKnobPos(
   zoneWidth: number,
   zoneHeight: number,
-  side: "left" | "right",
+  _side: "left" | "right",
 ): { left: number; top: number } {
   return {
-    top: zoneHeight / 2 - KNOB_R,
-    // 左：圆心距节点左缘 gap+r；右：圆心距节点右缘 gap+r（wrap 左上角对称）
-    left: side === "left" ? zoneWidth - SIMPLE_ANCHOR_KNOB : 0,
+    left: (zoneWidth - SIMPLE_ANCHOR_KNOB) / 2,
+    top: (zoneHeight - SIMPLE_ANCHOR_KNOB) / 2,
   };
 }
 
+/** 连线锚点圆心相对节点左上角的 X（贴左右边框） */
 export function getSimpleAnchorCenterOffsetX(
   side: "left" | "right",
   nodeWidth: number,
 ): number {
-  if (side === "left") {
-    return -(SIMPLE_ANCHOR_EDGE_GAP + KNOB_R);
-  }
-  return nodeWidth + SIMPLE_ANCHOR_EDGE_GAP + KNOB_R;
+  return side === "left" ? 0 : nodeWidth;
 }
 
-/** 节点锚点在画布 flow 坐标系下的中心点 */
+/** 节点锚点在画布 flow 坐标系下的中心点（连线贴边框） */
 export function getSimpleAnchorFlowPosition(
   node: Node,
   handleType: "source" | "target",

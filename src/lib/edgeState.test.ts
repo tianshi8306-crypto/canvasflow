@@ -6,6 +6,7 @@ import {
   edgeToggleActionLabel,
   edgeToggleStatusText,
   enabledEdges,
+  enabledTargetsFromSource,
   isEdgeDisabled,
 } from "@/lib/edgeState";
 
@@ -29,6 +30,15 @@ describe("edgeState helpers", () => {
   it("enabledEdges filters out disabled edges", () => {
     const edges = [edge("e1"), edge("e2", true), edge("e3")];
     expect(enabledEdges(edges).map((e) => e.id)).toEqual(["e1", "e3"]);
+  });
+
+  it("enabledTargetsFromSource returns only enabled outgoing targets", () => {
+    const edges = [
+      { source: "S", target: "A" },
+      { source: "S", target: "B", data: { disabled: true } },
+      { source: "X", target: "C" },
+    ];
+    expect([...enabledTargetsFromSource(edges, "S")].sort()).toEqual(["A"]);
   });
 
   it("returns consistent edge interaction messages", () => {

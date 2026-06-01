@@ -1,17 +1,7 @@
 import { useCallback } from "react";
 import { useReactFlow, type Node } from "@xyflow/react";
-import {
-  computeImageNodeFrameSize,
-  resolveImageNodeFrameRatio,
-} from "@/lib/imageGeneration/imageAspectSize";
-import { readImageOutputParams } from "@/lib/imageGeneration/imageOutputParams";
-import {
-  computeVideoNodeFrameSize,
-  resolveVideoNodeFrameRatio,
-} from "@/lib/videoGeneration/videoAspectSize";
-import { nodeLayoutDimensions } from "@/lib/nodeLayout";
+import { resolveNodeLayoutFootprint } from "@/lib/nodeLayout";
 import type { FlowNodeData } from "@/lib/types";
-import type { TextToVideoAspectId } from "@/lib/videoNodeTypes";
 
 export const MEDIA_PREVIEW_FOCUS_ZOOM = 2;
 export const MEDIA_PREVIEW_FOCUS_DURATION_MS = 420;
@@ -19,29 +9,7 @@ export const MEDIA_PREVIEW_FOCUS_DURATION_MS = 420;
 const MEDIA_NODE_TYPES = new Set(["imageNode", "videoNode"]);
 
 export function getMediaNodeFlowCenter(node: Node<FlowNodeData>): { x: number; y: number } {
-  let { w, h } = nodeLayoutDimensions(node);
-
-  if (node.type === "imageNode" && (node.measured?.width == null || node.measured.width <= 0)) {
-    const outputParams = readImageOutputParams(node.data?.params);
-    const ratio = resolveImageNodeFrameRatio({
-      aspectId: outputParams.aspect,
-      imageWidth: node.data?.imageWidth,
-      imageHeight: node.data?.imageHeight,
-    });
-    const frame = computeImageNodeFrameSize(ratio);
-    w = frame.width;
-    h = frame.height;
-  }
-
-  if (node.type === "videoNode" && (node.measured?.width == null || node.measured.width <= 0)) {
-    const aspectId =
-      (node.data?.video?.draft?.output?.aspectRatio as TextToVideoAspectId | undefined) ?? "16:9";
-    const ratio = resolveVideoNodeFrameRatio({ aspectId });
-    const frame = computeVideoNodeFrameSize(ratio);
-    w = frame.width;
-    h = frame.height;
-  }
-
+  const { w, h } = resolveNodeLayoutFootprint(node);
   return {
     x: node.position.x + w / 2,
     y: node.position.y + h / 2,

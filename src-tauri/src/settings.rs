@@ -46,6 +46,10 @@ fn default_max_reference_images() -> u8 {
     4
 }
 
+fn default_agent_max_concurrent_media() -> u8 {
+    2
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -64,6 +68,33 @@ pub struct AppSettings {
     /// 为 true 时任一节点失败即中止整图（与默认「失败下游跳过」相反）。
     #[serde(default)]
     pub abort_workflow_on_failure: bool,
+    /// 自定义 Hermes 用户记忆根目录；空则使用各工程内 `.canvasflow/hermes-knowledge-user/`。
+    #[serde(default)]
+    pub hermes_memory_root: Option<String>,
+    /// Hermes Agent：识别制片意图后自动执行（关则仅展示计划，需用户确认）
+    #[serde(default = "default_true")]
+    pub agent_auto_execute: bool,
+    /// 大批量出图/出视频跳过对话「继续」确认
+    #[serde(default = "default_true")]
+    pub agent_auto_batch: bool,
+    /// 允许自动改脚本/分镜
+    #[serde(default = "default_true")]
+    pub agent_allow_script_edit: bool,
+    /// 允许自动提交出图/出视频 API
+    #[serde(default = "default_true")]
+    pub agent_allow_media_submit: bool,
+    /// 同时进行的媒体生成任务上限（1～3）
+    #[serde(default = "default_agent_max_concurrent_media")]
+    pub agent_max_concurrent_media: u8,
+    /// 步内 Agent loop：执行前补齐依赖、失败后规则 recovery
+    #[serde(default = "default_true")]
+    pub agent_loop_enabled: bool,
+    /// 长上下文 workstate 摘要用 LLM（关则仅规则压缩）
+    #[serde(default = "default_true")]
+    pub agent_long_context_llm_summary: bool,
+    /// 外接 MCP Server（stdio 子进程）
+    #[serde(default)]
+    pub hermes_mcp_servers: Vec<crate::mcp_stdio::HermesMcpServerConfig>,
 }
 
 impl Default for AppSettings {
@@ -83,6 +114,15 @@ impl Default for AppSettings {
             video_models: Vec::new(),
             audio_models: Vec::new(),
             abort_workflow_on_failure: false,
+            hermes_memory_root: None,
+            agent_auto_execute: true,
+            agent_auto_batch: true,
+            agent_allow_script_edit: true,
+            agent_allow_media_submit: true,
+            agent_max_concurrent_media: default_agent_max_concurrent_media(),
+            agent_loop_enabled: true,
+            agent_long_context_llm_summary: true,
+            hermes_mcp_servers: Vec::new(),
         }
     }
 }

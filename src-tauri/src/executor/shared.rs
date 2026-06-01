@@ -16,8 +16,10 @@ use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::ffmpeg::run_ffmpeg_concat;
+use super::graph_flow::script_beat_params_patch_if_changed;
 use super::llm::run_llm_node;
-use super::asset_resolve::resolve_node_media_rel_path;
+use super::asset_resolve::{resolve_node_media_asset_id, resolve_node_media_rel_path};
+use super::node_output::{encode_media_output_value, output_value_from_run_event_payload};
 use super::script_node::run_script_node;
 
 /// 从上一次运行恢复已成功的节点 output
@@ -33,7 +35,9 @@ pub(crate) fn recover_run_outputs(conn: &Connection, previous_run_id: &str) -> R
         };
         let payload: serde_json::Value =
             serde_json::from_str(&ev.payload_json).unwrap_or_else(|_| json!({}));
-        if let Some(v) = payload.get("output").and_then(|v| v.as_str()) {
+        if let Some(stored) = output_value_from_run_event_payload(&payload) {
+            out.insert(node_id, stored);
+        } else if let Some(v) = payload.get("output").and_then(|v| v.as_str()) {
             out.insert(node_id, v.to_string());
         }
     }
@@ -61,8 +65,8 @@ pub(crate) fn recover_run_succeeded(conn: &Connection, previous_run_id: &str) ->
     Ok(out)
 }
 
-/// 节点执行结果：成功返回 output string，跳过返回 None，失败返回 Err
-type NodeStepResult = Result<Option<String>, String>;
+/// 节点执行结果：`(output, data_patch)`；跳过则两者均为 `None`
+type NodeStepResult = Result<(Option<String>, Option<serde_json::Value>), String>;
 
 /// 执行单个节点的类型匹配分支（async）。
 /// caller 负责在调用前后记录 "running" / "succeeded" / "failed" 日志。
@@ -84,26 +88,41 @@ async fn exec_node(
                 run_script_node(http, project_root, graph, node, settings, outputs, conn, run_id).await?;
             let _ = db::log_event(conn, run_id, Some(&node.id), "node_output", &json!({ "output": res }));
             let _ = db::log_event(conn, run_id, Some(&node.id), "node_patch", &patch);
-            Ok(Some(res))
+            Ok((Some(res), Some(patch)))
         }
 
         "llm" | "textNode" => {
             let res = run_llm_node(http, graph, node, settings, outputs, conn, run_id).await?;
             let _ = db::log_event(conn, run_id, Some(&node.id), "node_output", &json!({ "output": res }));
-            Ok(Some(res))
+            Ok((Some(res), None))
         }
 
         "imageNode" | "audioNode" | "videoNode" | "mediaImport" | "imageAsset" => {
             let path = resolve_node_media_rel_path(project_root, &node.data).unwrap_or_default();
-            let _ = db::log_event(conn, run_id, Some(&node.id), "asset", &json!({ "path": path, "kind": kind }));
-            let _ = db::log_event(conn, run_id, Some(&node.id), "node_output", &json!({ "output": path }));
-            Ok(Some(path))
+            let asset_id = resolve_node_media_asset_id(project_root, &node.data);
+            let output_value = encode_media_output_value(&path, asset_id.as_deref());
+            let _ = db::log_event(
+                conn,
+                run_id,
+                Some(&node.id),
+                "asset",
+                &json!({ "path": path, "assetId": asset_id, "kind": kind }),
+            );
+            let _ = db::log_event(
+                conn,
+                run_id,
+                Some(&node.id),
+                "node_output",
+                &json!({ "output": path, "assetId": asset_id }),
+            );
+            let data_patch = script_beat_params_patch_if_changed(graph, node);
+            Ok((Some(output_value), data_patch))
         }
 
         "ffmpegConcat" => {
             let out = run_ffmpeg_concat(project_root, node, settings, conn, run_id)?;
             let _ = db::log_event(conn, run_id, Some(&node.id), "node_output", &json!({ "output": out }));
-            Ok(Some(out))
+            Ok((Some(out), None))
         }
 
         _ => {
@@ -112,7 +131,7 @@ async fn exec_node(
                 conn, run_id, Some(&node.id), "node_state",
                 &json!({ "state": "skipped", "reason": "unsupported_type", "nodeType": kind }),
             );
-            Ok(None)
+            Ok((None, None))
         }
     }
 }
@@ -181,11 +200,14 @@ pub(crate) async fn exec_node_loop(
         let step = exec_node(http, project_root, graph, node, settings, &outputs, &mut conn, run_id).await;
 
         match step {
-            Ok(Some(output)) => {
+            Ok((Some(output), data_patch)) => {
                 outputs.insert(node_id.clone(), output);
+                if let Some(patch) = data_patch {
+                    script_patches.push((node_id.clone(), patch));
+                }
                 let _ = db::log_event(&conn, run_id, Some(node_id), "node_state", &json!({ "state": "succeeded" }));
             }
-            Ok(None) => {
+            Ok((None, _)) => {
                 // skipped — 已在 exec_node 中记录
             }
             Err(e) => {

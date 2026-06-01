@@ -2,9 +2,14 @@
 :root {
   --bg-canvas: #121212;
   --bg-sidebar: #1a1a1a;
-  --bg-node: #1e1e1e;
-  --bg-panel: #1a1a1a;
-  --bg-button: #252525;
+  /* 统一节点底板：壳 / 生成面板 / 空态预览区同色（一层皮肤，禁止框中框） */
+  --bg-node: #2b2b2b;
+  --bg-panel: #2b2b2b;
+  --bg-node-preview: #2b2b2b;
+  /* 内嵌控件：默认与底板同色（透明），靠描边区分；悬停/选中用半透明叠层 */
+  --bg-button: transparent;
+  --bg-button-hover: rgba(255, 255, 255, 0.08);
+  --bg-button-active: rgba(255, 255, 255, 0.08);
   --border-node: rgba(255, 255, 255, 0.12);
   --border-button: rgba(255, 255, 255, 0.14);
   --text-primary: #e0e0e0;
@@ -19,6 +24,20 @@
   --radius-node: 8px;
   --chrome-meta-offset-top: -18px;
   --chrome-meta-inset-x: 4px;
+  --chrome-preview-stack-gap: 4px;
+  --chrome-above-preview-gap: 6px;
   --simple-anchor-gap: 6px;
   --simple-anchor-knob: 18px;
+
+  /* 生成参数面板（真源：videoGenPanel--chrome，见 docs/design/gen-panel-design-system.md） */
+  --gen-panel-width: 500px;
+  --gen-panel-pad: 12px 14px 14px;
+  --gen-panel-bg: #2b2b2b;
+  --gen-panel-max-height: min(calc(100vh - 88px), 360px);
+  --gen-control-h: 36px;
+  --gen-control-radius: 8px;
+  --gen-cta-bg-ready: #f0f0f0;
+  --gen-cta-bg-ready-hover: #ffffff;
+  --gen-ref-thumb-size: 37px;
+  --gen-ref-thumb-gap: 4px;
 }

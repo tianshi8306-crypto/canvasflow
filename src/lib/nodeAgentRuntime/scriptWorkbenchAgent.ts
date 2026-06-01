@@ -1,3 +1,4 @@
+import { SCRIPT_DRAFT_STATUS_DONE } from "@/lib/scriptNodeActionLabels";
 import { normalizeScriptBeat } from "@/lib/scriptBeatHelpers";
 import type { ScriptBeat } from "@/lib/types";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
@@ -67,7 +68,7 @@ export const scriptDraftFromThemeAgentRuntime: NodeTaskAgentRuntime<
       scriptBeats: seed,
       scriptBeatSelection: seed.map((s) => s.id),
     });
-    ctx.setStatusText("已根据主题生成脚本草案（可继续在工作台编辑）");
+    ctx.setStatusText(SCRIPT_DRAFT_STATUS_DONE);
   },
 };
 

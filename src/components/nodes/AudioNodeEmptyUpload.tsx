@@ -9,7 +9,7 @@ type Props = {
   nodeId: string;
 };
 
-/** 无音频态：节点上方居中上传（对齐图片空态） */
+/** 无音频态：节点上方居中上传（仅图标，文案见 title） */
 export function AudioNodeEmptyUpload({ nodeId }: Props) {
   const queryClient = useQueryClient();
   const projectPath = useProjectStore((s) => s.projectPath);
@@ -29,7 +29,7 @@ export function AudioNodeEmptyUpload({ nodeId }: Props) {
   return (
     <button
       type="button"
-      className="nodeChrome-upload-float minimal-audio-upload-float"
+      className="nodeChrome-upload-float minimal-image-upload-float"
       title="上传音频"
       onClick={() => void onUpload()}
       onPointerDown={(e) => e.stopPropagation()}

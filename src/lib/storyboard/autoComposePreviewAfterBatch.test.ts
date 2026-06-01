@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
+import { defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
 import { videoNodeIdsForBeats } from "@/lib/storyboard/autoComposePreviewAfterBatch";
 import { readAutoComposePreviewAfterBatchVideo } from "@/lib/storyboard/scriptProductionPrefs";
 
@@ -18,7 +19,7 @@ describe("videoNodeIdsForBeats", () => {
         id: "vid-1",
         type: "videoNode",
         position: { x: 0, y: 0 },
-        data: { params: { scriptBeatId: "beat-a" }, video: {} },
+        data: { params: { scriptBeatId: "beat-a" }, video: defaultVideoNodePersisted() },
       },
     ];
     const edges: Edge[] = [

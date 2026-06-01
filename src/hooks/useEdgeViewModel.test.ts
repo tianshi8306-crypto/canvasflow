@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
-import { buildEdgeView, buildNodesView, summarizeEdgePayloadText } from "@/hooks/useEdgeViewModel";
+import { buildEdgeView, buildNodesView } from "@/hooks/useEdgeViewModel";
 
 function node(id: string, type: Node<FlowNodeData>["type"], data: Partial<FlowNodeData> = {}): Node<FlowNodeData> {
   return {
@@ -31,6 +31,11 @@ describe("useEdgeViewModel pure helpers", () => {
     expect(out[0].animated).toBe(false);
   });
 
+  it("buildEdgeView applies active stroke when selected", () => {
+    const out = buildEdgeView([edge("e1", "A", "B", false)], ["e1"], {});
+    expect(out[0].style?.stroke).toBe("#7dd3fc");
+  });
+
   it("buildEdgeView marks running state and keeps animation on", () => {
     const out = buildEdgeView(
       [edge("e1", "A", "B", false)],
@@ -51,30 +56,22 @@ describe("useEdgeViewModel pure helpers", () => {
     expect(out[0].animated).toBe(false);
   });
 
-  it("buildNodesView highlights linked nodes and dims others", () => {
-    const nodes = [node("A", "textNode"), node("B", "imageNode"), node("C", "audioNode")];
-    const out = buildNodesView(nodes, {
-      edgeId: "e",
-      sourceId: "A",
-      targetId: "B",
-      x: 0,
-      y: 0,
-      summary: "",
-      disabled: false,
-    });
-    expect(out.find((n) => n.id === "A")?.className).toContain("flowNodeLinkedByEdge");
-    expect(out.find((n) => n.id === "B")?.className).toContain("flowNodeLinkedByEdge");
-    expect(out.find((n) => n.id === "C")?.className).toContain("flowNodeDimmedByEdge");
-  });
-
-  it("summarizeEdgePayloadText includes disabled marker", () => {
+  it("buildNodesView syncs selected from store and strips dragging", () => {
     const nodes = [
-      node("A", "textNode", { prompt: "hello" }),
+      { ...node("A", "textNode"), selected: true, dragging: true },
       node("B", "imageNode"),
     ];
-    const summary = summarizeEdgePayloadText(nodes, "A", "B", true);
-    expect(summary).toContain("textNode -> imageNode");
-    expect(summary).toContain("已禁用（不参与执行/推导）");
+    const out = buildNodesView(nodes, ["B"]);
+    expect(out.find((n) => n.id === "A")?.selected).toBe(false);
+    expect(out.find((n) => n.id === "B")?.selected).toBe(true);
+    expect(out.find((n) => n.id === "A")?.dragging).toBeUndefined();
+  });
+
+  it("buildNodesView elevates single-selected node for chrome stacking", () => {
+    const out = buildNodesView([node("A", "imageNode"), node("B", "videoNode")], ["B"]);
+    expect(out.find((n) => n.id === "B")?.zIndex).toBe(1000);
+    expect(out.find((n) => n.id === "B")?.className).toContain("flowNodeChromeFocus");
+    expect(out.find((n) => n.id === "A")?.zIndex).toBeUndefined();
   });
 });
 

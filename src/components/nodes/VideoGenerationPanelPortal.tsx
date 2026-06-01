@@ -1,39 +1,32 @@
-import { createPortal } from "react-dom";
-import { useCallback, useMemo, type MutableRefObject, type RefObject } from "react";
+import { useCallback, type MutableRefObject, type RefObject } from "react";
 import { NODE_CHROME_VIDEO_PANEL_CLASS } from "@/components/nodes/nodeChrome";
-import {
-  GEN_PANEL_CHROME_Z,
-  useNodeGenerationChrome,
-} from "@/hooks/useNodeGenerationChrome";
-import { useFocusLinkedPartnerNode } from "@/hooks/canvas/useFocusLinkedPartnerNode";
+import { useNodeChromeMount } from "@/components/nodes/nodeChrome/NodeChromeContext";
+import { NodeChromePortalShell } from "@/components/nodes/nodeChrome/NodeChromePortalShell";
+import { useNodeGenerationChrome } from "@/hooks/useNodeGenerationChrome";
 import { VideoMultimodalInputPanel } from "@/components/nodes/VideoMultimodalInputPanel";
-import { useProjectStore } from "@/store/projectStore";
 
 type Props = {
   nodeId: string;
   anchorRef: RefObject<HTMLElement | null>;
   active: boolean;
   panelRef?: RefObject<HTMLDivElement | null>;
-  /** 文本节点托管 VGP 时显示「定位视频节点」 */
-  showLocateVideoNode?: boolean;
+  /** 预览区正中 overlay，生成胶囊 Portal 挂载点 */
+  previewOverlayEl?: HTMLElement | null;
 };
 
-/** 单选展开态：预览区下缘 Portal 渲染视频多模态生成面板 */
+/** 单选展开态：在预览区下缘 Portal 渲染视频多模态生成面板 */
 export function VideoGenerationPanelPortal({
   nodeId,
   anchorRef,
   active,
   panelRef: externalPanelRef,
-  showLocateVideoNode = false,
+  previewOverlayEl = null,
 }: Props) {
-  const nodes = useProjectStore((s) => s.nodes);
-  const { focusPartnerNode } = useFocusLinkedPartnerNode();
-  const { pos, panelRef: innerPanelRef } = useNodeGenerationChrome(anchorRef, { active });
-
-  const videoLabel = useMemo(() => {
-    const n = nodes.find((x) => x.id === nodeId);
-    return (n?.data.label ?? "视频节点").toString();
-  }, [nodeId, nodes]);
+  const chromeMount = useNodeChromeMount();
+  const { pos, panelRef: innerPanelRef } = useNodeGenerationChrome(anchorRef, {
+    active,
+    mountRef: chromeMount?.mountRef,
+  });
 
   const setPanelRef = useCallback(
     (el: HTMLDivElement | null) => {
@@ -45,38 +38,19 @@ export function VideoGenerationPanelPortal({
     [innerPanelRef, externalPanelRef],
   );
 
-  if (!active || !pos || typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      ref={setPanelRef}
+  return (
+    <NodeChromePortalShell
+      active={active}
+      pos={pos}
+      setPanelRef={setPanelRef}
       className={NODE_CHROME_VIDEO_PANEL_CLASS}
-      style={{
-        position: "fixed",
-        left: `${pos.x}px`,
-        top: `${pos.y}px`,
-        transform: "translateX(-50%)",
-        zIndex: GEN_PANEL_CHROME_Z + 1,
-      }}
       onPointerDown={(e) => e.stopPropagation()}
     >
-      {showLocateVideoNode ? (
-        <div className="tgp-partner-linkRow tgp-partner-linkRow--video">
-          <span className="tgp-partner-linkHint">文生视频 · 面板锚定在文本节点</span>
-          <button
-            type="button"
-            className="tgp-partner-focusBtn"
-            onClick={(e) => {
-              e.stopPropagation();
-              void focusPartnerNode(nodeId, { kind: "video", label: videoLabel });
-            }}
-          >
-            定位视频节点
-          </button>
-        </div>
-      ) : null}
-      <VideoMultimodalInputPanel videoNodeId={nodeId} layout="portal" />
-    </div>,
-    document.body,
+      <VideoMultimodalInputPanel
+        videoNodeId={nodeId}
+        layout="portal"
+        previewOverlayEl={previewOverlayEl}
+      />
+    </NodeChromePortalShell>
   );
 }

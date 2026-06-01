@@ -1,0 +1,23 @@
+{
+  "version": "0.2.0",
+  "notes": "示例：在此填写更新说明，会显示在更新弹窗中。",
+  "pub_date": "2026-06-01T00:00:00Z",
+  "platforms": {
+    "windows-x86_64": {
+      "signature": "PASTE_CONTENT_FROM_.sig_FILE",
+      "url": "https://github.com/tianshi8306-crypto/vibevideo/releases/download/v0.2.0/CanvasFlow.AI.Studio_0.2.0_x64-setup.nsis.zip"
+    },
+    "darwin-x86_64": {
+      "signature": "PASTE_CONTENT_FROM_.sig_FILE",
+      "url": "https://github.com/tianshi8306-crypto/vibevideo/releases/download/v0.2.0/CanvasFlow.AI.Studio_0.2.0_x64.app.tar.gz"
+    },
+    "darwin-aarch64": {
+      "signature": "PASTE_CONTENT_FROM_.sig_FILE",
+      "url": "https://github.com/tianshi8306-crypto/vibevideo/releases/download/v0.2.0/CanvasFlow.AI.Studio_0.2.0_aarch64.app.tar.gz"
+    },
+    "linux-x86_64": {
+      "signature": "PASTE_CONTENT_FROM_.sig_FILE",
+      "url": "https://github.com/tianshi8306-crypto/vibevideo/releases/download/v0.2.0/CanvasFlow.AI.Studio_0.2.0_amd64.AppImage.tar.gz"
+    }
+  }
+}

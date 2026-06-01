@@ -3,10 +3,10 @@ export type ImageModelOption = {
   label: string;
 };
 
+/** 内置默认露出（与 settings 预设一致；更多型号请用设置里「添加图片模型」） */
 export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
-  { id: "Doubao-Seedream-5.0-lite", label: "seedream 5.0 lite" },
+  { id: "Doubao-Seedream-5.0-lite", label: "Seedream 5.0 Lite" },
   { id: "dreamina/4.5", label: "即梦 4.5（CLI）" },
-  { id: "dreamina/5.0", label: "即梦 5.0（CLI）" },
 ];
 
 export type ImageTaskMode = "text_to_image" | "image_to_image" | "multi_ref_fusion" | "image_edit";

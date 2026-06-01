@@ -1,0 +1,2659 @@
+/* Hermes 内置智能体壳层 — 视觉对齐 LibTV 节点 Chrome（nodeChromeTokens.css） */
+
+:root {
+  /* 灵体光晕：中性珍珠灰，与画布节点底板同系，非独立品牌色 */
+  --hermes-spirit-glow: rgba(255, 255, 255, 0.16);
+  --hermes-spirit-glow-outer: rgba(255, 255, 255, 0.05);
+  --hermes-spirit-face-hi: rgba(255, 255, 255, 0.96);
+  --hermes-spirit-face-mid: rgba(224, 224, 224, 0.9);
+  --hermes-spirit-face-deep: rgba(158, 158, 158, 0.82);
+  --hermes-spirit-shadow: rgba(0, 0, 0, 0.32);
+  --hermes-accent: var(--text-progress, rgba(147, 197, 253, 0.95));
+  --hermes-accent-soft: rgba(147, 197, 253, 0.22);
+  --hermes-accent-fill: rgba(147, 197, 253, 0.1);
+  --hermes-cta-bg: var(--gen-cta-bg-ready, #f0f0f0);
+  --hermes-cta-bg-hover: var(--gen-cta-bg-ready-hover, #ffffff);
+  --hermes-cta-text: #1a1a1a;
+  --hermes-panel-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+/* 在 Hermes 壳层内将旧 cf token 重映射为节点 token，避免「两套产品」观感 */
+.hermesSidebar,
+.hermesFloatShell,
+.hermesCanvasSpiritLayer,
+.hermesJobDrawer,
+.hermesJobToastHost {
+  --cf-charcoal-canvas: var(--bg-canvas, #121212);
+  --cf-charcoal-surface: var(--bg-sidebar, #1a1a1a);
+  --cf-charcoal-elevated: var(--gen-panel-bg, #2b2b2b);
+  --cf-charcoal-inset: var(--bg-canvas, #121212);
+  --cf-charcoal-zebra: var(--bg-sidebar, #1a1a1a);
+  --cf-soft-white: var(--text-primary, #e0e0e0);
+  --cf-soft-white-secondary: var(--text-secondary, #9e9e9e);
+  --cf-soft-white-tertiary: var(--text-meta, rgba(255, 255, 255, 0.28));
+  --cf-muted: var(--text-secondary, #9e9e9e);
+  --cf-border: var(--border-node, rgba(255, 255, 255, 0.12));
+  --cf-border-strong: var(--border-button, rgba(255, 255, 255, 0.14));
+  --cf-hover: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+  --cf-shadow-float: var(--hermes-panel-shadow);
+  --cf-cyan: var(--hermes-accent);
+  --cf-cyan-light: var(--hermes-accent);
+  --cf-cyan-deep: #93c5fd;
+  --cf-cyan-pale: rgba(224, 231, 255, 0.95);
+  --cf-cyan-glow: rgba(147, 197, 253, 0.35);
+  --cf-cyan-fill-08: var(--hermes-accent-fill);
+  --cf-cyan-fill-12: rgba(147, 197, 253, 0.12);
+  --cf-cyan-fill-22: rgba(147, 197, 253, 0.2);
+  --cf-cyan-fill-35: rgba(147, 197, 253, 0.28);
+  --cf-accent-focus: rgba(255, 255, 255, 0.55);
+  --cf-accent-flow: var(--hermes-accent);
+  --panel: var(--gen-panel-bg, #2b2b2b);
+  --border: var(--border-node, rgba(255, 255, 255, 0.12));
+  --text: var(--text-primary, #e0e0e0);
+  --muted: var(--text-secondary, #9e9e9e);
+}
+
+.hermesSidebar {
+  position: relative;
+  flex-shrink: 0;
+  height: 100%;
+  z-index: 22;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  border-left: 1px solid var(--cf-border, var(--border));
+  background: var(--cf-charcoal-elevated, var(--panel));
+  color: var(--cf-soft-white, var(--text));
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.25);
+}
+
+.hermesSidebarHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 14px 6px;
+  flex-shrink: 0;
+}
+
+.hermesSidebarBrand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.hermesSidebarMark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: radial-gradient(
+    circle at 35% 30%,
+    var(--hermes-spirit-face-hi) 0%,
+    var(--hermes-spirit-face-mid) 45%,
+    var(--hermes-spirit-face-deep) 100%
+  );
+  box-shadow: 0 0 12px var(--hermes-spirit-shadow);
+}
+
+.hermesSidebarTitles {
+  min-width: 0;
+}
+
+.hermesSidebarTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+}
+
+.hermesSidebarSubtitle {
+  margin: 2px 0 0;
+  font-size: 11px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.hermesSidebarStage {
+  margin: 2px 0 0;
+  font-size: 10px;
+  color: var(--text-secondary, #9e9e9e);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.hermesRefStrip {
+  flex-shrink: 0;
+  margin: 0 12px 6px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border, var(--border));
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.hermesRefStripHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.hermesRefStripTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesRefStripScroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  min-height: 56px;
+  align-items: flex-start;
+}
+
+.hermesRefStripEmpty,
+.hermesRefStripHint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesRefThumb {
+  position: relative;
+  flex-shrink: 0;
+  width: 64px;
+}
+
+.hermesRefThumbMain {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  width: 100%;
+  padding: 0;
+  border: 1px solid var(--cf-border, var(--border));
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+}
+
+.hermesRefThumbMain:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hermesRefThumbImg {
+  width: 64px;
+  height: 48px;
+  object-fit: cover;
+  display: block;
+}
+
+.hermesRefThumbPlaceholder {
+  display: grid;
+  place-items: center;
+  width: 64px;
+  height: 48px;
+  font-size: 18px;
+}
+
+.hermesRefThumbName {
+  font-size: 9px;
+  padding: 2px 4px;
+  text-align: center;
+  color: var(--cf-soft-white-secondary, var(--muted));
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hermesRefThumbRemove {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.75);
+  color: #fff;
+  font-size: 12px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.hermesSidebarHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.hermesSidebarCollapse {
+  padding: 4px 6px;
+}
+
+.hermesSidebarContext {
+  margin: 0 14px 10px;
+  font-size: 11px;
+  color: var(--cf-soft-white-tertiary, var(--muted));
+  line-height: 1.4;
+}
+
+.hermesSidebarDialogueHint {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.hermesSkills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 14px 12px;
+  flex-shrink: 0;
+}
+
+.hermesSkillChip {
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--cf-border, var(--border));
+  background: var(--cf-charcoal-surface, rgba(255, 255, 255, 0.04));
+  color: var(--cf-soft-white, var(--text));
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.hermesSkillChip:hover {
+  border-color: var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+}
+
+.hermesChat {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 4px 14px 12px;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hermesChatLine {
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: 10px;
+  max-width: 100%;
+  word-break: break-word;
+}
+
+.hermesChatLine--user {
+  align-self: flex-end;
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #e0e0e0);
+}
+
+.hermesChatLine--hermes {
+  align-self: flex-start;
+  background: var(--cf-charcoal-surface, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--cf-border, var(--border));
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesComposer {
+  flex-shrink: 0;
+  padding: 10px 14px 14px;
+  border-top: 1px solid var(--cf-border, var(--border));
+  background: var(--cf-charcoal-surface, rgba(0, 0, 0, 0.2));
+}
+
+.hermesComposerInput {
+  width: 100%;
+  resize: none;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--cf-border, var(--border));
+  background: var(--cf-charcoal-inset, #0e0e0e);
+  color: var(--cf-soft-white, var(--text));
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.hermesComposerInput:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.hermesComposerBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hermesSidebarProvider {
+  margin-top: -6px;
+}
+
+.hermesEnhanceRow {
+  padding: 0 14px 8px;
+  flex-shrink: 0;
+}
+
+.hermesComposerHint {
+  font-size: 10px;
+  color: var(--cf-soft-white-tertiary, var(--muted));
+}
+
+.hermesComposerSend {
+  display: grid;
+  place-items: center;
+  min-width: 36px;
+  padding: 6px;
+}
+
+.hermesBibleStrip {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+  padding: 0 2px;
+  font-size: 11px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesBibleStripSummary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-weight: 600;
+  color: var(--cf-soft-white, var(--text));
+}
+
+.hermesBibleStripSummary::-webkit-details-marker {
+  display: none;
+}
+
+.hermesBibleStripMeta {
+  font-weight: 400;
+  font-size: 10px;
+  color: var(--cf-soft-white-tertiary, var(--muted));
+}
+
+.hermesBibleStripBody {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.hermesBibleField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hermesBibleField > span {
+  font-size: 10px;
+  color: var(--cf-soft-white-tertiary, var(--muted));
+}
+
+.hermesBibleInput {
+  width: 100%;
+  resize: vertical;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--gen-panel-bg, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  font: inherit;
+  line-height: 1.4;
+}
+
+.hermesBibleInput:focus {
+  outline: none;
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.hermesBibleSyncBtn {
+  align-self: flex-start;
+}
+
+.hermesBibleHint {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.35;
+  color: var(--cf-soft-white-tertiary, var(--muted));
+}
+
+.hermesScriptUploadRow {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+}
+
+.hermesSituationCard {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--gen-panel-bg, #2b2b2b);
+}
+
+.hermesSituationHeadline {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesSituationGaps {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.hermesSituationGap {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.hermesSituationGap--warn {
+  color: #fcd34d;
+}
+
+.hermesSituationGap--block {
+  color: #f87171;
+}
+
+.hermesSituationGap--info {
+  color: var(--cf-soft-white-tertiary, var(--muted));
+}
+
+.hermesSituationGapBtn {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(255, 255, 255, 0.22);
+  text-underline-offset: 2px;
+}
+
+.hermesSituationGapBtn:hover:not(:disabled) {
+  color: var(--cf-soft-white, var(--text));
+}
+
+.hermesSituationGapBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hermesSituationGapCta {
+  opacity: 0.75;
+  font-weight: 500;
+}
+
+.hermesProactiveChips {
+  flex-shrink: 0;
+  margin: 0 10px 6px;
+  padding: 0 2px;
+}
+
+.hermesProactiveChipsLabel {
+  display: block;
+  font-size: 10px;
+  color: var(--cf-soft-white-tertiary, var(--muted));
+  margin-bottom: 4px;
+}
+
+.hermesProactiveChipsRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hermesProactiveChip {
+  display: inline-flex;
+  align-items: stretch;
+  max-width: 100%;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--gen-panel-bg, #2b2b2b);
+  overflow: hidden;
+}
+
+.hermesProactiveChip--warn {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.hermesProactiveChip--success {
+  border-color: rgba(52, 211, 153, 0.4);
+}
+
+.hermesProactiveChipMain {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  min-width: 0;
+}
+
+.hermesProactiveChipMain:hover:not(:disabled) {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+}
+
+.hermesProactiveChipMain:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.hermesProactiveChipMessage {
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.hermesProactiveChipAction {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-primary, #e0e0e0);
+}
+
+.hermesProactiveChipDismiss {
+  padding: 0 6px;
+  border: none;
+  border-left: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.hermesProactiveChipDismiss:hover:not(:disabled) {
+  color: var(--text-primary, #e0e0e0);
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+}
+
+.hermesSidebarTeachModeActive {
+  color: var(--text-primary, #e0e0e0);
+  border-color: var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+}
+
+.hermesTipCard {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--gen-panel-bg, #2b2b2b);
+}
+
+.hermesTipCardTitle {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hermesTipCardMeta {
+  margin: 0 0 8px;
+  font-size: 11px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesTipCardMetaSep {
+  margin: 0 4px;
+  opacity: 0.5;
+}
+
+.hermesTipCardId {
+  font-size: 10px;
+}
+
+.hermesTipCardPreview {
+  margin: 0 0 10px;
+  max-height: 160px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: rgba(0, 0, 0, 0.25);
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesTipCardActions {
+  display: flex;
+  gap: 8px;
+}
+
+.hermesPlanCard {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+  padding: 10px 12px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--gen-panel-bg, #2b2b2b);
+}
+
+.hermesPlanCardTitle {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cf-soft-white, var(--text));
+}
+
+.hermesPlanSteps {
+  margin: 0 0 10px;
+  padding-left: 18px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesPlanStep--running {
+  color: var(--hermes-accent);
+}
+
+.hermesPlanStep--done {
+  color: var(--text-primary, #e0e0e0);
+}
+
+.hermesPlanStep--failed {
+  color: #f87171;
+}
+
+.hermesPlanActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hermesJobCenter {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border, var(--border));
+  background: rgba(0, 0, 0, 0.18);
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hermesJobCenterHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.hermesJobCenterTitle {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hermesJobCenterSummary {
+  font-size: 10px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesJobList,
+.hermesJobBgList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.hermesJobCard {
+  margin: 0 0 6px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.hermesJobCard--running {
+  border-left: 2px solid var(--hermes-accent);
+}
+
+.hermesJobCard--failed {
+  border-left: 2px solid #f87171;
+}
+
+.hermesJobCardHead {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hermesJobCardToggle {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.hermesJobCardChevron {
+  flex-shrink: 0;
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.hermesJobCardTitle {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hermesJobCardBadge {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hermesJobCardBadge--running {
+  color: var(--cf-cyan-light);
+}
+
+.hermesJobCardBadge--failed {
+  color: #f87171;
+}
+
+.hermesJobCardCancel {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--cf-border, var(--border));
+  background: transparent;
+  color: var(--cf-soft-white-secondary, var(--muted));
+  cursor: pointer;
+}
+
+.hermesJobCardCancel:hover {
+  color: inherit;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hermesJobCardProgressWrap {
+  position: relative;
+  height: 4px;
+  margin: 6px 0 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hermesJobCardProgressBar {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--cf-cyan);
+}
+
+.hermesJobCardProgressMeta {
+  position: absolute;
+  right: 0;
+  top: 6px;
+  font-size: 9px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesJobCardError {
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: #f87171;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hermesJobStepList {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0 0 0 4px;
+}
+
+.hermesJobStepRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10px;
+  padding: 2px 0;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesJobStepRow--running {
+  color: var(--cf-cyan-light);
+}
+
+.hermesJobStepRow--done {
+  color: inherit;
+}
+
+.hermesJobStepRow--failed {
+  color: #f87171;
+}
+
+.hermesJobStepGlyph {
+  width: 14px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.hermesJobStepLabel {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermesJobCenterBg {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.hermesJobCenterBgTitle {
+  display: block;
+  font-size: 10px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+  margin-bottom: 4px;
+}
+
+.hermesJobBgRowMain {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 4px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+  font-size: 10px;
+}
+
+.hermesJobBgRowMain:not(:disabled) {
+  cursor: pointer;
+}
+
+.hermesJobBgRowMain:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hermesJobBgLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermesJobBgMeta {
+  flex-shrink: 0;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesTaskTrack {
+  flex-shrink: 0;
+  margin: 0 12px 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border, var(--border));
+  background: rgba(0, 0, 0, 0.18);
+  max-height: 140px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hermesTaskTrackHead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.hermesTaskTrackTitle {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.hermesTaskTrackSummary {
+  font-size: 10px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesTaskList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.hermesTaskRow {
+  margin: 0 0 4px;
+}
+
+.hermesTaskRowMain {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: default;
+}
+
+.hermesTaskRowMain:not(:disabled) {
+  cursor: pointer;
+}
+
+.hermesTaskRowMain:not(:disabled):hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.hermesTaskKind {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  display: grid;
+  place-items: center;
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.hermesTaskBody {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.hermesTaskLabel {
+  display: block;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hermesTaskMeta {
+  font-size: 10px;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesTaskProgress {
+  display: block;
+  height: 2px;
+  margin-top: 4px;
+  border-radius: 1px;
+  background: var(--hermes-accent);
+  max-width: 100%;
+}
+
+.hermesTaskRow--failed .hermesTaskKind {
+  background: rgba(248, 113, 113, 0.25);
+  color: #f87171;
+}
+
+.hermesTaskRow--running .hermesTaskMeta {
+  color: var(--hermes-accent);
+}
+
+/* ── 画布灵体层：独立 stacking，始终在 React Flow 之上 ── */
+
+.hermesCanvasSpiritLayer {
+  position: absolute;
+  inset: 0;
+  z-index: var(--canvas-z-hermes-float, 45);
+  pointer-events: none;
+  overflow: visible;
+}
+
+.hermesCanvasSpiritLayer > * {
+  pointer-events: auto;
+}
+
+.hermesOrb--fixed {
+  position: fixed;
+}
+
+.hermesOrb--hidden {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.hermesOrb {
+  position: absolute;
+  z-index: calc(var(--canvas-z-hermes-float, 45) + 2);
+  width: 52px;
+  height: 52px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  cursor: grab;
+  background: transparent;
+  touch-action: none;
+}
+
+.hermesOrb--dragging {
+  cursor: grabbing;
+}
+
+.hermesOrb:active {
+  cursor: grabbing;
+}
+
+.hermesOrb--failed .hermesOrbGlow {
+  background: radial-gradient(circle, rgba(248, 113, 113, 0.5) 0%, rgba(248, 113, 113, 0.12) 55%, transparent 70%);
+}
+
+.hermesOrb--failedPulse .hermesOrbGlow {
+  animation: hermesOrbFailedPulse 1.2s ease-in-out infinite;
+}
+
+.hermesOrb--planning .hermesOrbGlow {
+  background: radial-gradient(
+    circle,
+    rgba(251, 191, 36, 0.42) 0%,
+    rgba(251, 191, 36, 0.1) 55%,
+    transparent 70%
+  );
+  animation: hermesOrbPlanningPulse 1.8s ease-in-out infinite;
+}
+
+.hermesOrb--running .hermesOrbGlow {
+  animation: hermesOrbPulse 1.6s ease-in-out infinite;
+}
+
+.hermesOrb--planning .hermesOrbBadge {
+  background: rgba(251, 191, 36, 0.95);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+}
+
+.hermesOrbProgressPeek {
+  position: absolute;
+  z-index: calc(var(--canvas-z-hermes-float, 45) + 1);
+  max-width: min(240px, calc(100% - 24px));
+  padding: 8px 10px 9px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--gen-panel-bg, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  box-shadow: var(--hermes-panel-shadow);
+  pointer-events: auto;
+  animation: hermesOrbPeekIn 0.22s ease-out;
+}
+
+.hermesOrbProgressPeek--orbActive {
+  pointer-events: none;
+}
+
+.hermesOrbProgressPeek--pinned {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.hermesOrbProgressPeek--planning {
+  border-color: rgba(251, 191, 36, 0.28);
+}
+
+.hermesOrbProgressPeek--running {
+  border-color: var(--hermes-accent-soft);
+}
+
+.hermesOrbProgressPeekHead {
+  margin-bottom: 4px;
+}
+
+.hermesOrbProgressPeekKicker {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cf-soft-white-tertiary, #6e6c69);
+}
+
+.hermesOrbProgressPeek--failed .hermesOrbProgressPeekKicker {
+  color: #fca5a5;
+}
+
+.hermesOrbProgressPeekList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.hermesOrbProgressPeekLine {
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--cf-soft-white-secondary, #a8a6a3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermesOrbProgressPeekEmpty {
+  margin: 0;
+  font-size: 11px;
+  color: var(--cf-soft-white-tertiary, #6e6c69);
+}
+
+.hermesOrbProgressPeekActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.hermesOrbProgressPeekAction,
+.hermesOrbProgressPeekSecondary {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hermesOrbProgressPeekAction {
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+}
+
+.hermesOrbProgressPeekAction:hover {
+  background: rgba(248, 113, 113, 0.2);
+}
+
+.hermesOrbProgressPeekSecondary {
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.1));
+  background: transparent;
+  color: var(--cf-soft-white-secondary, #a8a6a3);
+}
+
+.hermesOrbProgressPeekSecondary:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+@keyframes hermesOrbFailedPulse {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes hermesOrbPlanningPulse {
+  0%,
+  100% {
+    opacity: 0.65;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes hermesOrbPeekIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* iter-108 · Agent 画布高亮（与选中框 / @钉选区分） */
+.canvasWrap .react-flow__node.flowNodeHermesPulse {
+  z-index: 2;
+  outline: 2px solid rgba(255, 255, 255, 0.55);
+  outline-offset: 2px;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.08),
+    0 0 18px rgba(0, 0, 0, 0.35);
+  animation: hermesCanvasPulseRing 3s ease-out forwards;
+}
+
+@keyframes hermesCanvasPulseRing {
+  0%,
+  15% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.35;
+    outline-color: rgba(255, 255, 255, 0.15);
+    box-shadow: none;
+  }
+}
+
+.hermesSelectionAck {
+  color: var(--cf-soft-white-secondary, #a8a6a3) !important;
+  opacity: 0.92;
+}
+
+.hermesContextStrip {
+  flex-shrink: 0;
+  margin: 0 0 6px;
+  padding: 0 2px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--cf-soft-white-secondary, #a8a6a3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hermesContextStrip--warn {
+  color: #fcd34d;
+}
+
+.hermesContextStrip--block {
+  color: #f87171;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .canvasWrap .react-flow__node.flowNodeHermesPulse {
+    animation-duration: 1.2s !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hermesOrb--failedPulse .hermesOrbGlow,
+  .hermesOrb--planning .hermesOrbGlow,
+  .hermesOrbProgressPeek {
+    animation: none !important;
+  }
+}
+
+.hermesOrb--suggest .hermesOrbGlow {
+  background: radial-gradient(
+    circle,
+    var(--hermes-spirit-glow) 0%,
+    var(--hermes-spirit-glow-outer) 55%,
+    transparent 70%
+  );
+}
+
+.hermesOrbSuggest {
+  position: absolute;
+  z-index: calc(var(--canvas-z-hermes-float, 45) + 1);
+  max-width: min(240px, calc(100% - 24px));
+  padding: 10px 12px 11px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  background: var(--gen-panel-bg, #2b2b2b);
+  color: var(--text-primary, #e0e0e0);
+  box-shadow: var(--hermes-panel-shadow);
+  pointer-events: auto;
+}
+
+.hermesOrbSuggest--orbActive {
+  pointer-events: none;
+}
+
+.hermesOrbSuggest--info {
+  border-color: var(--cf-border-strong, rgba(255, 255, 255, 0.14));
+}
+
+.hermesOrbSuggest--success {
+  border-color: var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--gen-panel-bg, #2b2b2b);
+  box-shadow: var(--hermes-panel-shadow);
+}
+
+.hermesOrbSuggest--warn {
+  border-color: rgba(251, 191, 36, 0.34);
+  background: var(--gen-panel-bg, #2b2b2b);
+  box-shadow: var(--hermes-panel-shadow);
+}
+
+.hermesOrbSuggestHead {
+  margin-bottom: 6px;
+}
+
+.hermesOrbSuggestKicker {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary, #9e9e9e);
+}
+
+.hermesOrbSuggest--warn .hermesOrbSuggestKicker {
+  color: #fcd34d;
+}
+
+.hermesOrbSuggestMessage {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 500;
+  color: var(--cf-soft-white, var(--text));
+}
+
+.hermesOrbSuggestActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.hermesOrbSuggestAction {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--bg-button, transparent);
+  color: var(--text-primary, #e0e0e0);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.hermesOrbSuggestAction:hover:not(:disabled) {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+  border-color: var(--border-button, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #e0e0e0);
+}
+
+.hermesOrbSuggestAction:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 1px;
+}
+
+.hermesOrbSuggest--warn .hermesOrbSuggestAction {
+  border-color: rgba(251, 191, 36, 0.42);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fde68a;
+}
+
+.hermesOrbSuggest--warn .hermesOrbSuggestAction:hover:not(:disabled) {
+  background: rgba(251, 191, 36, 0.18);
+  border-color: rgba(251, 191, 36, 0.55);
+  color: var(--cf-soft-white, var(--text));
+}
+
+.hermesOrbSuggestDismiss {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.08));
+  background: var(--cf-charcoal-inset, #0e0e0e);
+  color: var(--cf-soft-white-secondary, var(--muted));
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.hermesOrbSuggestDismiss:hover:not(:disabled) {
+  background: var(--cf-hover, rgba(255, 255, 255, 0.06));
+  border-color: var(--cf-border-strong, rgba(255, 255, 255, 0.14));
+  color: var(--cf-soft-white, var(--text));
+}
+
+.hermesOrbSuggestDismiss:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.35);
+  outline-offset: 1px;
+}
+
+.hermesOrbBadge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--hermes-spirit-face-mid);
+  box-shadow: 0 0 8px var(--hermes-spirit-shadow);
+  pointer-events: none;
+}
+
+.hermesOrb--failed .hermesOrbBadge {
+  background: #f87171;
+  box-shadow: 0 0 8px rgba(248, 113, 113, 0.8);
+}
+
+.hermesOrbGlow {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    var(--hermes-spirit-glow) 0%,
+    var(--hermes-spirit-glow-outer) 55%,
+    transparent 70%
+  );
+  pointer-events: none;
+  will-change: transform, opacity;
+  max-width: 64px;
+  max-height: 64px;
+}
+
+.hermesOrb--standby .hermesOrbGlow {
+  animation: hermesOrbStandbyGlow 4.2s ease-in-out infinite;
+}
+
+.hermesOrb--standby .hermesOrbFace {
+  animation: hermesOrbStandbyFloat 4.2s ease-in-out infinite;
+  will-change: transform;
+}
+
+.hermesOrb--attention .hermesOrbGlow {
+  animation: hermesOrbPulse 1.6s ease-in-out infinite;
+}
+
+.hermesOrbFace {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle at 40% 35%,
+    var(--hermes-spirit-face-hi) 0%,
+    var(--hermes-spirit-face-mid) 48%,
+    var(--hermes-spirit-face-deep) 100%
+  );
+  box-shadow:
+    0 0 22px var(--hermes-spirit-shadow),
+    inset 0 -2px 8px rgba(0, 0, 0, 0.12);
+  pointer-events: none;
+}
+
+.hermesOrbEye {
+  width: 5px;
+  height: 8px;
+  border-radius: 999px;
+  background: rgba(8, 24, 40, 0.82);
+}
+
+@keyframes hermesOrbPulse {
+  0%,
+  100% {
+    opacity: 0.75;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes hermesOrbStandbyGlow {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.92;
+    transform: scale(1.035);
+  }
+}
+
+@keyframes hermesOrbStandbyFloat {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -3px, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hermesOrb--standby .hermesOrbGlow,
+  .hermesOrb--standby .hermesOrbFace,
+  .hermesOrb--attention .hermesOrbGlow {
+    animation: none !important;
+  }
+}
+
+/* ── 画布浮窗（竖版，可拖拽，叠在节点之上） ── */
+
+.hermesFloatShell {
+  --hermes-float-radius: var(--radius-lg, 12px);
+  position: absolute;
+  z-index: var(--canvas-z-hermes-float, 45);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  border-radius: var(--hermes-float-radius);
+  background: var(--bg-canvas, #121212);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+  box-shadow: var(--hermes-panel-shadow);
+  overflow: hidden;
+  pointer-events: auto;
+  touch-action: none;
+  max-width: min(300px, calc(100% - 20px));
+  max-height: min(533px, calc(100% - 24px));
+}
+
+/* 灵体浮窗顶栏：极薄，仅拖拽 + 窗口操作 */
+.hermesFloatHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  min-height: 28px;
+  padding: 4px 6px 4px 8px;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  border-bottom: 1px solid var(--cf-border, rgba(255, 255, 255, 0.05));
+  background: transparent;
+}
+
+.hermesFloatHeader:active {
+  cursor: grabbing;
+}
+
+.hermesFloatHeaderLead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.hermesFloatHeaderMark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  color: var(--text-icon, #bdbdbd);
+  opacity: 0.9;
+}
+
+.hermesFloatHeaderName {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--cf-soft-white, #e8e6e3);
+}
+
+.hermesFloatHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.hermesFloatHeaderBtn {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cf-soft-white-tertiary, #6e6c69);
+  cursor: pointer;
+}
+
+.hermesFloatHeaderBtn:hover:not(:disabled) {
+  background: var(--cf-hover, rgba(255, 255, 255, 0.06));
+  color: var(--cf-soft-white-secondary, #a8a6a3);
+}
+
+.hermesFloatHeaderBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hermesFloatBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--cf-charcoal-inset, #0e0e0e);
+}
+
+.hermesPanel--float {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  width: 100%;
+  height: 100%;
+  padding-top: 0;
+}
+
+/* 消息区 */
+.hermesWxChat {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 8px 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: transparent;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.hermesWxChat::-webkit-scrollbar {
+  width: 5px;
+}
+
+.hermesWxChat::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.hermesFloatIntro {
+  margin: 0;
+  padding: 4px 2px 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-weight: 450;
+  color: var(--cf-soft-white-tertiary, #6e6c69);
+  letter-spacing: 0.01em;
+}
+
+.hermesFloatIntro--hint {
+  font-size: 11px;
+  color: var(--cf-soft-white-tertiary, var(--muted));
+}
+
+.hermesWxRow--lite {
+  gap: 0;
+}
+
+.hermesWxRow--lite.hermesWxRow--agent .hermesWxBubbleWrap {
+  max-width: 100%;
+}
+
+.hermesWxBubble--plain {
+  padding: 0 2px;
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  color: var(--cf-soft-white, #e8e6e3);
+}
+
+.hermesWxRow--agent .hermesWxBubble--plain::before {
+  display: none;
+}
+
+.hermesWxBubble--plain.hermesWxBubble--typing {
+  padding: 0 2px;
+  min-width: 0;
+}
+
+.hermesWxRow--lite.hermesWxRow--user .hermesWxBubbleWrap {
+  max-width: 88%;
+}
+
+.hermesWxRow--lite .hermesWxBubble--user {
+  padding: 7px 11px;
+  border-radius: 10px;
+  background: var(--cf-charcoal-elevated, #242424);
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.1));
+  color: var(--cf-soft-white, #e8e6e3);
+}
+
+.hermesWxRow--lite .hermesWxBubble--user::before {
+  display: none;
+}
+
+.hermesWxRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: 100%;
+}
+
+.hermesWxRow--user {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.hermesWxRow--agent {
+  flex-direction: row;
+  justify-content: flex-start;
+}
+
+.hermesWxAvatar {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+.hermesWxAvatar--agent {
+  background: linear-gradient(
+    145deg,
+    var(--hermes-spirit-face-mid) 0%,
+    var(--hermes-spirit-face-deep) 100%
+  );
+  color: #1a1a1a;
+}
+
+.hermesWxAvatar--user {
+  background: #4a4a4c;
+  color: #e8e8e8;
+  font-size: 10px;
+}
+
+.hermesWxBubbleWrap {
+  max-width: calc(100% - 40px);
+  min-width: 0;
+}
+
+.hermesWxRow--user .hermesWxBubbleWrap {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.hermesWxBubble {
+  display: inline-block;
+  padding: 8px 11px;
+  font-size: 13px;
+  line-height: 1.5;
+  word-break: break-word;
+  border-radius: 8px;
+  background: var(--cf-charcoal-elevated, #242424);
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.08));
+  color: var(--cf-soft-white, #e8e6e3);
+  position: relative;
+}
+
+.hermesWxRow--agent .hermesWxBubble {
+  background: var(--cf-charcoal-elevated, #242424);
+  border-top-left-radius: 4px;
+}
+
+.hermesWxRow--agent .hermesWxBubble::before {
+  content: "";
+  position: absolute;
+  left: -5px;
+  top: 11px;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-right-color: var(--cf-charcoal-elevated, #242424);
+}
+
+.hermesWxBubble--user {
+  background: var(--hermes-cta-bg);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--hermes-cta-text);
+  border-top-right-radius: 4px;
+}
+
+.hermesWxBubble--user::before {
+  content: "";
+  position: absolute;
+  right: -5px;
+  top: 11px;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-left-color: var(--hermes-cta-bg);
+}
+
+.hermesWxBubble--typing {
+  min-width: 28px;
+  color: #9e9e9e;
+  letter-spacing: 2px;
+}
+
+.hermesWxBubble--typing::before {
+  display: none;
+}
+
+/* 底部输入区 */
+.hermesFloatComposer {
+  flex-shrink: 0;
+  padding: 8px 10px 10px;
+  border-top: 1px solid var(--cf-border, rgba(255, 255, 255, 0.06));
+  background: var(--cf-charcoal-surface, #1a1a1a);
+}
+
+.hermesFloatComposer--lite {
+  padding: 6px 8px 8px;
+  border-top-color: rgba(255, 255, 255, 0.04);
+  background: transparent;
+}
+
+.hermesFloatComposerStatus {
+  margin: 0 0 4px;
+  padding: 0 2px;
+  font-size: 10px;
+  color: var(--hermes-accent);
+  text-align: left;
+  opacity: 0.9;
+}
+
+.hermesFloatExtras {
+  margin: 0 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.06));
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.hermesFloatExtrasSummary {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 8px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--cf-soft-white-secondary, var(--muted));
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+}
+
+.hermesFloatExtrasSummary::-webkit-details-marker {
+  display: none;
+}
+
+.hermesFloatExtrasSummary::before {
+  content: "▸";
+  font-size: 9px;
+  opacity: 0.7;
+}
+
+.hermesFloatExtras[open] .hermesFloatExtrasSummary::before {
+  content: "▾";
+}
+
+.hermesFloatExtrasBody {
+  padding: 0 6px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hermesFloatExtrasBody .hermesRefStrip,
+.hermesFloatExtrasBody .hermesSituationCard,
+.hermesFloatExtrasBody .hermesProactiveChips {
+  margin: 0;
+}
+
+.hermesJobCenterPeek {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: calc(100% - 16px);
+  margin: 0 8px 4px;
+  padding: 5px 8px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.08));
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font: inherit;
+  font-size: 10px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hermesJobCenterPeek:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.hermesJobCenterPeekLabel {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--cf-soft-white-secondary, var(--muted));
+}
+
+.hermesJobCenterPeekSummary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hermes-accent);
+}
+
+.hermesJobCenterPeekChevron {
+  flex-shrink: 0;
+  opacity: 0.6;
+  font-size: 9px;
+}
+
+.hermesJobCenter--float {
+  margin: 0 8px 4px;
+  max-height: min(180px, 34vh);
+  padding: 0 0 6px;
+  border-radius: 8px;
+}
+
+.hermesJobCenter--float .hermesJobCenterPeek {
+  width: 100%;
+  margin: 0 0 4px;
+}
+
+.hermesFloatVersionDiffLink {
+  align-self: flex-start;
+  margin: 0 4px 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  color: var(--text-secondary, #9e9e9e);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.hermesFloatVersionDiffLink:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hermes-mention-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.hermes-mention-overlay {
+  pointer-events: none;
+}
+
+.hermes-mention-input .mention-textarea.hermesFloatInput {
+  border: none;
+  background: transparent;
+  resize: none;
+  min-height: 2.5em;
+  max-height: 80px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.hermes-mention-input .mention-pill--hermes-ref {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #e0e0e0);
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+}
+
+.hermes-mention-picker {
+  max-height: min(320px, 42vh);
+}
+
+.video-at-picker__thumb--text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #9e9e9e);
+  background: var(--gen-panel-bg, #2b2b2b);
+}
+
+.hermesFloatInputPill {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 10px 8px;
+  border-radius: var(--gen-control-radius, 8px);
+  background: var(--gen-panel-bg, #2b2b2b);
+  border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
+}
+
+.hermesFloatInputPill--unified {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 8px 8px 8px 6px;
+  border-radius: 999px;
+}
+
+.hermesFloatInputPill--inline {
+  flex-direction: row;
+  align-items: flex-end;
+  gap: 4px;
+  padding: 6px 8px 6px 10px;
+  border-radius: var(--canvas-dock-radius-panel, 12px);
+}
+
+.hermesFloatInputBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.hermesFloatInputAttachBtn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin-bottom: 1px;
+  padding: 0;
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  border-radius: 50%;
+  background: var(--bg-button, transparent);
+  color: var(--text-icon, #bdbdbd);
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.hermesFloatInputAttachBtn:hover:not(:disabled) {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+  border-color: var(--border-button, rgba(255, 255, 255, 0.14));
+  color: var(--text-primary, #e0e0e0);
+}
+
+.hermesFloatInputAttachBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.hermesFloatInputPill--unified .hermes-mention-input .mention-textarea.hermesFloatInput {
+  min-height: 1.5em;
+  max-height: 96px;
+}
+
+.hermesFloatInputPill--inline .hermesFloatInputActions {
+  flex-shrink: 0;
+  padding-bottom: 1px;
+}
+
+.hermesFloatInputPill--inline .hermes-mention-input .mention-textarea.hermesFloatInput {
+  min-height: 1.5em;
+}
+
+.hermesFloatInputPill:focus-within {
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06);
+}
+
+.hermesFloatInput {
+  width: 100%;
+  min-height: 36px;
+  max-height: 80px;
+  resize: none;
+  box-sizing: border-box;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  line-height: 1.5;
+  font-family: inherit;
+}
+
+.hermesFloatInput:focus {
+  outline: none;
+}
+
+/* placeholder 颜色由 MentionInput.css 镜像层规则提供 */
+
+.hermesFloatInputActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.hermesFloatInputIconBtn {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+}
+
+.hermesFloatInputIconBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.hermesFloatInputIconBtn--listening {
+  color: var(--hermes-accent);
+  background: var(--hermes-accent-fill);
+  animation: hermesVoicePulse 1.2s ease-in-out infinite;
+}
+
+@keyframes hermesVoicePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+.hermesFloatInputSendBtn {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  margin-bottom: 0;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.35);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.hermesFloatInputSendBtn--active {
+  background: var(--hermes-cta-bg);
+  color: var(--hermes-cta-text);
+}
+
+.hermesFloatInputSendBtn--active:hover:not(:disabled) {
+  background: var(--hermes-cta-bg-hover);
+  transform: translateY(-1px);
+}
+
+.hermesFloatInputSendBtn:hover:not(:disabled):not(.hermesFloatInputSendBtn--active) {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.hermesFloatInputSendBtn:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+
+.hermesPlanCard--float {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  background: var(--cf-charcoal-surface, #1a1a1a);
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.08));
+}
+
+.hermesPlanCard--float .hermesPlanCardTitle {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cf-soft-white, #e8e6e3);
+}
+
+.hermesPlanCard--float .hermesPlanSteps {
+  margin: 0 0 8px;
+  padding-left: 1.1em;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--cf-soft-white-secondary, #a8a6a3);
+}
+
+.hermesPlanActions--float {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.hermesPlanActions--float .btn {
+  font-size: 11px;
+  padding: 4px 10px;
+}
+
+.hermesFloatTipWrap {
+  flex-shrink: 0;
+}
+
+.hermesFloatTipWrap .hermesUserTipCard {
+  margin: 0;
+  padding: 8px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+/* ── iter-110 Ambient 任务轨 ── */
+
+.hermesJobAmbientChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 2px 7px 2px 5px;
+  border-radius: 999px;
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+  color: var(--text-primary, #e0e0e0);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.3;
+  cursor: pointer;
+  text-align: left;
+}
+
+.hermesJobAmbientChip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.hermesJobAmbientChip--failed {
+  border-color: rgba(248, 113, 113, 0.35);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fca5a5;
+}
+
+.hermesJobAmbientChipDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  background: var(--hermes-accent);
+  box-shadow: 0 0 6px var(--hermes-accent-soft);
+}
+
+.hermesJobAmbientChip--failed .hermesJobAmbientChipDot {
+  background: #f87171;
+  box-shadow: 0 0 6px rgba(248, 113, 113, 0.45);
+}
+
+.hermesJobAmbientChipText {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermesJobAmbientChip--orb {
+  max-width: 100%;
+}
+
+.hermesFloatHeaderLead .hermesJobAmbientChip {
+  flex: 1;
+  min-width: 0;
+}
+
+.hermesOrbJobAmbient {
+  position: absolute;
+  z-index: calc(var(--canvas-z-hermes-float, 45) - 1);
+  pointer-events: auto;
+}
+
+.hermesJobDrawerBackdrop {
+  position: absolute;
+  inset: 0;
+  z-index: calc(var(--canvas-z-hermes-float, 45) + 2);
+  border: none;
+  padding: 0;
+  background: rgba(0, 0, 0, 0.28);
+  cursor: default;
+}
+
+.hermesJobDrawer {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: calc(var(--canvas-z-hermes-float, 45) + 3);
+  width: min(320px, calc(100% - 24px));
+  max-height: min(420px, 52vh);
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--canvas-dock-radius-panel, 14px);
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.1));
+  background: var(--cf-charcoal-surface, #1a1a1a);
+  box-shadow: var(--cf-shadow-float, 0 12px 40px rgba(0, 0, 0, 0.5));
+  overflow: hidden;
+}
+
+.hermesJobDrawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--cf-border, rgba(255, 255, 255, 0.06));
+  flex-shrink: 0;
+}
+
+.hermesJobDrawerTitle {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cf-soft-white, #e8e6e3);
+}
+
+.hermesJobDrawerClose {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--cf-soft-white-tertiary, #6e6c69);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.hermesJobDrawerClose:hover {
+  background: var(--cf-hover, rgba(255, 255, 255, 0.06));
+  color: var(--cf-soft-white-secondary, #a8a6a3);
+}
+
+.hermesJobDrawerBody {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 0 0 8px;
+}
+
+.hermesJobDrawerEmpty {
+  margin: 12px;
+  font-size: 11px;
+  color: var(--cf-soft-white-tertiary, #6e6c69);
+}
+
+.hermesJobCenter--drawer {
+  margin: 0;
+  max-height: none;
+  border: none;
+  background: transparent;
+  padding: 8px 10px 0;
+}
+
+.hermesJobToastHost {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  z-index: calc(var(--canvas-z-hermes-float, 45) + 4);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(360px, calc(100% - 24px));
+  pointer-events: none;
+}
+
+.hermesJobToast {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.1));
+  background: var(--cf-charcoal-elevated, #242424);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--cf-soft-white, #e8e6e3);
+  pointer-events: auto;
+  animation: hermesJobToastIn 0.22s ease-out;
+}
+
+.hermesJobToast--success {
+  border-color: rgba(52, 211, 153, 0.35);
+}
+
+.hermesJobToast--error {
+  border-color: rgba(248, 113, 113, 0.35);
+}
+
+.hermesJobToast--info {
+  border-color: var(--border-button, rgba(255, 255, 255, 0.14));
+}
+
+.hermesJobToastMessage {
+  flex: 1;
+  min-width: 0;
+}
+
+.hermesJobToastDismiss {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--cf-soft-white-tertiary, #6e6c69);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.hermesJobToastDismiss:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+@keyframes hermesJobToastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hermesJobToast {
+    animation: none;
+  }
+}
+
+/* ── iter-111 消息内嵌媒体预览 ── */
+
+.hermesChatMediaPreview {
+  margin-top: 6px;
+  border-radius: 10px;
+  border: 1px solid var(--cf-border, rgba(255, 255, 255, 0.08));
+  background: rgba(0, 0, 0, 0.18);
+  overflow: hidden;
+}
+
+.hermesChatMediaPreviewSummary {
+  padding: 4px 8px;
+  font-size: 10px;
+  color: var(--cf-muted, rgba(232, 230, 227, 0.55));
+  cursor: pointer;
+  list-style: none;
+}
+
+.hermesChatMediaPreviewSummary::-webkit-details-marker {
+  display: none;
+}
+
+.hermesChatMediaPreviewBody {
+  padding: 0 8px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hermesChatMediaPreviewMedia {
+  display: block;
+  width: 100%;
+  max-height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  background: #111;
+}
+
+.hermesChatMediaPreviewAudio {
+  width: 100%;
+}
+
+.hermesChatMediaPreviewAction {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--bg-button, transparent);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.hermesChatMediaPreviewAction:hover {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+}
+
+/* ── iter-112 Composer 剧本上传 ── */
+
+.hermesComposerUploadActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-bottom: 4px;
+  padding: 4px 6px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px dashed var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--gen-panel-bg, #2b2b2b);
+}
+
+.hermesComposerUploadLabel {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  color: var(--cf-muted, rgba(232, 230, 227, 0.55));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hermesComposerUploadBtns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.hermesComposerUploadBtn {
+  padding: 2px 8px;
+  border-radius: var(--gen-control-radius, 8px);
+  border: 1px solid var(--border-button, rgba(255, 255, 255, 0.14));
+  background: var(--bg-button, transparent);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 10px;
+  cursor: pointer;
+}
+
+.hermesComposerUploadBtn:hover:not(:disabled) {
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.08));
+}
+
+.hermesComposerUploadBtn--primary {
+  border-color: rgba(255, 255, 255, 0.2);
+  background: var(--hermes-cta-bg);
+  color: var(--hermes-cta-text);
+}
+
+.hermesComposerUploadBtn--ghost {
+  opacity: 0.75;
+}
+
+.hermesComposerUploadBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

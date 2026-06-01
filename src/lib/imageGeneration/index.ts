@@ -20,6 +20,9 @@ export {
   getImageScriptUpstreamState,
 } from "./imageScriptPromptSync";
 export { estimateImageGenerationCost } from "./estimateCost";
+export { parseImageGenerationRelPaths } from "./parseImageGenerationResult";
+export { spawnExtraImageOutputNodes } from "./spawnMultiImageOutputNodes";
+export { prepareImageGenerationRun, loadMergedImageModels } from "./prepareImageGenerationRun";
 export {
   computeImageNodeFrameSize,
   getAspectRatioNumber,

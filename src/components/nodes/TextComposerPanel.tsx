@@ -7,13 +7,11 @@ import {
   type SyntheticEvent,
   type WheelEvent as ReactWheelEvent,
 } from "react";
-import { MentionInput, type MentionInputRef } from "@/components/nodes/MentionInput";
-import { SlashPresetPanel } from "@/components/nodes/SlashPresetPanel";
+import { MentionInput } from "@/components/nodes/MentionInput";
 import { IgpGenerateButtonIcon } from "@/components/nodes/IgpGenerateButtonIcon";
 import { PanelCloseIcon, PanelExpandIcon, PanelPinIcon } from "@/components/nodes/nodePanelIcons";
 import { TextProviderPicker } from "@/components/nodes/TextProviderPicker";
 import { dispatchTextNodeComposerRun } from "@/lib/textNodeDispatch";
-import { useSlashPresets } from "@/hooks/useSlashPresets";
 import { useNodeStatus } from "@/hooks/useNodeStatus";
 import {
   getProviderSelectionPatch,
@@ -27,7 +25,6 @@ import { useProjectStore } from "@/store/projectStore";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
 
 const MAX_CHARS = 200_000;
-const SLASH_CHIP_VISIBLE = 5;
 
 const ZONE_A_HINT_DEFAULT = "写下你想讲的故事…";
 const ZONE_A_HINT_IMAGE = "图片反推提示词";
@@ -79,8 +76,6 @@ export function TextComposerPanel({
   const isTextToMusic = layout === "textToMusic";
   const isDefaultLayout = layout === "default";
   const promptMaxChars = isTextToMusic ? MUSIC_PROMPT_MAX_CHARS : MAX_CHARS;
-  const { presets: slashPresets, recordUsage: recordSlashUsage } = useSlashPresets();
-  const slashChips = useMemo(() => slashPresets.slice(0, SLASH_CHIP_VISIBLE), [slashPresets]);
 
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodes = useProjectStore((s) => s.nodes);
@@ -93,9 +88,7 @@ export function TextComposerPanel({
   const { focusPartnerNode } = useFocusLinkedPartnerNode();
 
   const { status: nodeStatus, clearStatus } = useNodeStatus(nodeId);
-  const mentionRef = useRef<MentionInputRef>(null);
   const genRunRef = useRef(0);
-  const [slashCursorRect, setSlashCursorRect] = useState<DOMRect | null>(null);
   const [generatingLocal, setGeneratingLocal] = useState(false);
   const [providerOptions, setProviderOptions] = useState<TextNodeProviderOption[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
@@ -192,23 +185,6 @@ export function TextComposerPanel({
       updateNodeData(nodeId, { params: { ...base, ...patch } });
     },
     [node?.data.params, nodeId, providerOptions, updateNodeData],
-  );
-
-  const handleSlashTrigger = useCallback((rect: DOMRect) => {
-    setSlashCursorRect(rect);
-  }, []);
-
-  const handlePresetSelect = useCallback((template: string) => {
-    mentionRef.current?.insertPresetTemplate(template);
-    setSlashCursorRect(null);
-  }, []);
-
-  const handleSlashChipClick = useCallback(
-    (presetId: string, template: string) => {
-      recordSlashUsage(presetId);
-      handlePresetSelect(template);
-    },
-    [handlePresetSelect, recordSlashUsage],
   );
 
   const handleCancelGenerate = useCallback(() => {
@@ -312,8 +288,6 @@ export function TextComposerPanel({
         : ZONE_A_HINT_DEFAULT;
 
   const showZoneA = isExpandedLayout || !hideChromeHead || isImageToPrompt || isTextToMusic;
-  const showSlashChipRow = isDefaultLayout && slashChips.length > 0;
-
   const zoneAActions = isExpandedLayout ? (
     <>
       {onRequestDock ? (
@@ -429,14 +403,12 @@ export function TextComposerPanel({
 
         <div className="igp-prompt-wrap tgp-prompt-wrap tgp-v2-zone-b">
           <MentionInput
-            ref={mentionRef}
             nodeId={nodeId}
             value={modelInput}
             onChange={setModelInput}
             placeholder={placeholder}
             className={textareaClass}
             nodeLabels={nodeLabels}
-            onSlashTrigger={handleSlashTrigger}
           />
           <span className="igp-counter vgp-prompt-counter tgp-prompt-counter" aria-live="polite">
             {modelInput.length}/{promptMaxChars}
@@ -473,32 +445,6 @@ export function TextComposerPanel({
               <p className="tgp-i2p-missing">请从左侧 ⊕ 连接图片节点</p>
             )}
           </div>
-        ) : showSlashChipRow ? (
-          <div className="tgp-v2-zone-c" role="group" aria-label="快捷预设">
-            {slashChips.map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                className="tgp-v2-chip"
-                title={preset.desc}
-                onPointerDown={onPointerDown}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleSlashChipClick(preset.id, preset.template);
-                }}
-              >
-                {preset.title}
-              </button>
-            ))}
-          </div>
-        ) : null}
-
-        {slashCursorRect ? (
-          <SlashPresetPanel
-            cursorRect={slashCursorRect}
-            onSelect={handlePresetSelect}
-            onClose={() => setSlashCursorRect(null)}
-          />
         ) : null}
 
         <div className="igp-bottom-bar tgp-bottom-bar tgp-v2-zone-d">

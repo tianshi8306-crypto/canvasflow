@@ -2,6 +2,7 @@ import { useCallback } from "react";
 import { clampContextMenuPosition } from "@/lib/clampFloatingUi";
 import { FLOW_MENU } from "@/components/canvas/menuConstants";
 import type { FlowCanvasMenuState } from "@/components/canvas/flowCanvasMenuState";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
 
 interface UseMenuHandlersOptions {
   setMenuState: (s: FlowCanvasMenuState | null) => void;
@@ -16,6 +17,7 @@ export function useMenuHandlers({
 }: UseMenuHandlersOptions) {
   const openAddPanelAt = useCallback(
     (x: number, y: number, nodeId: string | null = null) => {
+      useCanvasUiStore.getState().dismissEmptyGuide();
       const p = clampContextMenuPosition(x, y, FLOW_MENU.widths.contextPaneL2, FLOW_MENU.clampEstimatedHeight);
       setMenuState({ x: p.x, y: p.y, mode: "add-panel", nodeId, addPanelTab: "types" });
     },
@@ -47,6 +49,7 @@ export function useMenuHandlers({
   );
 
   const openGalleryFromDock = useCallback(() => {
+    useCanvasUiStore.getState().dismissEmptyGuide();
     const p = clampContextMenuPosition(240, 200, FLOW_MENU.widths.gallery, FLOW_MENU.clampEstimatedHeight);
     setMenuState({ x: p.x, y: p.y, mode: "add-panel", nodeId: null, addPanelTab: "gallery" });
   }, [setMenuState]);

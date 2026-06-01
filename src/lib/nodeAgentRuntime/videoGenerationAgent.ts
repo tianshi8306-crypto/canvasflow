@@ -4,6 +4,14 @@ import { applyNoSubtitlePrompt } from "@/lib/videoGeneration/noSubtitlePrompt";
 import { buildMergedGenerationPrompt } from "@/lib/ttvCameraUi";
 import type { VideoNodePersisted } from "@/lib/videoNodeTypes";
 import { buildSeedancePromptSimple } from "@/lib/seedance/promptBuilder";
+import {
+  buildNamedAssetsForVideoGeneration,
+  buildPanelOrderedRefs,
+} from "@/lib/seedance/videoPromptAtTokens";
+import { resolveOrderedVideoIncomingRefItems } from "@/hooks/useVideoIncomingReferenceItems";
+import { useProjectStore } from "@/store/projectStore";
+import { refreshDreaminaAuthOnGenerationFailure } from "@/lib/dreaminaAuthOnFailure";
+import { parseVideoGenError } from "@/lib/video/formatVideoGenError";
 import { isDreaminaModel } from "@/lib/dreamina/model";
 import { readFileAsDataUrl } from "@/lib/mediaUtils";
 import { joinProjectRelativePath } from "@/lib/paths";
@@ -41,15 +49,26 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
     const draft = videoBlock.draft;
     const useDreaminaCli = isDreaminaModel(draft.modelId);
 
-    // 构建 prompt，支持 @图N、@视频N、@音频N 引用语法
+    // 构建 prompt，支持 @图N / @视频N / @音频N / @文件名 引用语法
     const merged = buildMergedGenerationPrompt(draft);
     const basePrompt = applyNoSubtitlePrompt(merged, draft.output.noSubtitles ?? false);
+    const { nodes, edges } = useProjectStore.getState();
+    const incoming = resolveOrderedVideoIncomingRefItems(ctx.nodeId, nodes, edges);
+    const panelOrder = buildPanelOrderedRefs(incoming);
+    const namedAssets = buildNamedAssetsForVideoGeneration({
+      videoNodeId: ctx.nodeId,
+      draft,
+      nodes,
+      edges,
+    });
     const { expandedPrompt, imagePaths: atImagePaths, videoPaths: atVideoPaths, audioPaths: atAudioPaths } =
       buildSeedancePromptSimple(
         basePrompt,
         draft.referenceImagePaths,
         draft.referenceVideoPaths,
         draft.referenceAudioPaths,
+        namedAssets,
+        panelOrder,
       );
 
     // 火山方舟需 Base64；即梦 CLI 使用工程相对路径
@@ -131,6 +150,8 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
       jobId = result.jobId;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      const human = parseVideoGenError(msg).summary;
+      refreshDreaminaAuthOnGenerationFailure(draft.modelId);
       ctx.updateNodeData(ctx.nodeId, {
         video: {
           ...videoBlock,
@@ -143,7 +164,7 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
           },
         },
       });
-      ctx.setStatusText(`视频生成失败：${msg}`);
+      ctx.setStatusText(human);
       throw new Error(`视频生成失败：${msg}`);
     }
     return { jobId, videoBlock };

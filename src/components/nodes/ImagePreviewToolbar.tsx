@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { isTauri } from "@tauri-apps/api/core";
 import { pickImagePathsForImport } from "@/lib/tauriMediaPaths";
@@ -12,30 +12,168 @@ import {
   IMAGE_PREVIEW_TOOLBAR_GROUPS,
   resolvePresetPrompt,
   type ImagePreviewToolbarAction,
+  type ImagePreviewToolbarGroup,
 } from "@/lib/imagePreviewToolbarActions";
 import { IMAGE_GENERATION_PROMPT_MAX_CHARS } from "@/lib/promptLimits";
 import { MediaPromptReverseButton } from "@/components/nodes/MediaPromptReverseButton";
+import { PreviewToolbarMenuPortal } from "@/components/nodes/nodeChrome";
+import {
+  isPreviewToolbarActionPending,
+  previewToolbarPendingTitle,
+} from "@/lib/previewToolbarPending";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
-
-export type ImagePreviewToolbarCallbacks = {
-  onOpenGenPanel: () => void;
-};
 
 type Props = {
   nodeId: string;
   hasLocalImage: boolean;
-} & ImagePreviewToolbarCallbacks;
+};
 
-export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: Props) {
+function IconExpand() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        d="M9.5 3.5 12.5 3.5 12.5 6.5M6.5 12.5 3.5 12.5 3.5 9.5M12.5 6.5 12.5 3.5 9.5 3.5M3.5 9.5 3.5 12.5 6.5 12.5"
+      />
+    </svg>
+  );
+}
+
+function ImagePreviewToolbarMenuGroup({
+  group,
+  open,
+  onToggle,
+  triggerRef,
+  menuRef,
+  hasLocalImage,
+  editActive,
+  onRunAction,
+}: {
+  group: ImagePreviewToolbarGroup;
+  open: boolean;
+  onToggle: (trigger: HTMLButtonElement) => void;
+  triggerRef: React.RefObject<HTMLButtonElement>;
+  menuRef: React.RefObject<HTMLDivElement>;
+  hasLocalImage: boolean;
+  editActive: boolean;
+  onRunAction: (action: ImagePreviewToolbarAction) => void;
+}) {
+  const useMenu = group.actions.length > 3 || group.id === "grid";
+
+  if (!useMenu) {
+    return (
+      <>
+        {group.actions.map((action) => {
+          const pending = isPreviewToolbarActionPending(action.kind);
+          const disabled = pending || (action.kind === "edit" && !hasLocalImage);
+          const title = pending
+            ? previewToolbarPendingTitle(action.stubMessage)
+            : action.kind === "edit" && !hasLocalImage
+              ? "请先有预览图"
+              : action.label;
+          return (
+          <button
+            key={action.id}
+            type="button"
+            className={`imagePreviewToolbarBtn${pending ? " imagePreviewToolbarBtn--pending" : ""}${editActive && action.kind === "edit" ? " active" : ""}`}
+            disabled={disabled}
+            title={title}
+            aria-disabled={disabled}
+            onClick={pending ? undefined : () => onRunAction(action)}
+          >
+            {action.label}
+          </button>
+          );
+        })}
+      </>
+    );
+  }
+
+  return (
+    <div className="imagePreviewToolbarMenu">
+      <button
+        ref={open ? triggerRef : undefined}
+        type="button"
+        className={`imagePreviewToolbarBtn imagePreviewToolbarMenuTrigger${open ? " open" : ""}`}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        onClick={(e) => onToggle(e.currentTarget)}
+      >
+        {group.label}
+        <span className="imagePreviewToolbarMenuCaret" aria-hidden>
+          ▾
+        </span>
+      </button>
+      <PreviewToolbarMenuPortal
+        open={open}
+        triggerRef={triggerRef}
+        menuRef={menuRef}
+        className="imagePreviewToolbarMenuDrop imagePreviewToolbarMenuDrop--portal"
+      >
+        {group.actions.map((action) => {
+          const pending = isPreviewToolbarActionPending(action.kind);
+          const disabled = pending || (action.kind === "edit" && !hasLocalImage);
+          const title = pending
+            ? previewToolbarPendingTitle(action.stubMessage)
+            : action.label;
+          return (
+          <button
+            key={action.id}
+            type="button"
+            className={`imagePreviewToolbarMenuItem${pending ? " imagePreviewToolbarMenuItem--pending" : ""}`}
+            disabled={disabled}
+            title={title}
+            aria-disabled={disabled}
+            onClick={pending ? undefined : () => onRunAction(action)}
+          >
+            {action.label}
+          </button>
+          );
+        })}
+      </PreviewToolbarMenuPortal>
+    </div>
+  );
+}
+
+export function ImagePreviewToolbar({ nodeId, hasLocalImage }: Props) {
   const queryClient = useQueryClient();
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodes = useProjectStore((s) => s.nodes);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const assignImportedMediaToNode = useProjectStore((s) => s.assignImportedMediaToNode);
   const setStatusText = useProjectStore((s) => s.setStatusText);
-  const setImageGenPanelExpandedNodeId = useCanvasUiStore((s) => s.setImageGenPanelExpandedNodeId);
+  const setImagePreviewExpandedNodeId = useCanvasUiStore((s) => s.setImagePreviewExpandedNodeId);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const menuDropRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!openMenuId) return;
+    const onPointerDown = (e: PointerEvent) => {
+      const target = e.target;
+      if (!(target instanceof Node)) return;
+      if (menuTriggerRef.current?.contains(target)) return;
+      if (menuDropRef.current?.contains(target)) return;
+      setOpenMenuId(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [openMenuId]);
+
+  const toggleMenu = useCallback((groupId: string, trigger: HTMLButtonElement) => {
+    setOpenMenuId((current) => {
+      if (current === groupId) {
+        menuTriggerRef.current = null;
+        return null;
+      }
+      menuTriggerRef.current = trigger;
+      return groupId;
+    });
+  }, []);
 
   const node = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
   const localPrompt = (node?.data.prompt ?? "").trim();
@@ -58,6 +196,7 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: P
 
   const runAction = useCallback(
     (action: ImagePreviewToolbarAction) => {
+      setOpenMenuId(null);
       if (action.kind === "stub") {
         setStatusText(action.stubMessage ?? "即将支持");
         return;
@@ -79,7 +218,11 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: P
           return;
         }
         if (action.id === "maximize") {
-          setImageGenPanelExpandedNodeId(nodeId);
+          if (!hasLocalImage) {
+            setStatusText("请先有预览图");
+            return;
+          }
+          setImagePreviewExpandedNodeId(nodeId);
           return;
         }
         if (action.id === "download") {
@@ -103,7 +246,6 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: P
         mergeParams(
           imageEditIntentParams({ active: true, subAction: action.subAction }),
         );
-        onOpenGenPanel();
         return;
       }
       if (action.kind === "preset") {
@@ -117,7 +259,6 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: P
         updateNodeData(nodeId, {
           prompt: nextPrompt.slice(0, IMAGE_GENERATION_PROMPT_MAX_CHARS),
         });
-        onOpenGenPanel();
       }
     },
     [
@@ -128,16 +269,23 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: P
       mediaPath,
       mergeParams,
       nodeId,
-      onOpenGenPanel,
       projectPath,
       queryClient,
-      setImageGenPanelExpandedNodeId,
+      setImagePreviewExpandedNodeId,
       setStatusText,
       updateNodeData,
     ],
   );
 
   const editActive = getImageEditIntent(node?.data).active;
+
+  const openPreviewExpand = useCallback(() => {
+    if (!hasLocalImage) {
+      setStatusText("请先有预览图");
+      return;
+    }
+    setImagePreviewExpandedNodeId(nodeId);
+  }, [hasLocalImage, nodeId, setImagePreviewExpandedNodeId, setStatusText]);
 
   return (
     <div
@@ -148,72 +296,40 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage, onOpenGenPanel }: P
     >
       <div className="imagePreviewToolbarScroll">
         <div className="imagePreviewToolbarGroup">
-          <span className="imagePreviewToolbarGroupLabel">提示词</span>
           <MediaPromptReverseButton
             sourceNodeId={nodeId}
             mediaKind="image"
             mediaPath={mediaPath}
             mediaAssetId={mediaAssetId}
-            hasLocalImage={hasLocalImage}
+            hasMedia={hasLocalImage}
           />
         </div>
         {IMAGE_PREVIEW_TOOLBAR_GROUPS.map((group) => (
           <div key={group.id} className="imagePreviewToolbarGroup">
-            <span className="imagePreviewToolbarGroupLabel">{group.label}</span>
-            {group.actions.length <= 3 && group.id !== "grid" ? (
-              group.actions.map((action) => (
-                <button
-                  key={action.id}
-                  type="button"
-                  className={`imagePreviewToolbarBtn${editActive && action.kind === "edit" ? " active" : ""}`}
-                  disabled={action.kind === "edit" && !hasLocalImage}
-                  title={
-                    action.kind === "edit" && !hasLocalImage
-                      ? "请先有预览图"
-                      : action.label
-                  }
-                  onClick={() => runAction(action)}
-                >
-                  {action.label}
-                </button>
-              ))
-            ) : (
-              <div className="imagePreviewToolbarMenu">
-                <button
-                  type="button"
-                  className={`imagePreviewToolbarBtn imagePreviewToolbarMenuTrigger${openMenuId === group.id ? " open" : ""}`}
-                  onClick={() =>
-                    setOpenMenuId((id) => (id === group.id ? null : group.id))
-                  }
-                >
-                  {group.label}
-                  <span className="imagePreviewToolbarMenuCaret" aria-hidden>
-                    ▾
-                  </span>
-                </button>
-                {openMenuId === group.id ? (
-                  <div className="imagePreviewToolbarMenuDrop">
-                    {group.actions.map((action) => (
-                      <button
-                        key={action.id}
-                        type="button"
-                        className="imagePreviewToolbarMenuItem"
-                        disabled={action.kind === "edit" && !hasLocalImage}
-                        onClick={() => {
-                          runAction(action);
-                          setOpenMenuId(null);
-                        }}
-                      >
-                        {action.label}
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            )}
+            <ImagePreviewToolbarMenuGroup
+              group={group}
+              open={openMenuId === group.id}
+              onToggle={(trigger) => toggleMenu(group.id, trigger)}
+              triggerRef={menuTriggerRef}
+              menuRef={menuDropRef}
+              hasLocalImage={hasLocalImage}
+              editActive={editActive}
+              onRunAction={runAction}
+            />
           </div>
         ))}
       </div>
+      <div className="imagePreviewToolbar-divider" aria-hidden />
+      <button
+        type="button"
+        className="imagePreviewToolbar-iconBtn"
+        title="放大预览"
+        aria-label="放大预览"
+        disabled={!hasLocalImage}
+        onClick={openPreviewExpand}
+      >
+        <IconExpand />
+      </button>
     </div>
   );
 }

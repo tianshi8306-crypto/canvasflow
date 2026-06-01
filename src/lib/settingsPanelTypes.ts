@@ -52,6 +52,27 @@ export type AppSettings = {
   ffmpegPath: string | null;
   /** 为 true 时任一节点失败即中止整图（默认 false：失败则跳过下游） */
   abortWorkflowOnFailure: boolean;
+  /** 自定义 Hermes 用户记忆根目录；空则保存在各工程 `.canvasflow/hermes-knowledge-user/` */
+  hermesMemoryRoot?: string | null;
+
+  /** Hermes Agent：自动执行制片计划 */
+  agentAutoExecute?: boolean;
+  /** 大批量出图/出视频免「继续」确认 */
+  agentAutoBatch?: boolean;
+  agentAllowScriptEdit?: boolean;
+  agentAllowMediaSubmit?: boolean;
+  agentMaxConcurrentMedia?: number;
+  /** 步内智能调整：缺图先出图、失败插入修复步 */
+  agentLoopEnabled?: boolean;
+  /** 长上下文 workstate 摘要用 LLM（iter-61） */
+  agentLongContextLlmSummary?: boolean;
+  /** 任务结束后 LLM 复盘（iter-73） */
+  agentPostJobLlmReflect?: boolean;
+  /** 灵体对失败/断链建议自动执行（需 agentAutoExecute） */
+  agentProactiveRecovery?: boolean;
+
+  /** 外接 MCP Server（stdio） */
+  hermesMcpServers?: import("@/lib/hermes/agent/hermesExternalMcp").HermesMcpServerConfig[];
 
   // ── 外观 ──
   /** 主题预设（dark/dawn/day/dusk） */
@@ -87,6 +108,9 @@ export type AppSettings = {
 
   // ── 素材 ──
   uploadQuality: UploadQualityMode;
+
+  /** 画布工程自动保存：编辑停顿多少秒后写入（0 = 关闭） */
+  projectAutoSaveIdleSec?: number;
 };
 
 export type KeyPreviewItem = {

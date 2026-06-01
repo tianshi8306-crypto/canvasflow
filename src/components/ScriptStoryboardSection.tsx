@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { isTauri } from "@tauri-apps/api/core";
-import type { FlowNodeData, ScriptBeat, StoryboardShot } from "@/lib/types";
+import type { ScriptBeat, StoryboardShot } from "@/lib/types";
 import { normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
 import { formatUserError } from "@/lib/errors";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
@@ -16,13 +16,22 @@ import { resolveProjectAssetSrc } from "@/lib/projectMediaUrl";
 import { useProjectStore } from "@/store/projectStore";
 import { importStoryboardImageForBeat } from "@/lib/scriptStoryboardImageImport";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
-import { batchGenerateImagesForStoryboard } from "@/lib/storyboard/batchGenerateImages";
-import { batchGenerateVideosForStoryboard } from "@/lib/storyboard/batchGenerateVideos";
 import {
+  batchGenerateImagesForStoryboard,
+  findImageNodesForScript,
+} from "@/lib/storyboard/batchGenerateImages";
+import { createBeatReferenceResolver } from "@/lib/projectBible/resolveBeatRefsForBatch";
+import { useProjectBibleStore } from "@/store/projectBibleStore";
+import { batchGenerateVideosForStoryboard } from "@/lib/storyboard/batchGenerateVideos";
+import { getAgentMaxConcurrentMedia } from "@/lib/hermes/agent/hermesAgentSettings";
+import {
+  assessBatchImageReadiness,
   assessBatchVideoReadiness,
   assessComposeExportScope,
+  formatBatchImageReadinessHint,
   formatBatchVideoReadinessHint,
   formatComposeExportReadinessHint,
+  listFailedKeyframeBeatIds,
   listFailedVideoBeatIds,
 } from "@/lib/storyboard/scriptProductionExport";
 import {
@@ -34,6 +43,12 @@ import {
   formatChainBuildStatus,
   type ChainMediaKind,
 } from "@/lib/scriptBeatChainBuild";
+import {
+  getGroupMemberIdSet,
+  resolveUniqueStoryboardGroupForScript,
+  storyboardBeatIdsForGroup,
+} from "@/lib/canvasGroupStoryboard";
+import { fitGroupAfterMemberChange } from "@/store/projectGroupProduction";
 import { preflightScriptNodeLlm, scriptNodeLlmInvokeParams } from "@/lib/scriptNodeLlmParams";
 
 type Props = {
@@ -63,6 +78,7 @@ export function ScriptStoryboardSection({
   const [sbView, setSbView] = useState<"grid" | "list">("grid");
   const [generating, setGenerating] = useState(false);
   const [batchVideoRunning, setBatchVideoRunning] = useState(false);
+  const [batchImageRunning, setBatchImageRunning] = useState(false);
   const [composeExportRunning, setComposeExportRunning] = useState(false);
   const [detail, setDetail] = useState<StoryboardShot | null>(null);
   const storyboardImageInputRef = useRef<HTMLInputElement | null>(null);
@@ -175,10 +191,27 @@ export function ScriptStoryboardSection({
       }),
     [beatsNorm, shots, nodes, edges, nodeId, scriptBeatSelection],
   );
+  const batchImageReadiness = useMemo(
+    () =>
+      assessBatchImageReadiness({
+        scriptNodeId: nodeId,
+        beats: beatsNorm,
+        shots,
+        nodes,
+        edges,
+        scriptBeatSelection,
+      }),
+    [beatsNorm, shots, nodes, edges, nodeId, scriptBeatSelection],
+  );
   const batchVideoOk = "canStart" in batchVideoReadiness;
   const batchVideoHint = batchVideoOk
     ? formatBatchVideoReadinessHint(batchVideoReadiness)
     : batchVideoReadiness.message;
+  const batchImageHasScope = "canStart" in batchImageReadiness;
+  const batchImageCanRun = batchImageHasScope && batchImageReadiness.canStart;
+  const batchImageHint = batchImageHasScope
+    ? formatBatchImageReadinessHint(batchImageReadiness)
+    : batchImageReadiness.message;
 
   const composeExportReadiness = useMemo(
     () =>
@@ -202,6 +235,22 @@ export function ScriptStoryboardSection({
     const scopeIds = new Set(chainScopeResult.scope.beats.map((b) => b.id));
     return listFailedVideoBeatIds(shots).filter((id) => scopeIds.has(id));
   }, [shots, chainScopeResult]);
+  const failedKeyframeBeatIdsInScope = useMemo(() => {
+    if (!chainScopeResult.ok) return [];
+    const scopeIds = new Set(chainScopeResult.scope.beats.map((b) => b.id));
+    return listFailedKeyframeBeatIds(shots).filter((id) => scopeIds.has(id));
+  }, [shots, chainScopeResult]);
+  const storyboardGroupId = useMemo(
+    () => resolveUniqueStoryboardGroupForScript(nodeId, nodes, edges),
+    [nodeId, nodes, edges],
+  );
+  const restrictToStoryboardGroup = useMemo(
+    () =>
+      storyboardGroupId
+        ? getGroupMemberIdSet(nodes, storyboardGroupId)
+        : undefined,
+    [nodes, storyboardGroupId],
+  );
   const hermesPolicyHint = useMemo(
     () => hermesAutoChainSettingsHint(loadHermesAutoChainSettings()),
     [],
@@ -295,7 +344,6 @@ export function ScriptStoryboardSection({
     void runGenerate(picked);
   };
 
-  /** 手动触发 Hermes 自动串联（为已生成分镜的镜头创建下游节点） */
   const batchGenerateVideos = async () => {
     if (!projectPath) {
       setStatusText("请先打开工程");
@@ -304,7 +352,7 @@ export function ScriptStoryboardSection({
     if (!batchVideoOk) {
       setStatusText(
         "canStart" in batchVideoReadiness
-          ? batchVideoReadiness.blockMessage
+          ? batchVideoReadiness.message
           : batchVideoReadiness.message,
       );
       return;
@@ -322,12 +370,132 @@ export function ScriptStoryboardSection({
         updateNodeData,
         setStatusText,
         beatIds,
+        maxConcurrent: getAgentMaxConcurrentMedia(),
         onProgress: (current, total, shotNumber) => {
           setStatusText(`批量视频：${current}/${total} 镜 ${shotNumber}…`);
         },
       });
     } finally {
       setBatchVideoRunning(false);
+    }
+  };
+
+  /** E5：批量出关键帧（缺节点则先建链再提交云端出图） */
+  const batchGenerateKeyframeImages = async () => {
+    if (!projectPath?.trim()) {
+      setStatusText("请先打开工程");
+      return;
+    }
+    if (!("canStart" in batchImageReadiness)) {
+      setStatusText(batchImageReadiness.message);
+      return;
+    }
+    const readiness = batchImageReadiness;
+    if (!readiness.canStart) {
+      setStatusText(readiness.blockMessage);
+      return;
+    }
+    if (readiness.needsChainBuild > 0) {
+      runChainBuild(["image"], { submitImageGeneration: true });
+      return;
+    }
+    setBatchImageRunning(true);
+    try {
+      const beatIds = readiness.eligible.map((e) => e.beatId);
+      const bible = useProjectBibleStore.getState().bible;
+      const scriptNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
+      const nodeParams =
+        scriptNode?.data.params && typeof scriptNode.data.params === "object"
+          ? (scriptNode.data.params as Record<string, unknown>)
+          : undefined;
+      const split = resolveHermesBatchSplitSettings(loadHermesAutoChainSettings(), nodeParams);
+      await batchGenerateImagesForStoryboard({
+        scriptNodeId: nodeId,
+        nodes: useProjectStore.getState().nodes,
+        edges: useProjectStore.getState().edges,
+        projectPath: projectPath.trim(),
+        updateNodeData,
+        setStatusText,
+        beatIds,
+        restrictToNodeIds: restrictToStoryboardGroup,
+        resolveBeatReferencePaths: createBeatReferenceResolver(beatsNorm, bible),
+        maxConcurrent: getAgentMaxConcurrentMedia(),
+        hermesBatch: {
+          strategy: split.batchSplitStrategy,
+          packImageCount: split.packImageCount,
+          beats: beatsNorm,
+          shots,
+        },
+        onProgress: (current, total, detail) => {
+          setStatusText(`批量出图：${current}/${total}${detail ? ` · ${detail}` : ""}`);
+        },
+      });
+    } finally {
+      setBatchImageRunning(false);
+    }
+  };
+
+  /** E5：仅重试范围内 storyboard status=failed 的关键帧出图 */
+  const retryFailedKeyframes = async () => {
+    if (!projectPath?.trim()) {
+      setStatusText("请先打开工程");
+      return;
+    }
+    if (failedKeyframeBeatIdsInScope.length === 0) {
+      setStatusText("范围内没有失败的关键帧镜头");
+      return;
+    }
+    const imageByBeat = findImageNodesForScript(nodeId, nodes, edges, {
+      restrictToNodeIds: restrictToStoryboardGroup,
+    });
+    const beatIds = failedKeyframeBeatIdsInScope.filter((id) => imageByBeat.has(id));
+    const missingNodeCount = failedKeyframeBeatIdsInScope.length - beatIds.length;
+    if (beatIds.length === 0) {
+      setStatusText(
+        missingNodeCount > 0
+          ? "失败镜头尚无图片节点，请先点「批量出关键帧」建链"
+          : "范围内没有可重试的关键帧",
+      );
+      return;
+    }
+    const bible = useProjectBibleStore.getState().bible;
+    const scriptNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
+    const retryNodeParams =
+      scriptNode?.data.params && typeof scriptNode.data.params === "object"
+        ? (scriptNode.data.params as Record<string, unknown>)
+        : undefined;
+    const split = resolveHermesBatchSplitSettings(loadHermesAutoChainSettings(), retryNodeParams);
+    setBatchImageRunning(true);
+    try {
+      await batchGenerateImagesForStoryboard({
+        scriptNodeId: nodeId,
+        nodes: useProjectStore.getState().nodes,
+        edges: useProjectStore.getState().edges,
+        projectPath: projectPath.trim(),
+        updateNodeData,
+        setStatusText,
+        beatIds,
+        restrictToNodeIds: restrictToStoryboardGroup,
+        resolveBeatReferencePaths: createBeatReferenceResolver(beatsNorm, bible),
+        maxConcurrent: getAgentMaxConcurrentMedia(),
+        hermesBatch: {
+          strategy: split.batchSplitStrategy,
+          packImageCount: split.packImageCount,
+          beats: beatsNorm,
+          shots,
+        },
+        onProgress: (current, total, detail) => {
+          setStatusText(`重试关键帧：${current}/${total}${detail ? ` · ${detail}` : ""}`);
+        },
+      });
+      if (missingNodeCount > 0) {
+        const tail = useProjectStore.getState().statusText;
+        setStatusText(
+          `${tail}；另有 ${missingNodeCount} 镜无图片节点，请先「批量出关键帧」建链`,
+        );
+      }
+    } finally {
+      setBatchImageRunning(false);
     }
   };
 
@@ -352,6 +520,7 @@ export function ScriptStoryboardSection({
         updateNodeData,
         setStatusText,
         beatIds: failedVideoBeatIdsInScope,
+        maxConcurrent: getAgentMaxConcurrentMedia(),
         onProgress: (current, total, shotNumber) => {
           setStatusText(`重试视频：${current}/${total} 镜 ${shotNumber}…`);
         },
@@ -369,7 +538,7 @@ export function ScriptStoryboardSection({
     if (!composeExportOk) {
       setStatusText(
         "canExport" in composeExportReadiness
-          ? composeExportReadiness.blockMessage
+          ? composeExportReadiness.message
           : composeExportReadiness.message,
       );
       return;
@@ -424,7 +593,15 @@ export function ScriptStoryboardSection({
     kinds: ChainMediaKind[],
     opts?: { submitImageGeneration?: boolean },
   ) => {
-    const anchor = nodes.find((n) => n.id === nodeId);
+    const storyboardGroupId = resolveUniqueStoryboardGroupForScript(nodeId, nodes, edges);
+    const storyboardGroup = storyboardGroupId
+      ? nodes.find((n) => n.id === storyboardGroupId)
+      : undefined;
+    const groupBeatIds = storyboardBeatIdsForGroup(storyboardGroup);
+    const chainSelection =
+      groupBeatIds && groupBeatIds.length > 0 ? groupBeatIds : scriptBeatSelection;
+    const anchor =
+      storyboardGroup ?? nodes.find((n) => n.id === nodeId);
     if (!anchor) {
       setStatusText("找不到脚本节点，无法创建链路");
       return;
@@ -433,12 +610,13 @@ export function ScriptStoryboardSection({
       scriptNodeId: nodeId,
       anchor,
       beats: beatsNorm,
-      scriptBeatSelection,
+      scriptBeatSelection: chainSelection,
       shots,
       nodes,
       edges,
       kinds,
       skipExisting: true,
+      storyboardGroupId: storyboardGroupId ?? undefined,
     });
     if ("message" in result) {
       setStatusText(result.message);
@@ -446,7 +624,14 @@ export function ScriptStoryboardSection({
     }
     if (result.newNodes.length > 0) {
       addNodesWithEdges(result.newNodes, result.newEdges);
-      setSelectedNodeIds(result.newNodes.map((n) => n.id));
+      if (storyboardGroupId) {
+        useProjectStore.setState((s) => ({
+          nodes: fitGroupAfterMemberChange(s.nodes, storyboardGroupId),
+        }));
+      }
+      setSelectedNodeIds(
+        storyboardGroupId ? [storyboardGroupId] : result.newNodes.map((n) => n.id),
+      );
     }
     setStatusText(formatChainBuildStatus(result));
     if (
@@ -460,6 +645,10 @@ export function ScriptStoryboardSection({
           ? (scriptNode.data.params as Record<string, unknown>)
           : undefined;
       const split = resolveHermesBatchSplitSettings(loadHermesAutoChainSettings(), nodeParams);
+      const restrict = storyboardGroupId
+        ? getGroupMemberIdSet(useProjectStore.getState().nodes, storyboardGroupId)
+        : undefined;
+      const bible = useProjectBibleStore.getState().bible;
       void batchGenerateImagesForStoryboard({
         scriptNodeId: nodeId,
         nodes: useProjectStore.getState().nodes,
@@ -468,6 +657,9 @@ export function ScriptStoryboardSection({
         updateNodeData,
         setStatusText,
         beatIds: result.scope.beats.map((b) => b.id),
+        restrictToNodeIds: restrict,
+        resolveBeatReferencePaths: createBeatReferenceResolver(beatsNorm, bible),
+        maxConcurrent: getAgentMaxConcurrentMedia(),
         hermesBatch: {
           strategy: split.batchSplitStrategy,
           packImageCount: split.packImageCount,
@@ -652,10 +844,36 @@ export function ScriptStoryboardSection({
           type="button"
           className="btn btnPrimary"
           disabled={generating || storyboardHealth.generatedCount === 0}
-          title="手动触发 Hermes：为已生成分镜的镜头创建图+视频节点（受 Inspector 策略与勾选范围约束）"
+          title="手动触发 Hermes：为已生成分镜的镜头创建图+视频节点（受节点 Hermes 策略与勾选范围约束）"
           onClick={triggerHermesAutoChain}
         >
           {generating ? "串联中…" : `Hermes 手动串联（${storyboardHealth.generatedCount}）`}
+        </button>
+        <button
+          type="button"
+          className="btn btnPrimary"
+          disabled={batchImageRunning || !projectPath || !batchImageCanRun}
+          title={
+            "canStart" in batchImageReadiness
+              ? batchImageReadiness.canStart
+                ? batchImageHint
+                : batchImageReadiness.blockMessage
+              : batchImageReadiness.message
+          }
+          onClick={() => void batchGenerateKeyframeImages()}
+        >
+          {batchImageRunning ? "批量出图中…" : "批量出关键帧"}
+        </button>
+        <button
+          type="button"
+          className="btn"
+          disabled={
+            batchImageRunning || !projectPath || failedKeyframeBeatIdsInScope.length === 0
+          }
+          title="仅重试范围内分镜 status=failed 的镜头（需已有图片节点）"
+          onClick={() => void retryFailedKeyframes()}
+        >
+          重试失败关键帧（{failedKeyframeBeatIdsInScope.length}）
         </button>
         <button
           type="button"
@@ -665,7 +883,7 @@ export function ScriptStoryboardSection({
             batchVideoOk
               ? batchVideoHint
               : "canStart" in batchVideoReadiness
-                ? batchVideoReadiness.blockMessage
+                ? batchVideoReadiness.message
                 : batchVideoReadiness.message
           }
           onClick={() => void batchGenerateVideos()}
@@ -691,7 +909,7 @@ export function ScriptStoryboardSection({
             composeExportOk
               ? composeExportHint
               : "canExport" in composeExportReadiness
-                ? composeExportReadiness.blockMessage
+                ? composeExportReadiness.message
                 : composeExportReadiness.message
           }
           onClick={() => void handleExportScriptCompose()}
@@ -703,10 +921,12 @@ export function ScriptStoryboardSection({
               : "导出成片"}
         </button>
       </div>
-      {(batchVideoOk || composeExportOk) && (
+      {(batchImageHasScope || batchVideoOk || composeExportOk) && (
         <p className="storyboardProductionHint mono" role="status">
+          {batchImageHasScope ? batchImageHint : null}
+          {batchImageHasScope && batchVideoOk ? " · " : null}
           {batchVideoOk ? batchVideoHint : null}
-          {batchVideoOk && composeExportOk ? " · " : null}
+          {(batchImageHasScope || batchVideoOk) && composeExportOk ? " · " : null}
           {composeExportOk ? composeExportHint : null}
         </p>
       )}

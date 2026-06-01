@@ -33,6 +33,10 @@ import type {
 import { ScriptWorkbenchPrimaryActions } from "@/components/ScriptWorkbenchPrimaryActions";
 import { ScriptWorkbenchTemplateGuideCard } from "@/components/ScriptWorkbenchTemplateGuideCard";
 import { ScriptWorkbenchCardView } from "@/components/ScriptWorkbenchCardView";
+import { ScriptWorkbenchCardToolbar } from "@/components/ScriptWorkbenchCardToolbar";
+import { scriptStoryboardGenerateAgentRuntime } from "@/lib/nodeAgentRuntime/scriptStoryboardAgent";
+import { resolveStoryboardBeatScope } from "@/lib/scriptStoryboardScope";
+import { preflightScriptNodeLlm, scriptNodeLlmInvokeParams } from "@/lib/scriptNodeLlmParams";
 import { ScriptWorkbenchActionConfirmDialog } from "@/components/ScriptWorkbenchActionConfirmDialog";
 import { ScriptWorkbenchBatchLogPanel } from "@/components/ScriptWorkbenchBatchLogPanel";
 import { ScriptWorkbenchTableView } from "@/components/ScriptWorkbenchTableView";
@@ -48,10 +52,12 @@ type Props = {
 };
 
 export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePrompt }: Props) {
+  const nodes = useProjectStore((s) => s.nodes);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const setStatusText = useProjectStore((s) => s.setStatusText);
   const projectPath = useProjectStore((s) => s.projectPath);
   const [view, setView] = useState<"table" | "card">("table");
+  const [storyboardGenBusy, setStoryboardGenBusy] = useState(false);
   const [hasBatchUndo, setHasBatchUndo] = useState(false);
   const [dangerOpen, setDangerOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -620,6 +626,49 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
     })();
   };
 
+  const scriptNode = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
+  const nodeParams =
+    scriptNode?.data.params && typeof scriptNode.data.params === "object"
+      ? (scriptNode.data.params as Record<string, unknown>)
+      : undefined;
+  const llmParams = useMemo(() => scriptNodeLlmInvokeParams(nodeParams), [nodeParams]);
+
+  const generateStoryboardFromCard = () => {
+    if (!projectPath?.trim()) {
+      setStatusText("请先打开工程后再生成分镜");
+      return;
+    }
+    if (rows.length === 0) {
+      setStatusText("请先添加或生成脚本镜头");
+      return;
+    }
+    const scopeResult = resolveStoryboardBeatScope(rows, storedSelection);
+    if (!scopeResult.ok) {
+      setStatusText(scopeResult.message);
+      return;
+    }
+    void (async () => {
+      setStoryboardGenBusy(true);
+      try {
+        if (!(await preflightScriptNodeLlm(nodeParams, setStatusText))) return;
+        await runNodeTaskAgent(
+          scriptStoryboardGenerateAgentRuntime,
+          {
+            targetBeats: scopeResult.scope.beats,
+            themePrompt,
+            prevShots: scriptNode?.data.storyboardShots,
+            llmParams,
+          },
+          { nodeId, projectPath, updateNodeData, setStatusText },
+        );
+      } catch {
+        /* runNodeTaskAgent 已写入状态 */
+      } finally {
+        setStoryboardGenBusy(false);
+      }
+    })();
+  };
+
   useEffect(() => {
     const onPointerDown = (ev: PointerEvent) => {
       if (!dangerOpen && !moreOpen) return;
@@ -952,9 +1001,14 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
           }}
         />
       ) : (
-        <div
-          ref={cardWrapRef}
-        >
+        <div ref={cardWrapRef}>
+          <ScriptWorkbenchCardToolbar
+            selectedCount={selectedIds.length}
+            totalCount={rows.length}
+            storyboardBusy={storyboardGenBusy}
+            onGenerateStoryboard={generateStoryboardFromCard}
+            onSendToStoryboard={sendToStoryboardSection}
+          />
           <ScriptWorkbenchCardView
             rows={rows}
             selectedIds={selectedIds}

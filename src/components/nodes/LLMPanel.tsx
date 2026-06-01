@@ -57,14 +57,14 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
 
   useEffect(() => {
     if (providerId !== undefined) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setSelectedProviderId(providerId);
     }
   }, [providerId]);
 
   useEffect(() => {
     if (prompt !== undefined) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setResponse(prompt);
     }
   }, [prompt]);

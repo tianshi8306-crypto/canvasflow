@@ -1,16 +1,12 @@
-/* ── CanvasProjectPanel ── */
+/* ── CanvasProjectPanel：位置由触发钮 getBoundingClientRect 动态计算 ── */
 .canvasProjectPanel {
   position: fixed;
-  top: 64px;
-  left: 58px;
   width: 260px;
-  border-radius: var(--canvas-float-radius);
-  border: 1px solid var(--canvas-float-border);
-  background: var(--canvas-float-bg);
-  backdrop-filter: blur(var(--canvas-float-blur));
-  -webkit-backdrop-filter: blur(var(--canvas-float-blur));
-  box-shadow: var(--canvas-float-shadow);
-  z-index: 40;
+  border-radius: var(--canvas-dock-radius-panel);
+  border: 1px solid var(--canvas-dock-border);
+  background: var(--canvas-dock-bg);
+  box-shadow: var(--canvas-dock-shadow);
+  z-index: var(--canvas-z-project-panel);
   padding: 12px;
   display: none;
   flex-direction: column;
@@ -83,8 +79,8 @@
   width: 30px;
   height: 30px;
   border-radius: 7px;
-  background: rgba(15, 18, 28, 0.95);
-  border: 1px solid var(--canvas-float-border);
+  background: var(--cf-charcoal-inset);
+  border: 1px solid var(--cf-border);
   color: var(--muted);
   flex-shrink: 0;
 }

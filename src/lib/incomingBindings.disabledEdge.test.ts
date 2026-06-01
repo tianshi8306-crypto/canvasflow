@@ -1,8 +1,13 @@
 import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
-import { orderedIncomingScriptNodeIds } from "@/lib/incomingScriptBinding";
-import { incomingScriptUpstreamState } from "@/lib/incomingScriptBinding";
+import {
+  buildScriptPromptFromUpstreamText,
+  incomingScriptUpstreamState,
+  incomingTextUpstreamState,
+  orderedIncomingScriptNodeIds,
+  orderedIncomingTextNodeIds,
+} from "@/lib/incomingScriptBinding";
 import {
   inspectorScriptUpstreamHint,
   scriptSyncButtonTitle,
@@ -48,6 +53,25 @@ describe("incoming bindings ignore disabled edges", () => {
     const nodes = [script, target];
     const edges: Edge[] = [edge("S", "IMG", true)];
     expect(incomingScriptUpstreamState(nodes, edges, "IMG")).toBe("disabled_only");
+  });
+
+  it("orderedIncomingTextNodeIds filters disabled incoming edges", () => {
+    const text1 = node("T1", "textNode", 10);
+    const text2 = node("T2", "textNode", 20);
+    const script = node("S", "scriptNode", 30);
+    const nodes = [text1, text2, script];
+    const edges: Edge[] = [edge("T1", "S"), edge("T2", "S", true)];
+    expect(orderedIncomingTextNodeIds(nodes, edges, "S")).toEqual(["T1"]);
+  });
+
+  it("buildScriptPromptFromUpstreamText merges enabled upstream text", () => {
+    const text = node("T1", "textNode", 10);
+    text.data = { prompt: "上游梗概" };
+    const script = node("S", "scriptNode", 20);
+    const nodes = [text, script];
+    const edges: Edge[] = [edge("T1", "S")];
+    expect(buildScriptPromptFromUpstreamText(nodes, edges, "S")).toBe("上游梗概");
+    expect(incomingTextUpstreamState(nodes, edges, "S")).toBe("enabled");
   });
 
   it("incomingScriptUpstreamState returns enabled when at least one enabled script edge exists", () => {

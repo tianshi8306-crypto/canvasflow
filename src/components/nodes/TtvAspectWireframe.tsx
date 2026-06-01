@@ -1,4 +1,5 @@
 import type { TextToVideoAspectId } from "@/lib/videoNodeTypes";
+import "./TtvShared.css";
 
 /** 线框示意：在固定视口内按比例画内框 */
 export function TtvAspectWireframe({ id }: { id: TextToVideoAspectId }) {

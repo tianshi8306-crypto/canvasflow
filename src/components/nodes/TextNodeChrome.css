@@ -1,12 +1,6 @@
-/* 文本节点 Chrome：配色与图片节点壳层一致（#2b2b2b / #1f1f1f / #4d4d4d） */
-
-.minimal-text-node.nodeChrome-shell {
-  background: var(--bg-node, #2b2b2b);
-  border-color: var(--border-node, #4d4d4d);
-}
+/* 文本节点 Chrome：配色与共享 nodeChrome Token 一致 */
 
 .minimal-text-preview.nodeChrome-preview {
-  background: var(--bg-node-preview, #1f1f1f);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -49,9 +43,10 @@
   color: var(--text-primary, #e0e0e0);
 }
 
-/* 仅底栏生成参数 Portal：更扁；不影响节点正文预览壳 */
+/* 底栏生成参数 Portal：与 videoGenPanel 同 padding（见 gen-panel-design-system.md） */
 .nodeChrome--panel.textNodeChrome--minimal:has(.textGenPanel--chrome) {
-  padding: 8px 12px 8px;
+  padding: var(--gen-panel-pad, 12px 14px 14px);
+  background: var(--gen-panel-bg, #2b2b2b);
 }
 
 .textNodeChrome--minimal .scriptGenComposer,
@@ -68,18 +63,18 @@
 
 /* ── 文本 Composer 底栏（textGenPanel--chrome，对齐图/视频 Chrome P0）── */
 .textGenPanel--chrome.scriptGenComposer {
-  --tgp-control-h: 36px;
-  --tgp-control-radius-pill: 999px;
-  --tgp-control-radius-square: 8px;
+  --tgp-control-h: var(--gen-control-h, 36px);
+  --tgp-control-radius-square: var(--gen-control-radius, 8px);
+  --tgp-control-radius-pill: var(--tgp-control-radius-square);
   --tgp-control-border: 1px solid var(--border-button, #4d4d4d);
-  --tgp-control-bg: var(--bg-button, #2b2b2b);
-  --tgp-control-bg-hover: var(--bg-button-active, #444444);
+  --tgp-control-bg: var(--bg-button);
+  --tgp-control-bg-hover: var(--bg-button-hover);
   --tgp-control-text: rgba(255, 255, 255, 0.88);
   --tgp-control-text-muted: #9e9e9e;
-  --tgp-cta-bg-ready: #ffffff;
-  --tgp-cta-bg-ready-hover: #f2f2f2;
-  --tgp-cta-border-ready: rgba(255, 255, 255, 0.28);
-  --tgp-cta-shadow-ready: 0 1px 0 rgba(255, 255, 255, 0.14) inset, 0 2px 12px rgba(0, 0, 0, 0.5);
+  --tgp-cta-bg-ready: var(--gen-cta-bg-ready, #f0f0f0);
+  --tgp-cta-bg-ready-hover: var(--gen-cta-bg-ready-hover, #ffffff);
+  --tgp-cta-border-ready: rgba(255, 255, 255, 0.14);
+  --tgp-cta-shadow-ready: none;
   --tgp-cta-fg-ready: #121212;
   --tgp-cta-bg-disabled: #2b2b2b;
   --tgp-cta-fg-disabled: #616161;
@@ -178,7 +173,7 @@
 }
 
 .textGenPanel--v2 .tgp-v2-chip:hover {
-  background: var(--tgp-control-bg-hover, #444444);
+  background: var(--tgp-control-bg-hover);
 }
 
 .textGenPanel--v2 .tgp-v2-zone-c--i2p .tgp-i2p-thumb {
@@ -236,10 +231,18 @@
 }
 
 /* 输入区：与面板同色，无框中框（覆盖 global .imageGenPanelTextarea） */
+.textGenPanel--chrome .mention-input-wrapper {
+  --mention-mirror-pad-block: 0;
+  --mention-mirror-pad-inline: 0;
+  --mention-mirror-line-height: 1.45;
+  --mention-mirror-font-size: 13px;
+  --mention-mirror-border-width: 0;
+  --mention-mirror-text: var(--text-primary, #e0e0e0);
+  --mention-mirror-caret: var(--text-primary, #e0e0e0);
+}
+
 .textGenPanel--chrome .mention-overlay {
   color: var(--text-primary, #e0e0e0);
-  font-size: 13px;
-  line-height: 1.45;
 }
 
 .textGenPanel--chrome .mention-input-wrapper.imageGenPanelTextarea,
@@ -265,15 +268,12 @@
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
-  font-size: 13px;
   color: transparent !important;
-  caret-color: var(--text-primary, #e0e0e0);
-  padding: 0;
+  -webkit-text-fill-color: transparent !important;
   border-radius: 0;
   min-height: 32px;
   max-height: 72px;
   overflow-y: auto;
-  line-height: 1.45;
 }
 
 .textGenPanel--chrome .mention-textarea:focus,
@@ -595,7 +595,7 @@
 .textNodeChrome--minimal .scriptGenComposerInput {
   border-radius: var(--radius-sm, 6px);
   border: 1px solid var(--border-node, #4d4d4d);
-  background: var(--bg-node-preview, #1f1f1f);
+  background: var(--bg-node-preview, #2b2b2b);
   color: var(--text-primary, #e0e0e0);
 }
 
@@ -638,7 +638,7 @@
 .textNodeChrome .textNodeEditable,
 .textNodeChrome .textNodeWriteSelfEditable {
   border: 1px solid var(--border-node, #4d4d4d);
-  background: var(--bg-node-preview, #1f1f1f);
+  background: var(--bg-node-preview, #2b2b2b);
   color: var(--text-primary, #e0e0e0);
   border-radius: var(--radius-sm, 6px);
 }
@@ -713,7 +713,7 @@
 .textNodeChrome .scriptGenEmptyCard,
 .textNodeChrome .textNodeFigure3Empty {
   border: 1px dashed var(--border-node, #4d4d4d);
-  background: var(--bg-node-preview, #1f1f1f);
+  background: var(--bg-node-preview, #2b2b2b);
   color: var(--text-secondary, #9e9e9e);
 }
 
@@ -727,7 +727,6 @@
   padding: 0 2px 8px;
 }
 
-.textNodeChrome .textNodeTtvPanel,
 .textNodeChrome .textNodeTtmPanel {
   border-color: var(--border-node, #4d4d4d);
 }
@@ -851,36 +850,6 @@
 }
 
 /* ── 工作流底栏（C3）── */
-.textNodeWorkflowStub {
-  padding: 12px 4px;
-  text-align: center;
-}
-
-.textNodeWorkflowStubLead {
-  margin: 0 0 6px;
-  font-size: 13px;
-  color: var(--text-primary, #e0e0e0);
-}
-
-.textNodeWorkflowStubHint {
-  margin: 0;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text-secondary, #9e9e9e);
-}
-
-.textNodeTtvChromeWrap {
-  width: 100%;
-}
-
-.textNodeTtvChromeWrap .videoGenPanel--chrome {
-  width: 100%;
-  max-width: none;
-  border: none;
-  box-shadow: none;
-  padding: 0;
-  background: transparent;
-}
 
 .textNodeTtmChromeWrap {
   width: 100%;
@@ -961,6 +930,16 @@
   line-clamp: 10;
 }
 
+/* 覆盖 .textNodeChrome .textNodeReadOnly 的内层壳线框，只保留外圈节点壳 */
+.textNodeChrome .textNodeReadOnly--integrated {
+  border: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  min-height: 0;
+  color: var(--text-primary, #e0e0e0);
+}
+
 .textNodeChrome--userSized .textNodeReadOnly--integrated {
   display: block;
   -webkit-line-clamp: unset;
@@ -976,7 +955,7 @@
   right: 0;
   bottom: 0;
   height: 24px;
-  background: linear-gradient(to bottom, transparent, var(--bg-node-preview, #1f1f1f));
+  background: linear-gradient(to bottom, transparent, var(--gen-panel-bg, #2b2b2b));
   pointer-events: none;
 }
 
@@ -1199,8 +1178,13 @@
   position: relative;
 }
 
-/* 顶栏 Portal：单层胶囊（去掉 nodeChrome--panel 双底板） */
-.textPreviewToolbarChrome.nodeChrome--top {
+/* 顶栏 Portal：外层定位 + 内层胶囊 */
+.textPreviewToolbarPortalRoot {
+  width: max-content;
+  max-width: min(520px, 92vw);
+}
+
+.textPreviewToolbarChrome {
   background: transparent;
   border: none;
   box-shadow: none;
@@ -1211,12 +1195,11 @@
 
 .textPreviewToolbarChrome .textPreviewToolbar {
   max-width: min(520px, 92vw);
-  background: rgba(26, 26, 26, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 999px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-  padding: 3px 6px;
+  background: var(--gen-panel-bg, #2b2b2b);
+  border: 1px solid var(--border-button);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
+  padding: 4px 6px;
 }
 
 .textPreviewToolbarScroll {
@@ -1283,34 +1266,6 @@
   cursor: text;
 }
 
-.textNodeEmptyShellIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: var(--text-placeholder, #616161);
-  opacity: 0.25;
-}
-
-.textNodeEmptyShellIcon svg {
-  width: clamp(40px, 18%, 56px);
-  height: clamp(40px, 18%, 56px);
-}
-
-.textNodeEmptyShellLabel {
-  margin: 0;
-  max-width: 100%;
-  font-size: 12px;
-  line-height: 1.4;
-  color: var(--text-secondary, #9e9e9e);
-  text-align: center;
-}
-
-.textNodeChrome--integrated.selected .textNodeEmptyShellIcon,
-.minimal-text-node.selected .textNodeEmptyShellIcon {
-  opacity: 0.32;
-}
-
 /* ── 展开编辑 / 粘贴 Modal（与节点壳同色，不用 global 蓝灰 .btn）── */
 .textNodeExpandBackdrop {
   position: fixed;
@@ -1334,7 +1289,7 @@
   padding: 12px 14px 14px;
   border-radius: var(--radius-md, 8px);
   border: 1px solid var(--border-node, #4d4d4d);
-  background: var(--bg-node-preview, #1f1f1f);
+  background: var(--bg-node-preview, #2b2b2b);
   color: var(--text-primary, #e0e0e0);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
   box-sizing: border-box;
@@ -1398,7 +1353,7 @@
 }
 
 .textNodeExpandBtn:hover {
-  background: var(--bg-button-active, #444444);
+  background: var(--bg-button-active);
 }
 
 .textNodeExpandBtn--primary {
@@ -1414,7 +1369,7 @@
 
 /* ── 模型对话展开 Modal（与底栏 textGenPanel--chrome 同构）── */
 .igp-expanded-card.tgp-expanded-shell.textNodeChrome--minimal {
-  width: var(--tgp-shell-width, 300px);
+  width: var(--tgp-shell-width, 500px);
   max-width: calc(100vw - 24px);
   min-height: min(420px, calc(100vh - 48px));
   max-height: calc(100vh - 48px);
@@ -1423,7 +1378,7 @@
   padding: 12px 14px 14px;
   box-sizing: border-box;
   overflow: hidden;
-  background: var(--bg-node-preview, #1f1f1f);
+  background: var(--gen-panel-bg, #2b2b2b);
   border: 1px solid var(--border-node, rgba(255, 255, 255, 0.12));
   border-radius: var(--radius-md, 8px);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);

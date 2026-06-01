@@ -7,7 +7,7 @@ export function normalizeVideoSourceTrim(
   durationSec: number,
 ): VideoSourceTrim {
   const d = Math.max(MIN_TRIM_SPAN_SEC, durationSec);
-  let inSec = Math.max(0, Math.min(trim.inSec, d - MIN_TRIM_SPAN_SEC));
+  const inSec = Math.max(0, Math.min(trim.inSec, d - MIN_TRIM_SPAN_SEC));
   let outSec = Math.max(inSec + MIN_TRIM_SPAN_SEC, Math.min(trim.outSec, d));
   if (outSec > d) outSec = d;
   if (outSec - inSec < MIN_TRIM_SPAN_SEC) {

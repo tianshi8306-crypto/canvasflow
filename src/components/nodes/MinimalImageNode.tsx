@@ -8,11 +8,22 @@ import {
   resolveImageNodeFrameRatio,
 } from "@/lib/imageGeneration/imageAspectSize";
 import { readImageOutputParams } from "@/lib/imageGeneration/imageOutputParams";
+import {
+  getImageGenerationProgressPercent,
+  isImageGenerationInProgress,
+} from "@/lib/imageGeneration/imageGenerationProgressDisplay";
+import { useImageI2iAnchorImport } from "@/hooks/canvas/useImageI2iAnchorImport";
 import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
-import { NodeChromeShell, NodeMetaLabel, NodeMetaStatus } from "@/components/nodes/nodeChrome";
+import {
+  NodeChromeProvider,
+  NodeChromeShell,
+  NodeMetaLabel,
+  NodeMetaStatus,
+  NodePanelPlaceholder,
+} from "@/components/nodes/nodeChrome";
 import { NodeAnchors } from "./anchors";
 import { ImageGenerationPanelPortal } from "./ImageGenerationPanelPortal";
 import { ImageNodeEmptyUpload } from "./ImageNodeEmptyUpload";
@@ -29,30 +40,18 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const deleteSelection = useProjectStore((s) => s.deleteSelection);
   const { expandedChrome } = useNodeExpandedChrome(selected);
+  const { i2iFileInput } = useImageI2iAnchorImport(id);
 
   const hasPath = Boolean(data.path?.trim() || data.assetId?.trim());
   const mediaPath = data.path;
   const mediaAssetId = data.assetId;
 
   const expandedGenPanelId = useCanvasUiStore((s) => s.imageGenPanelExpandedNodeId);
-  const pinnedGenPanelId = useCanvasUiStore((s) => s.imageGenPanelPinnedNodeId);
-  const setPinnedGenPanelId = useCanvasUiStore((s) => s.setImageGenPanelPinnedNodeId);
 
-  const [genPanelPinned, setGenPanelPinned] = useState(false);
-  const dockedBelow = genPanelPinned || pinnedGenPanelId === id;
-  const showGenPanel =
-    expandedChrome && (!hasPath || dockedBelow) && expandedGenPanelId !== id;
+  /** 与视频节点一致：选中即显示底栏参数面板（出图后仍可二次生成/编辑） */
+  const showGenPanel = expandedChrome && expandedGenPanelId !== id;
   const showPreviewToolbar = expandedChrome && hasPath;
   const showEmptyUpload = expandedChrome && !hasPath;
-
-  useEffect(() => {
-    if (!selected) {
-      setGenPanelPinned(false);
-      if (pinnedGenPanelId === id) setPinnedGenPanelId(null);
-    }
-  }, [id, pinnedGenPanelId, selected, setPinnedGenPanelId]);
-
-  const openGenPanel = useCallback(() => setGenPanelPinned(true), []);
 
   const label = data.label ?? "";
   const commitLabel = useCallback(
@@ -61,6 +60,7 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
   );
 
   const [imgSize, setImgSize] = useState<{ w: number; h: number } | null>(null);
+  const [previewOverlayEl, setPreviewOverlayEl] = useState<HTMLDivElement | null>(null);
   const previewRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const previewToolbarRef = useRef<HTMLDivElement>(null);
@@ -102,7 +102,8 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
   useEffect(() => {
     if (!selected) return;
     const handlePointerDown = (e: MouseEvent) => {
-      const target = e.target as Node;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
       const inPanel = panelRef.current?.contains(target);
       const inToolbar = previewToolbarRef.current?.contains(target);
       if (!inPanel && !inToolbar) {
@@ -131,20 +132,23 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
   }, [selected, deleteSelection]);
 
   const nodeStatus = data.status;
-  const isGenerating =
-    nodeStatus?.status === "running" &&
-    typeof nodeStatus.progress === "number" &&
-    Number.isFinite(nodeStatus.progress);
-  const genProgress = isGenerating ? Math.round(nodeStatus.progress!) : null;
+  const genProgressInput = {
+    status: nodeStatus?.status,
+    progress: nodeStatus?.progress,
+  };
+  const isGenerating = isImageGenerationInProgress(genProgressInput);
+  const genProgress = isGenerating
+    ? (getImageGenerationProgressPercent(genProgressInput) ?? null)
+    : null;
   const dimW = imgSize?.w ?? data.imageWidth;
   const dimH = imgSize?.h ?? data.imageHeight;
   const showDims = Boolean(dimW && dimH && dimW > 0 && dimH > 0);
   const dimsText = showDims ? `${dimW}\u00d7${dimH}` : null;
 
   return (
-    <>
+    <NodeChromeProvider>
+      {i2iFileInput}
       <NodeMetaLabel label={label} defaultLabel="图片" onCommit={commitLabel} />
-
       <NodeMetaStatus dimsText={dimsText} generating={isGenerating} progress={genProgress} />
 
       {showEmptyUpload ? <ImageNodeEmptyUpload nodeId={id} /> : null}
@@ -166,11 +170,10 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
           />
         ) : (
           <div className="nodeChrome-placeholder minimal-image-placeholder">
-            <svg viewBox="0 0 24 24" fill="#616161" aria-hidden>
-              <path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z" />
-            </svg>
+            <NodePanelPlaceholder kind="imageNode" />
           </div>
         )}
+        <div className="nodeChrome-previewGenOverlay" ref={setPreviewOverlayEl} />
       </NodeChromeShell>
 
       <ImagePreviewToolbarPortal
@@ -178,7 +181,6 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
         anchorRef={previewRef}
         active={showPreviewToolbar}
         hasLocalImage={hasPath}
-        onOpenGenPanel={openGenPanel}
         toolbarRef={previewToolbarRef}
       />
 
@@ -186,9 +188,9 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
         nodeId={id}
         anchorRef={previewRef}
         active={showGenPanel}
-        layout={hasPath ? "default" : "empty"}
         panelRef={panelRef}
+        previewOverlayEl={previewOverlayEl}
       />
-    </>
+    </NodeChromeProvider>
   );
 }

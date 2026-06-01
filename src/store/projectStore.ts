@@ -17,9 +17,30 @@ import { computeNextLeftInputY, leftInputColumnX } from "@/lib/videoInputNodeLay
 import {
   CANVAS_NODE_LAYOUT_GAP,
   computeBatchImportDropPositions,
-  nodeLayoutDimensions,
 } from "@/lib/nodeLayout";
+import { applyGridSnapToPositionChanges } from "@/lib/nodeGridSnap";
 import { snapNodePositionChanges } from "@/lib/nodeSnapAlignment";
+import {
+  alignOpLabel,
+  computeAlignedPositions,
+  computeDistributedPositions,
+  distributeOpLabel,
+} from "@/lib/nodeAlignCommands";
+import { selectionIdsEqual } from "@/lib/canvasGroup";
+import {
+  clampGroupDimensionChanges,
+  computeGroupSizeFromMembers,
+  normalizeGroupNodesForCanvas,
+  planNestedGroup,
+  ungroupNodes,
+} from "@/lib/canvasGroup";
+import { applyCanvasTidyLayout, computeLayoutPositions } from "@/lib/canvasTidyLayout";
+import {
+  applyGroupMembershipAfterDrag,
+  syncGroupStylesFromDimensions,
+} from "@/lib/canvasGroupMembership";
+import { groupKindLabel } from "@/lib/canvasGroupStoryboard";
+import { collectGroupSubtreeIds } from "@/lib/canvasGroupDuplicate";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import {
   connectionRejectedReason,
@@ -31,22 +52,36 @@ import {
   validateConnection,
 } from "@/lib/flowConnectionPolicy";
 import { applyTextWorkflowSyncToNodes } from "@/lib/textNodeWorkflowSync";
+import { patchVideoNodesWithUpstreamTextPrompt } from "@/lib/videoGeneration/videoTextPromptSync";
+import { patchVideoNodesWithUpstreamVideoPrompt } from "@/lib/videoGeneration/videoVideoPromptSync";
+import { CANVAS_EDGE_STYLE_DEFAULT } from "@/lib/canvasColors";
 import { makeFlowEdge } from "@/lib/flowEdge";
 import { edgeToggleStatusText, isEdgeDisabled } from "@/lib/edgeState";
 import {
   buildPasteEdgesFromClipboard,
   buildPasteNodesFromClipboard,
 } from "@/lib/buildPasteNodesFromClipboard";
+import { buildForkDuplicatePaste } from "@/lib/createNodeForkDuplicate";
 import { cloneFlowNodeData } from "@/lib/flowNodeDataClone";
-import { defaultViewport, parseCanvas, serializeCanvas } from "@/lib/serialization";
+import { defaultViewport } from "@/lib/serialization";
+import { serializeCanvasToBytesAsync, yieldToMain } from "@/lib/serializeCanvasAsync";
+import { runCoalescedProjectSave } from "@/store/projectSaveRunner";
 import type { FlowNodeData } from "@/lib/types";
 import { importMediaFiles as importMediaFilesApi } from "@/shared/api/assets";
 import { defaultVideoGenerationDraft, defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
 import {
   buildComposeClipsFromScript,
-  DEFAULT_EXPORT_PATH,
+  clipsToRenderPayload,
+  composeClipToTimeline,
+  defaultExportRelPath,
+  exportEncodeToInvokePayload,
+  normalizeExportEncode,
+  parseExportFormatArg,
+  resolveExportFormat,
   findConcatNodeForScriptVideos,
   formatComposeMissingHint,
+  patchComposeNodeAfterExport,
+  timelineClipsToNodePatch,
 } from "@/lib/compose";
 import { orderedIncomingScriptNodeIds } from "@/lib/incomingScriptBinding";
 import { extractVideoAudioToAssets } from "@/lib/videoToolbarAudioExtract";
@@ -76,14 +111,92 @@ import { scheduleSave } from "./projectSaveDebounce";
 import { focusShellAfterNativeDialog } from "./projectShellFocus";
 import type { ProjectState } from "./projectStoreTypes";
 export type { GraphSnapshot, ProjectState } from "./projectStoreTypes";
+import { exportGroupMediaImpl, runGroupSubgraphImpl } from "./projectGroupRuns";
+import {
+  convertGroupToStoryboardImpl,
+  duplicateGroupImpl,
+  insertGroupTemplateImpl,
+  runGroupHermesImagesImpl,
+  saveGroupToToolboxImpl,
+  setGroupColorTokenImpl,
+} from "./projectGroupProduction";
+import {
+  deleteWorkflowImpl,
+  insertWorkflowImpl,
+  saveWorkflowFromSelectionImpl,
+} from "./projectWorkflowProduction";
 import {
   rerunFailedSubgraphImpl,
   runNodeSubgraphImpl,
   runWorkflowImpl,
 } from "./projectWorkflowRuns";
 import { rebuildShotNodeRegistry } from "@/lib/hermes";
+import { bindActiveTabToProject, syncActiveTabUnsaved } from "@/lib/canvasTabSync";
+import {
+  applyProjectSnapshot,
+  loadProjectFolder,
+  type ProjectGraphSnapshot,
+} from "@/lib/projectWorkspaceLoad";
+import { useProjectBibleStore } from "@/store/projectBibleStore";
+import { useHermesOrbSuggestStore } from "@/store/hermesOrbSuggestStore";
+import { rememberProjectOpened, removeRecentProject } from "@/lib/recentProjects";
+import { pickProjectFolder } from "@/lib/pickProjectFolder";
+import {
+  filterReactFlowEdgeEchoChanges,
+  isReactFlowGraphSyncLocked,
+  runIgnoringReactFlowSelectionEcho,
+  runWithReactFlowGraphSyncLock,
+  stripEphemeralNodeFields,
+} from "@/lib/reactFlowControlled";
 
-export const useProjectStore = create<ProjectState>((set, get) => ({
+/** 上次成功写入磁盘时的 graphRevision，用于跳过无实质变更的保存 */
+let lastSavedGraphRevision = -1;
+
+export function resetProjectSaveRevisionBaseline(revision = 0) {
+  lastSavedGraphRevision = revision;
+}
+
+export const useProjectStore = create<ProjectState>((set, get) => {
+  const loadSnapshotIntoStore = (snapshot: ProjectGraphSnapshot) => {
+    runWithReactFlowGraphSyncLock(() => {
+      runIgnoringReactFlowSelectionEcho(() => {
+        const patch = applyProjectSnapshot(snapshot);
+        set(patch);
+        resetProjectSaveRevisionBaseline(patch.graphRevision ?? 0);
+        rebuildShotNodeRegistry(patch.nodes);
+        if (patch.nodes.length === 0) {
+          useCanvasUiStore.getState().resetEmptyGuide();
+        } else {
+          useCanvasUiStore.getState().dismissEmptyGuide();
+        }
+        bindActiveTabToProject();
+      });
+    });
+  };
+
+  const markGraphDirtyOnly = () => {
+    set({ projectDirty: true });
+    if (useCanvasUiStore.getState().tabs.length === 0) {
+      bindActiveTabToProject();
+    } else {
+      syncActiveTabUnsaved(true);
+    }
+  };
+
+  const afterGraphEdit = () => {
+    set((s) => ({
+      projectDirty: true,
+      graphRevision: s.graphRevision + 1,
+    }));
+    if (useCanvasUiStore.getState().tabs.length === 0) {
+      bindActiveTabToProject();
+    } else {
+      syncActiveTabUnsaved(true);
+    }
+    if (get().projectPath) scheduleSave(get);
+  };
+
+  return {
   projectPath: null,
   nodes: [],
   edges: [],
@@ -92,6 +205,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   selectedNodeIds: [],
   selectedEdgeIds: [],
   lastSavedAt: null,
+  projectDirty: false,
+  graphRevision: 0,
   lastRunId: null,
   nodeRunStateById: {},
   isGraphRunning: false,
@@ -101,6 +216,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   /** 图片节点序号计数器，每个工程独立（用于 "图片 1", "图片 2" ...） */
   imageNodeCounter: 0,
   videoNodeCounter: 0,
+  textNodeCounter: 0,
+  audioNodeCounter: 0,
+  scriptNodeCounter: 0,
 
   /** 获取并递增下一个图片节点序号标签，如 "图片 1" */
   nextImageNodeLabel: () => {
@@ -116,10 +234,37 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     return `视频 ${n}`;
   },
 
+  nextTextNodeLabel: () => {
+    const n = get().textNodeCounter + 1;
+    set({ textNodeCounter: n });
+    return `文本 ${n}`;
+  },
+
+  nextAudioNodeLabel: () => {
+    const n = get().audioNodeCounter + 1;
+    set({ audioNodeCounter: n });
+    return `音频 ${n}`;
+  },
+
+  nextScriptNodeLabel: () => {
+    const n = get().scriptNodeCounter + 1;
+    set({ scriptNodeCounter: n });
+    return `分镜脚本 ${n}`;
+  },
+
   setProjectPath: (p) => set({ projectPath: p }),
   setSelectedNodeId: (id) => set({ selectedNodeId: id }),
-  setSelectedNodeIds: (ids) => set({ selectedNodeIds: ids, selectedNodeId: ids[0] ?? null }),
-  setSelectedEdgeIds: (ids) => set({ selectedEdgeIds: ids }),
+  setSelectedNodeIds: (ids) => {
+    const { selectedNodeIds } = get();
+    if (selectionIdsEqual(selectedNodeIds, ids)) return;
+    runIgnoringReactFlowSelectionEcho(() => {
+      set({ selectedNodeIds: ids, selectedNodeId: ids[0] ?? null });
+    });
+  },
+  setSelectedEdgeIds: (ids) => {
+    if (selectionIdsEqual(get().selectedEdgeIds, ids)) return;
+    set({ selectedEdgeIds: ids });
+  },
   setStatusText: (t) => set({ statusText: t }),
   setViewport: (v) => set({ viewport: v }),
   openScriptFullscreen: (nodeId) => set({ scriptFullscreenNodeId: nodeId }),
@@ -127,36 +272,96 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setLastRunId: (runId: string) => set({ lastRunId: runId }),
 
   onNodesChange: (changes) => {
-    scheduleHistoryBurst(get);
+    if (isReactFlowGraphSyncLocked()) return;
     const nodes = get().nodes;
     const ui = useCanvasUiStore.getState();
     const snapOn = ui.nodeSnapAlignmentEnabled;
     const typedChanges = changes as NodeChange<Node<FlowNodeData>>[];
-    let nextChanges = typedChanges;
+    // 选区由 onSelectionChange + nodesView 派生；忽略 select 变更，防止与 RF 互相触发死循环
+    // 非 group 节点的 dimensions 为 RF 自动测量，写回 store 会与 nodesView 形成 Maximum update depth
+    const graphChanges = typedChanges.filter((c) => {
+      if (c.type === "select") return false;
+      // 受控 nodes 由 store 写入；忽略 RF 内部 replace/add/remove 回声
+      if (c.type === "replace" || c.type === "add" || c.type === "remove") return false;
+      if (c.type === "dimensions") {
+        const node = nodes.find((n) => n.id === c.id);
+        return node?.type === "group";
+      }
+      // 仅用户拖拽时写回 position；挂载/测量附带的 dragging:false 会触发 Maximum update depth
+      if (c.type === "position") {
+        const dragging = (c as { dragging?: boolean }).dragging;
+        if (dragging === true) return true;
+        if (dragging === false && ui.nodeDragSuppressUi) return true;
+        return false;
+      }
+      return false;
+    });
+    if (graphChanges.length === 0) return;
+    scheduleHistoryBurst(get);
+    runWithReactFlowGraphSyncLock(() => {
+    let nextChanges = clampGroupDimensionChanges(graphChanges, nodes);
     if (snapOn) {
-      const snapped = snapNodePositionChanges(typedChanges, nodes);
+      const snapped = snapNodePositionChanges(graphChanges, nodes, {
+        showGuides: ui.snapGuidesEnabled,
+      });
       nextChanges = snapped.changes;
       ui.setNodeSnapVisual(snapped.visual);
     } else {
       ui.setNodeSnapVisual(null);
     }
-    const dragEnded = typedChanges.some(
+    const dragEnded = graphChanges.some(
       (c) => c.type === "position" && (c as { dragging?: boolean }).dragging === false,
+    );
+    const draggingNow = graphChanges.some(
+      (c) => c.type === "position" && (c as { dragging?: boolean }).dragging === true,
     );
     if (dragEnded) {
       ui.setNodeSnapVisual(null);
+      if (ui.snapGridEnabled) {
+        const step = ui.alignDistributeGap ?? CANVAS_NODE_LAYOUT_GAP;
+        nextChanges = applyGridSnapToPositionChanges(nextChanges, step);
+      }
     }
-    set((s) => ({ nodes: applyNodeChanges(nextChanges, s.nodes) }));
-    if (get().projectPath) scheduleSave(get);
+    let graphChanged = false;
+    set((s) => {
+      let nextNodes = applyNodeChanges(nextChanges, s.nodes);
+      nextNodes = syncGroupStylesFromDimensions(nextNodes);
+      if (dragEnded) {
+        nextNodes = applyGroupMembershipAfterDrag(nextNodes, graphChanges);
+      }
+      if (nextNodes === s.nodes) return s;
+      graphChanged = true;
+      return {
+        nodes: nextNodes,
+        projectDirty: true,
+      };
+    });
+    if (!graphChanged) return;
+    if (dragEnded || !draggingNow) {
+      afterGraphEdit();
+    } else {
+      markGraphDirtyOnly();
+    }
+    });
   },
   onEdgesChange: (changes) => {
+    if (isReactFlowGraphSyncLocked()) return;
+    const graphChanges = filterReactFlowEdgeEchoChanges(changes);
+    if (graphChanges.length === 0) return;
     scheduleHistoryBurst(get);
+    runWithReactFlowGraphSyncLock(() => {
     set((s) => {
-      const edges = applyEdgeChanges(changes, s.edges);
-      const nodes = applyTextWorkflowSyncToNodes(s.nodes, edges);
-      return { edges, nodes };
+      const nextEdges = applyEdgeChanges(graphChanges, s.edges);
+      const nextNodes = applyTextWorkflowSyncToNodes(s.nodes, nextEdges);
+      if (nextEdges === s.edges && nextNodes === s.nodes) return s;
+      return {
+        edges: nextEdges,
+        nodes: nextNodes,
+        projectDirty: true,
+      };
     });
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
+    });
   },
   onConnect: (c) => {
     const nodes = get().nodes;
@@ -183,15 +388,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           targetHandle: normalized.targetHandle ?? "in",
           id: crypto.randomUUID(),
           animated: true,
-          style: { strokeWidth: 2, stroke: "#60a5fa" },
+          style: { ...CANVAS_EDGE_STYLE_DEFAULT },
           ...(payloadType ? { data: { payloadType } } : {}),
         },
         s.edges,
       );
-      const nodes = applyTextWorkflowSyncToNodes(s.nodes, edges);
+      let nodes = applyTextWorkflowSyncToNodes(s.nodes, edges);
+      const tn = s.nodes.find((n) => n.id === normalized.target);
+      if (tn?.type === "videoNode") {
+        nodes = patchVideoNodesWithUpstreamVideoPrompt(nodes, edges, normalized.target, {
+          onlyIfPromptEmpty: true,
+        });
+        nodes = patchVideoNodesWithUpstreamTextPrompt(nodes, edges, normalized.target, {
+          onlyIfPromptEmpty: true,
+        });
+      }
       return { edges, nodes };
     });
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
   },
 
   deleteEdge: (edgeId) => {
@@ -199,17 +413,27 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     set((s) => {
       const edges = s.edges.filter((e) => e.id !== edgeId);
       const nodes = applyTextWorkflowSyncToNodes(s.nodes, edges);
-      return { edges, nodes };
+      return {
+        edges,
+        nodes,
+        selectedEdgeIds: s.selectedEdgeIds.filter((id) => id !== edgeId),
+        statusText: "已删除连线",
+      };
     });
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
   },
 
   updateNodeData: (id, patch, opts) => {
     if (!opts?.silent) recordBeforeDiscreteMutation(get);
     set((s) => ({
       nodes: s.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
+      ...(opts?.silent ? {} : { projectDirty: true }),
     }));
-    if (get().projectPath) scheduleSave(get);
+    if (opts?.silent) {
+      if (get().projectPath) scheduleSave(get);
+    } else {
+      afterGraphEdit();
+    }
   },
 
   newProject: async () => {
@@ -218,37 +442,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return;
     }
     try {
-      const folder = await invoke<string | null>("pick_project_folder");
+      const folder = await pickProjectFolder(get().projectPath);
       if (!folder) return;
-      await invoke("ensure_project_structure", { projectPath: folder });
-      clearHistoryStacks();
-      set({
-        projectPath: folder,
-        nodes: [],
-        edges: [],
-        viewport: defaultViewport,
-        selectedNodeId: null,
-        selectedNodeIds: [],
-        selectedEdgeIds: [],
-        lastRunId: null,
-        nodeRunStateById: {},
-        statusText: `工程：${folder}`,
-        flowClipboardCount: getFlowClipboardCount(),
-        imageNodeCounter: 0,
-        videoNodeCounter: 0,
-      });
-      // 新建工程时清空 Hermes shotNodeRegistry
-      rebuildShotNodeRegistry([]);
-      useCanvasUiStore
-        .getState()
-        .addTab({
-          name: folder.split(/[/\\]/).pop() ?? "新画布",
-          projectPath: folder,
-          unsaved: false,
-          nodes: [],
-          edges: [],
-          viewport: defaultViewport,
-        });
+      const snapshot = await loadProjectFolder(folder, "new");
+      loadSnapshotIntoStore(snapshot);
+      await useProjectBibleStore.getState().loadForProject(folder);
       await focusShellAfterNativeDialog();
       await get().saveProject();
     } catch (e) {
@@ -262,116 +460,126 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return;
     }
     try {
-      const folder = await invoke<string | null>("pick_project_folder");
+      const folder = await pickProjectFolder(get().projectPath);
       if (!folder) return;
-      await invoke("ensure_project_structure", { projectPath: folder });
-      try {
-        const raw = await invoke<string>("read_canvasflow_json", { projectPath: folder });
-        const { nodes, edges, viewport, invalidEdgesDropped, meta } = parseCanvas(raw);
-        clearHistoryStacks();
-        const statusBase = `工程：${folder}`;
-        // 计算已有图片节点数量，用于序号递增
-        const maxImgIdx = nodes
-          .filter((n) => n.type === "imageNode")
-          .reduce((acc, n) => {
-            const m = String(n.data.label ?? "").match(/^图片\s*(\d+)$/);
-            return Math.max(acc, m ? parseInt(m[1], 10) : 0);
-          }, 0);
-        const maxVidIdx = nodes
-          .filter((n) => n.type === "videoNode")
-          .reduce((acc, n) => {
-            const m = String(n.data.label ?? "").match(/^视频\s*(\d+)$/);
-            return Math.max(acc, m ? parseInt(m[1], 10) : 0);
-          }, 0);
-        set({
-          projectPath: folder,
-          nodes,
-          edges,
-          viewport,
-          selectedNodeId: null,
-          selectedNodeIds: [],
-          selectedEdgeIds: [],
-          lastRunId: null,
-          nodeRunStateById: {},
-          statusText:
-            invalidEdgesDropped > 0
-              ? `${statusBase}（已移除 ${invalidEdgesDropped} 条不兼容连线）`
-              : statusBase,
-          flowClipboardCount: getFlowClipboardCount(),
-          imageNodeCounter: meta?.imageNodeCounter != null ? meta.imageNodeCounter : maxImgIdx,
-          videoNodeCounter: meta?.videoNodeCounter != null ? meta.videoNodeCounter : maxVidIdx,
-        });
-        // 重建 Hermes shotNodeRegistry，确保工程重开后状态联动仍有效
-        rebuildShotNodeRegistry(nodes);
-        useCanvasUiStore
-          .getState()
-          .addTab({
-            name: folder.split(/[/\\]/).pop() ?? "新画布",
-            projectPath: folder,
-            unsaved: false,
-            nodes: [],
-            edges: [],
-            viewport: defaultViewport,
-          });
-        await focusShellAfterNativeDialog();
-      } catch {
-        const empty = serializeCanvas([], [], defaultViewport);
-        await invoke("write_canvasflow_json", { projectPath: folder, content: empty });
-        clearHistoryStacks();
-        set({
-          projectPath: folder,
-          nodes: [],
-          edges: [],
-          viewport: defaultViewport,
-          selectedNodeId: null,
-          selectedNodeIds: [],
-          selectedEdgeIds: [],
-          lastRunId: null,
-          nodeRunStateById: {},
-          statusText: `工程：${folder}（已创建空白 canvasflow.json）`,
-          flowClipboardCount: getFlowClipboardCount(),
-          imageNodeCounter: 0,
-          videoNodeCounter: 0,
-        });
-        useCanvasUiStore
-          .getState()
-          .addTab({
-            name: folder.split(/[/\\]/).pop() ?? "新画布",
-            projectPath: folder,
-            unsaved: false,
-            nodes: [],
-            edges: [],
-            viewport: defaultViewport,
-          });
-        await focusShellAfterNativeDialog();
-      }
+      const snapshot = await loadProjectFolder(folder, "open");
+      loadSnapshotIntoStore(snapshot);
+      await useProjectBibleStore.getState().loadForProject(folder);
+      await focusShellAfterNativeDialog();
     } catch (e) {
       set({ statusText: `打开工程失败：${formatUserError(e)}` });
     }
   },
 
-  saveProject: async () => {
+  openProjectAtPath: async (folder: string) => {
     if (!isTauri()) {
       set({ statusText: DESKTOP_SHELL_HINT });
       return;
     }
-    const { projectPath, nodes, edges, viewport, imageNodeCounter, videoNodeCounter } = get();
-    if (!projectPath) return;
+    const path = folder.trim();
+    if (!path) return;
     try {
-      const content = serializeCanvas(nodes, edges, viewport, {
+      const snapshot = await loadProjectFolder(path, "open");
+      loadSnapshotIntoStore(snapshot);
+      await useProjectBibleStore.getState().loadForProject(path);
+      await focusShellAfterNativeDialog();
+    } catch (e) {
+      removeRecentProject(path);
+      set({ statusText: `打开工程失败：${formatUserError(e)}` });
+    }
+  },
+
+  closeProject: async () => {
+    const { projectPath, projectDirty } = get();
+    if (!projectPath) return;
+
+    const doClose = () => {
+      rebuildShotNodeRegistry([]);
+      clearHistoryStacks();
+      useProjectBibleStore.getState().reset();
+      useHermesOrbSuggestStore.getState().reset();
+      set({
+        projectPath: null,
+        nodes: [],
+        edges: [],
+        viewport: defaultViewport,
+        selectedNodeId: null,
+        selectedNodeIds: [],
+        selectedEdgeIds: [],
+        lastRunId: null,
+        nodeRunStateById: {},
+        lastSavedAt: null,
+        projectDirty: false,
+        graphRevision: 0,
+        statusText: "未打开工程",
+        flowClipboardCount: getFlowClipboardCount(),
+        imageNodeCounter: 0,
+        videoNodeCounter: 0,
+        textNodeCounter: 0,
+        audioNodeCounter: 0,
+        scriptNodeCounter: 0,
+      });
+      useCanvasUiStore.getState().resetEmptyGuide();
+      bindActiveTabToProject();
+      resetProjectSaveRevisionBaseline(0);
+    };
+
+    if (projectDirty) {
+      useCanvasUiStore.getState().openConfirmDialog({
+        title: "关闭工程？",
+        message: "当前工程有尚未写入磁盘的更改，关闭后将丢弃（若已自动保存可忽略）。确定关闭？",
+        onConfirm: doClose,
+        onCancel: () => {},
+      });
+      return;
+    }
+    doClose();
+  },
+
+  saveProject: async () => {
+    await runCoalescedProjectSave(async () => {
+      if (!isTauri()) {
+        set({ statusText: DESKTOP_SHELL_HINT });
+        return;
+      }
+      const {
+        projectPath,
+        nodes,
+        edges,
+        viewport,
         imageNodeCounter,
         videoNodeCounter,
-      });
-      await invoke("write_canvasflow_json", { projectPath, content });
-      set({ lastSavedAt: Date.now() });
-      const { tabs } = useCanvasUiStore.getState();
-      const tab = tabs.find((t) => t.projectPath === projectPath);
-      if (tab) {
-        useCanvasUiStore.getState().updateTabUnsaved(tab.id, false);
+        textNodeCounter,
+        audioNodeCounter,
+        scriptNodeCounter,
+      } = get();
+      if (!projectPath) return;
+      const { projectDirty, graphRevision } = get();
+      if (!projectDirty) return;
+      if (graphRevision === lastSavedGraphRevision) {
+        set({ projectDirty: false });
+        syncActiveTabUnsaved(false);
+        return;
       }
-    } catch (e) {
-      set({ statusText: `保存失败：${formatUserError(e)}` });
-    }
+      try {
+        await yieldToMain();
+        const content = await serializeCanvasToBytesAsync(nodes, edges, viewport, {
+          imageNodeCounter,
+          videoNodeCounter,
+          textNodeCounter,
+          audioNodeCounter,
+          scriptNodeCounter,
+        });
+        await yieldToMain();
+        await invoke("write_canvasflow_json_bytes", { projectPath, content });
+        await useProjectBibleStore.getState().flushSave();
+        lastSavedGraphRevision = get().graphRevision;
+        set({ lastSavedAt: Date.now(), projectDirty: false });
+        syncActiveTabUnsaved(false);
+      } catch (e) {
+        set({ statusText: `保存失败：${formatUserError(e)}` });
+      }
+    });
   },
 
   saveProjectAs: async () => {
@@ -379,20 +587,39 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       set({ statusText: DESKTOP_SHELL_HINT });
       return;
     }
-    const { nodes, edges, viewport, imageNodeCounter, videoNodeCounter } = get();
+    const {
+      nodes,
+      edges,
+      viewport,
+      imageNodeCounter,
+      videoNodeCounter,
+      textNodeCounter,
+      audioNodeCounter,
+      scriptNodeCounter,
+    } = get();
     try {
-      const folder = await invoke<string | null>("pick_project_folder");
+      const folder = await pickProjectFolder(get().projectPath);
       if (!folder) return;
       await invoke("ensure_project_structure", { projectPath: folder });
-      const content = serializeCanvas(nodes, edges, viewport, {
+      await yieldToMain();
+      const content = await serializeCanvasToBytesAsync(nodes, edges, viewport, {
         imageNodeCounter,
         videoNodeCounter,
+        textNodeCounter,
+        audioNodeCounter,
+        scriptNodeCounter,
       });
-      await invoke("write_canvasflow_json", { projectPath: folder, content });
+      await invoke("write_canvasflow_json_bytes", { projectPath: folder, content });
+      await useProjectBibleStore.getState().loadForProject(folder);
+      await useProjectBibleStore.getState().flushSave();
       clearHistoryStacks();
+      rememberProjectOpened(folder);
+      resetProjectSaveRevisionBaseline(0);
       set({
         projectPath: folder,
         lastSavedAt: Date.now(),
+        projectDirty: false,
+        graphRevision: 0,
         lastRunId: null,
         nodeRunStateById: {},
         statusText: `工程：${folder}`,
@@ -407,23 +634,50 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   runNodeSubgraph: runNodeSubgraphImpl(get, set),
 
+  runGroupSubgraph: runGroupSubgraphImpl(get, set),
+
+  exportGroupMedia: exportGroupMediaImpl(get, set),
+
+  convertGroupToStoryboard: convertGroupToStoryboardImpl(get, set),
+
+  runGroupHermesImages: runGroupHermesImagesImpl(get, set),
+
+  duplicateGroup: duplicateGroupImpl(get, set),
+
+  setGroupColorToken: setGroupColorTokenImpl(get, set),
+
+  saveGroupToToolbox: saveGroupToToolboxImpl(get, set),
+
+  insertGroupTemplate: insertGroupTemplateImpl(get, set),
+
+  saveWorkflowFromSelection: saveWorkflowFromSelectionImpl(get, set),
+
+  insertWorkflow: insertWorkflowImpl(get, set),
+
+  deleteWorkflow: deleteWorkflowImpl(get, set),
+
   rerunFailedSubgraph: rerunFailedSubgraphImpl(get, set),
 
   addNode: (node) => {
     recordBeforeDiscreteMutation(get);
-    set((s) => ({ nodes: [...s.nodes, node] }));
-    if (get().projectPath) scheduleSave(get);
+    const clean = stripEphemeralNodeFields([node])[0] ?? node;
+    runWithReactFlowGraphSyncLock(() => {
+      set((s) => ({ nodes: [...s.nodes, clean] }));
+      afterGraphEdit();
+    });
   },
 
   addNodesWithEdges: (newNodes, newEdges) => {
     recordBeforeDiscreteMutation(get);
-    const mergedNodes = [...get().nodes, ...newNodes];
+    const mergedNodes = [...get().nodes, ...stripEphemeralNodeFields(newNodes)];
     const { edges: cleanedNew } = sanitizeCanvasEdges(mergedNodes, newEdges);
-    set((s) => ({
-      nodes: [...s.nodes, ...newNodes],
-      edges: [...s.edges, ...cleanedNew],
-    }));
-    if (get().projectPath) scheduleSave(get);
+    runWithReactFlowGraphSyncLock(() => {
+      set((s) => ({
+        nodes: [...s.nodes, ...stripEphemeralNodeFields(newNodes)],
+        edges: [...s.edges, ...cleanedNew],
+      }));
+      afterGraphEdit();
+    });
   },
 
   spawnAnchoredPartner: ({ anchorNodeId, direction, partnerType }) => {
@@ -467,6 +721,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       direction === "incoming"
         ? makeFlowEdge(newId, anchorNodeId, partnerType)
         : makeFlowEdge(anchorNodeId, newId, anchor.type ?? undefined);
+    const nodesWithPartner = [...state.nodes, newNode];
     if (hasParallelEdge(state.edges, edge)) {
       set({ statusText: "无法创建连线：相同节点之间已存在连线" });
       return;
@@ -478,7 +733,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         sourceHandle: edge.sourceHandle ?? null,
         targetHandle: edge.targetHandle ?? null,
       },
-      state.nodes,
+      nodesWithPartner,
       state.edges,
     );
     if (!verdict.ok) {
@@ -486,11 +741,12 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return;
     }
     recordBeforeDiscreteMutation(get);
-    set((s) => ({
-      nodes: [...s.nodes, newNode],
-      edges: [...s.edges, edge],
-    }));
-    if (get().projectPath) scheduleSave(get);
+    set((s) => {
+      const edges = [...s.edges, edge];
+      const nodes = applyTextWorkflowSyncToNodes([...s.nodes, newNode], edges);
+      return { nodes, edges };
+    });
+    afterGraphEdit();
     get().setSelectedNodeIds([newId]);
     get().setStatusText(direction === "incoming" ? "已在左侧添加并联线" : "已在右侧添加并联线");
   },
@@ -552,7 +808,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           n.id === videoNodeId ? { ...n, data: { ...n.data, video: buildMergedVideo(paths) } } : n,
         ),
       }));
-      if (get().projectPath) scheduleSave(get);
+      afterGraphEdit();
       get().setSelectedNodeIds([videoNodeId]);
       get().setStatusText("已切换为首尾帧模式，并填入示例提示词");
       return;
@@ -616,7 +872,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         edges: [...s.edges, ...newEdges],
       };
     });
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
     get().setSelectedNodeIds([videoNodeId]);
     get().setStatusText("已在左侧添加首帧与尾帧图片节点并联线，可上传图片后生成");
   },
@@ -675,7 +931,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           n.id === videoNodeId ? { ...n, data: { ...n.data, video: buildMergedVideo(paths) } } : n,
         ),
       }));
-      if (get().projectPath) scheduleSave(get);
+      afterGraphEdit();
       get().setSelectedNodeIds([videoNodeId]);
       get().setStatusText("已切换为全能参考（首帧），并填入示例提示词");
       return;
@@ -704,7 +960,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         edges: [...s.edges, ...newEdges],
       };
     });
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
     get().setSelectedNodeIds([videoNodeId]);
     get().setStatusText("已在左侧添加首帧图片节点，上传或生成图片后即可在面板中预览");
   },
@@ -749,7 +1005,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       nodes: [...s.nodes, node],
       edges: [...s.edges, makeFlowEdge(newId, videoNodeId, sourceEdgeType)],
     }));
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
     get().setSelectedNodeIds([newId]);
     get().setStatusText("已在左侧添加输入节点并联线；成片输出请从本节点右侧连接");
   },
@@ -771,7 +1027,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (existingEdge) {
       const concatId = existingEdge.target;
       get().setSelectedNodeIds([concatId]);
-      get().setStatusText("已选中右侧视频合成节点，可添加片段并导出");
+      useCanvasUiStore.getState().setComposeEditorNodeId(concatId);
+      get().setStatusText("已打开视频剪辑工作台");
       return;
     }
 
@@ -791,6 +1048,17 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       data: {
         ...newNodeDataByType.ffmpegConcat(),
         label: `${baseLabel} · 剪辑`,
+        timelineClips: videoPath
+          ? [
+              {
+                id: crypto.randomUUID(),
+                relPath: videoPath,
+                inSec: 0,
+                outSec: null,
+                sourceNodeId: videoNodeId,
+              },
+            ]
+          : [],
         inputs: videoPath ? [videoPath] : [],
         output: "assets/exports/final.mp4",
       },
@@ -801,9 +1069,10 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       nodes: [...s.nodes, concatNode],
       edges: [...s.edges, makeFlowEdge(videoNodeId, concatId, "videoNode")],
     }));
-    scheduleSave(get);
+    afterGraphEdit();
     get().setSelectedNodeIds([concatId]);
-    get().setStatusText("已创建视频合成节点：可继续连接更多视频并导出成片");
+    useCanvasUiStore.getState().setComposeEditorNodeId(concatId);
+    get().setStatusText("已打开视频剪辑工作台");
   },
 
   exportScriptCompose: async (scriptNodeId, opts) => {
@@ -832,7 +1101,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     });
 
     const scriptLabel = scriptNode.data.label?.trim() || "脚本";
-    const outputRel = DEFAULT_EXPORT_PATH;
+    const exportFmt = parseExportFormatArg(opts?.exportFormat) ?? "mp4";
+    const outputRel = defaultExportRelPath(exportFmt);
 
     let concatId = findConcatNodeForScriptVideos(state.nodes, state.edges, built.videoNodeIds);
     let createdConcat = false;
@@ -864,15 +1134,16 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         data: {
           ...newNodeDataByType.ffmpegConcat(),
           label: `${scriptLabel} · 成片`,
-          inputs: built.clipPaths,
+          ...timelineClipsToNodePatch(built.clips.map(composeClipToTimeline)),
           output: outputRel,
+          exportFormat: exportFmt,
         },
       };
 
       recordBeforeDiscreteMutation(get);
       set((s) => ({
         nodes: [...s.nodes, concatNode],
-        edges: ensureEdgesToConcat(concatId, s.edges),
+        edges: ensureEdgesToConcat(concatId as string, s.edges),
       }));
     } else {
       recordBeforeDiscreteMutation(get);
@@ -881,24 +1152,36 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (nextEdges.length !== cur.edges.length) {
         set({ edges: nextEdges });
       }
+      const timelineClips = built.clips.map(composeClipToTimeline);
       get().updateNodeData(concatId, {
-        inputs: built.clipPaths,
+        ...timelineClipsToNodePatch(timelineClips),
         output: outputRel,
+        exportFormat: exportFmt,
       });
     }
 
-    scheduleSave(get);
+    afterGraphEdit();
     get().setSelectedNodeIds([concatId]);
+    useCanvasUiStore.getState().setComposeEditorNodeId(concatId);
 
+    const concatClips = built.clips.map(composeClipToTimeline);
     let outputRelPath: string | undefined;
-    if (autoRender && built.clipPaths.length > 0) {
+    if (autoRender && concatClips.length > 0) {
       try {
+        const concatData = get().nodes.find((n) => n.id === concatId)?.data;
+        const encodeOptions = exportEncodeToInvokePayload(
+          normalizeExportEncode(concatData ?? {}),
+        );
+        const renderFormat = resolveExportFormat(concatData ?? {}, outputRel);
         outputRelPath = await invoke<string>("render_timeline", {
           projectPath,
-          clips: built.clipPaths,
+          clips: clipsToRenderPayload(concatClips, {}),
           outputRelPath: outputRel,
+          encodeOptions: encodeOptions ?? null,
+          exportFormat: renderFormat,
         });
-        get().updateNodeData(concatId, { output: outputRelPath, path: outputRelPath });
+        const exportPatch = await patchComposeNodeAfterExport(projectPath, outputRelPath);
+        get().updateNodeData(concatId, exportPatch);
       } catch (e) {
         const missHint = formatComposeMissingHint(built.missing);
         get().setStatusText(`成片导出失败：${formatUserError(e)}${missHint}`);
@@ -969,7 +1252,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           : n,
       ),
     }));
-    scheduleSave(get);
+    afterGraphEdit();
     get().setSelectedNodeIds([videoNodeId]);
 
     const hasScriptUpstream =
@@ -1041,7 +1324,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           : n,
       ),
     }));
-    scheduleSave(get);
+    afterGraphEdit();
   },
 
   patchVideoSourceTrim: (videoNodeId, trim) => {
@@ -1065,7 +1348,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           : n,
       ),
     }));
-    scheduleSave(get);
+    afterGraphEdit();
   },
 
   setVideoSourceMeta: (videoNodeId, meta) => {
@@ -1113,7 +1396,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
           : n,
       ),
     }));
-    scheduleSave(get);
+    afterGraphEdit();
   },
 
   exportVideoSubtitleDelogo: async (videoNodeId) => {
@@ -1160,8 +1443,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                 ...n,
                 data: {
                   ...n.data,
-                  path: imported.rel_path,
-                  assetId: imported.asset_id,
+                  path: imported.relPath,
+                  assetId: imported.assetId,
                   video: {
                     ...defaultVideoNodePersisted(),
                     ...curVideo,
@@ -1177,9 +1460,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             : n,
         ),
       }));
-      scheduleSave(get);
+      afterGraphEdit();
       useCanvasUiStore.getState().setVideoSubtitleRegionEditingNodeId(null);
-      const base = imported.rel_path.split(/[/\\]/).pop() ?? imported.rel_path;
+      const base = imported.relPath.split(/[/\\]/).pop() ?? imported.relPath;
       get().setStatusText(`已去字幕：${base}（已替换节点成片；固定区域修复，滚动字幕请用「自动去除」）`);
     } catch (e) {
       get().setStatusText(formatUserError(e));
@@ -1227,8 +1510,8 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
                 ...n,
                 data: {
                   ...n.data,
-                  path: imported.rel_path,
-                  assetId: imported.asset_id,
+                  path: imported.relPath,
+                  assetId: imported.assetId,
                   video: {
                     ...defaultVideoNodePersisted(),
                     ...curVideo,
@@ -1241,9 +1524,9 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
             : n,
         ),
       }));
-      scheduleSave(get);
+      afterGraphEdit();
       useCanvasUiStore.getState().setVideoTrimEditingNodeId(null);
-      const base = imported.rel_path.split(/[/\\]/).pop() ?? imported.rel_path;
+      const base = imported.relPath.split(/[/\\]/).pop() ?? imported.relPath;
       get().setStatusText(`已导出裁剪：${base}（已替换节点成片）`);
     } catch (e) {
       get().setStatusText(formatUserError(e));
@@ -1299,7 +1582,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         nodes: [...s.nodes, node],
         edges: [...s.edges, makeFlowEdge(newId, videoNodeId, "audioNode")],
       }));
-      scheduleSave(get);
+      afterGraphEdit();
       get().setSelectedNodeIds([newId]);
       get().setStatusText(
         mode === "vocal"
@@ -1314,7 +1597,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   loadGraph: (nodes, edges, viewport) => {
     clearHistoryStacks();
     const { edges: cleanedEdges } = sanitizeCanvasEdges(nodes, edges);
-    const syncedNodes = applyTextWorkflowSyncToNodes(nodes, cleanedEdges);
+    const syncedNodes = normalizeGroupNodesForCanvas(
+      applyTextWorkflowSyncToNodes(nodes, cleanedEdges),
+    );
+    if (syncedNodes.length === 0) {
+      useCanvasUiStore.getState().resetEmptyGuide();
+    } else {
+      useCanvasUiStore.getState().dismissEmptyGuide();
+    }
     set({
       nodes: syncedNodes,
       edges: cleanedEdges,
@@ -1329,6 +1619,39 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
     if (get().projectPath) scheduleSave(get);
   },
 
+  restoreCanvasTab: ({ nodes, edges, viewport, projectPath, projectDirty, statusText }) => {
+    clearHistoryStacks();
+    const { edges: cleanedEdges } = sanitizeCanvasEdges(nodes, edges);
+    const syncedNodes = stripEphemeralNodeFields(
+      normalizeGroupNodesForCanvas(applyTextWorkflowSyncToNodes(nodes, cleanedEdges)),
+    );
+    runWithReactFlowGraphSyncLock(() => {
+      runIgnoringReactFlowSelectionEcho(() => {
+        if (syncedNodes.length === 0) {
+          useCanvasUiStore.getState().resetEmptyGuide();
+        } else {
+          useCanvasUiStore.getState().dismissEmptyGuide();
+        }
+        rebuildShotNodeRegistry(syncedNodes);
+        set({
+          projectPath,
+          nodes: syncedNodes,
+          edges: cleanedEdges,
+          viewport,
+          projectDirty,
+          selectedNodeId: null,
+          selectedNodeIds: [],
+          selectedEdgeIds: [],
+          lastRunId: null,
+          nodeRunStateById: {},
+          lastSavedAt: projectDirty ? null : Date.now(),
+          statusText,
+          flowClipboardCount: getFlowClipboardCount(),
+        });
+      });
+    });
+  },
+
   commitViewport: (vp) => {
     if (viewportNearlyEqual(get().viewport, vp)) return;
     recordBeforeDiscreteMutation(get);
@@ -1339,62 +1662,111 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   groupSelectedNodes: () => {
     const { selectedNodeIds, nodes } = get();
     if (selectedNodeIds.length < 2) return;
+    const verdict = planNestedGroup(nodes, selectedNodeIds);
+    if (!verdict.ok) {
+      get().setStatusText(verdict.message);
+      return;
+    }
+    const { plan } = verdict;
     recordBeforeDiscreteMutation(get);
-    const selected = nodes.filter((n) => selectedNodeIds.includes(n.id));
-    const xs = selected.map((n) => n.position.x);
-    const ys = selected.map((n) => n.position.y);
-    const minX = Math.min(...xs);
-    const minY = Math.min(...ys);
-    const maxX = Math.max(...xs);
-    const maxY = Math.max(...ys);
     const groupId = crypto.randomUUID();
+    const rootIds = new Set(plan.roots.map((r) => r.id));
+
+    const parentGroupZ =
+      plan.parentId != null
+        ? (nodes.find((n) => n.id === plan.parentId)?.zIndex ?? 0)
+        : -1;
+    const groupZ = parentGroupZ + 1;
+    const memberZ = groupZ + 1;
+    const memberCount = plan.roots.length;
+
     const groupNode: Node<FlowNodeData> = {
       id: groupId,
       type: "group",
-      position: { x: minX - 40, y: minY - 40 },
+      position: plan.groupPosition,
+      ...(plan.parentId
+        ? { parentId: plan.parentId, extent: "parent" as const }
+        : {}),
       style: {
-        width: Math.max(260, maxX - minX + 260),
-        height: Math.max(220, maxY - minY + 220),
-        border: "1px dashed #4b5563",
+        width: plan.width,
+        height: plan.height,
         borderRadius: "12px",
-        background: "rgba(59,130,246,0.05)",
+        background: "transparent",
       },
-      data: { label: "工作流分组" },
+      data: {
+        label: groupKindLabel(undefined, memberCount),
+      },
       draggable: true,
       selectable: true,
+      dragHandle: ".groupNode__dragHandle",
+      zIndex: groupZ,
     };
 
-    const nextNodes = [
-      ...nodes.map((n) =>
-        selectedNodeIds.includes(n.id)
-          ? {
-              ...n,
-              parentId: groupId,
-              extent: "parent" as const,
-              position: {
-                x: n.position.x - (minX - 40),
-                y: n.position.y - (minY - 40),
-              },
-            }
-          : n,
-      ),
+    const nextNodes = normalizeGroupNodesForCanvas([
+      ...nodes.map((n) => {
+        const rel = plan.memberPositions.get(n.id);
+        if (!rel) return n;
+        return {
+          ...n,
+          parentId: groupId,
+          position: rel,
+          zIndex: memberZ,
+          draggable: n.draggable !== false,
+        };
+      }),
       groupNode,
-    ];
-    set({ nodes: nextNodes, selectedNodeIds: [groupId], selectedNodeId: groupId });
-    if (get().projectPath) scheduleSave(get);
+    ]);
+    const nested = plan.parentId ? "（嵌套）" : "";
+    set({
+      nodes: nextNodes.map((n) => ({ ...n, selected: n.id === groupId })),
+      selectedNodeIds: [groupId],
+      selectedNodeId: groupId,
+      selectedEdgeIds: [],
+      statusText: `已将 ${rootIds.size} 个节点打组${nested}`,
+    });
+    afterGraphEdit();
+  },
+
+  ungroupSelectedNodes: () => {
+    const { selectedNodeIds, nodes } = get();
+    const groupIds = selectedNodeIds.filter(
+      (id) => nodes.find((n) => n.id === id)?.type === "group",
+    );
+    if (groupIds.length === 0) {
+      get().setStatusText("请先选中要打散的组节点");
+      return;
+    }
+    recordBeforeDiscreteMutation(get);
+    let nextNodes = nodes;
+    const childIds: string[] = [];
+    for (const gid of groupIds) {
+      for (const c of nextNodes.filter((n) => n.parentId === gid)) {
+        childIds.push(c.id);
+      }
+      nextNodes = ungroupNodes(nextNodes, gid);
+    }
+    set({
+      nodes: nextNodes,
+      selectedNodeIds: childIds.length > 0 ? childIds : [],
+      selectedNodeId: childIds[0] ?? null,
+      statusText: `已解组 ${groupIds.length} 个`,
+    });
+    afterGraphEdit();
   },
 
   selectNodesByIds: (ids) => {
-    const idSet = new Set(ids);
-    set((s) => ({
-      nodes: s.nodes.map((n) => ({ ...n, selected: idSet.has(n.id) })),
-      selectedNodeIds: ids,
-      selectedNodeId: ids[0] ?? null,
-      selectedEdgeIds: [],
-    }));
+    const { selectedNodeIds, selectedEdgeIds } = get();
+    if (selectionIdsEqual(selectedNodeIds, ids) && selectedEdgeIds.length === 0) return;
+    runIgnoringReactFlowSelectionEcho(() => {
+      set({
+        selectedNodeIds: ids,
+        selectedNodeId: ids[0] ?? null,
+        selectedEdgeIds: [],
+      });
+    });
   },
 
-  arrangeSelectedNodes: (mode) => {
+  arrangeSelectedNodes: (mode, opts) => {
     const { selectedNodeIds, nodes } = get();
     const movable = selectedNodeIds
       .map((id) => nodes.find((n) => n.id === id))
@@ -1404,50 +1776,139 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       return;
     }
     recordBeforeDiscreteMutation(get);
-    const gap = CANVAS_NODE_LAYOUT_GAP;
-    const sorted = [...movable].sort(
-      (a, b) => a.position.y - b.position.y || a.position.x - b.position.x,
+    const gap = useCanvasUiStore.getState().alignDistributeGap ?? CANVAS_NODE_LAYOUT_GAP;
+    const baseX = Math.min(...movable.map((n) => n.position.x));
+    const baseY = Math.min(...movable.map((n) => n.position.y));
+    const nextPos = computeLayoutPositions(movable, mode, gap, { x: baseX, y: baseY }, opts);
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        const p = nextPos.get(n.id);
+        return p ? { ...n, position: p } : n;
+      }),
+      projectDirty: true,
+    }));
+    afterGraphEdit();
+  },
+
+  tidyCanvasLayout: () => {
+    const { nodes } = get();
+    const topLevel = nodes.filter((n) => !n.parentId);
+    if (topLevel.length === 0) {
+      get().setStatusText("没有可整理的顶层节点");
+      return 0;
+    }
+    recordBeforeDiscreteMutation(get);
+    const gap = useCanvasUiStore.getState().alignDistributeGap ?? CANVAS_NODE_LAYOUT_GAP;
+    const { nodes: nextNodes, movedCount } = applyCanvasTidyLayout(nodes, gap, "grid");
+    set({
+      nodes: nextNodes,
+      projectDirty: true,
+    });
+    get().setStatusText(
+      movedCount > 1
+        ? `已整理 ${movedCount} 个节点（宫格排列），可点还原或 Ctrl+Z 撤销`
+        : "已整理画布并适配视口",
     );
-    const dims = sorted.map((n) => nodeLayoutDimensions(n));
-    const baseX = Math.min(...sorted.map((n) => n.position.x));
-    const baseY = Math.min(...sorted.map((n) => n.position.y));
-    const nextPos = new Map<string, { x: number; y: number }>();
-    if (mode === "horizontal") {
-      let x = baseX;
-      sorted.forEach((n, i) => {
-        const { w } = dims[i]!;
-        nextPos.set(n.id, { x, y: baseY });
-        x += w + gap;
-      });
-    } else if (mode === "vertical") {
-      let y = baseY;
-      sorted.forEach((n, i) => {
-        const { h } = dims[i]!;
-        nextPos.set(n.id, { x: baseX, y });
-        y += h + gap;
-      });
-    } else {
-      const cols = Math.ceil(Math.sqrt(sorted.length));
-      const maxW = Math.max(...dims.map((d) => d.w));
-      const maxH = Math.max(...dims.map((d) => d.h));
-      const cellW = maxW + gap;
-      const cellH = maxH + gap;
-      sorted.forEach((n, i) => {
-        const row = Math.floor(i / cols);
-        const col = i % cols;
-        nextPos.set(n.id, {
-          x: baseX + col * cellW,
-          y: baseY + row * cellH,
-        });
-      });
+    afterGraphEdit();
+    return movedCount;
+  },
+
+  nudgeSelectedNodes: (dx, dy) => {
+    const { selectedNodeIds } = get();
+    if (!selectedNodeIds.length || (dx === 0 && dy === 0)) return;
+    recordBeforeDiscreteMutation(get);
+    const idSet = new Set(selectedNodeIds);
+    set((s) => ({
+      nodes: s.nodes.map((n) =>
+        idSet.has(n.id)
+          ? { ...n, position: { x: n.position.x + dx, y: n.position.y + dy } }
+          : n,
+      ),
+      projectDirty: true,
+    }));
+    afterGraphEdit();
+  },
+
+  alignSelectedNodes: (op) => {
+    const { selectedNodeIds, nodes } = get();
+    const movable = selectedNodeIds
+      .map((id) => nodes.find((n) => n.id === id))
+      .filter((n): n is Node<FlowNodeData> => Boolean(n && !n.parentId));
+    if (movable.length < 2) {
+      get().setStatusText("请框选至少两个未嵌套的节点再对齐");
+      return;
+    }
+    recordBeforeDiscreteMutation(get);
+    const nextPos = computeAlignedPositions(movable, op);
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        const p = nextPos.get(n.id);
+        return p ? { ...n, position: p } : n;
+      }),
+      projectDirty: true,
+    }));
+    get().setStatusText(`已${alignOpLabel(op)}`);
+    afterGraphEdit();
+  },
+
+  distributeSelectedNodes: (op) => {
+    const { selectedNodeIds, nodes } = get();
+    const movable = selectedNodeIds
+      .map((id) => nodes.find((n) => n.id === id))
+      .filter((n): n is Node<FlowNodeData> => Boolean(n && !n.parentId));
+    if (movable.length < 3) {
+      get().setStatusText("请框选至少三个未嵌套的节点再等距分布");
+      return;
+    }
+    recordBeforeDiscreteMutation(get);
+    const nextPos = computeDistributedPositions(movable, op);
+    if (nextPos.size === 0) {
+      get().setStatusText("等距分布失败");
+      return;
     }
     set((s) => ({
       nodes: s.nodes.map((n) => {
         const p = nextPos.get(n.id);
         return p ? { ...n, position: p } : n;
       }),
+      projectDirty: true,
     }));
-    if (get().projectPath) scheduleSave(get);
+    get().setStatusText(`已${distributeOpLabel(op)}`);
+    afterGraphEdit();
+  },
+
+  arrangeGroupMembers: (groupId, mode) => {
+    const { nodes } = get();
+    const group = nodes.find((n) => n.id === groupId && n.type === "group");
+    if (!group) return;
+    const members = nodes.filter((n) => n.parentId === groupId);
+    if (members.length < 2) {
+      get().setStatusText("组内至少需要两个节点才能排列");
+      return;
+    }
+    recordBeforeDiscreteMutation(get);
+    const gap = useCanvasUiStore.getState().alignDistributeGap ?? CANVAS_NODE_LAYOUT_GAP;
+    const nextPos = computeLayoutPositions(members, mode, gap);
+    const { width, height } = computeGroupSizeFromMembers(
+      members.map((n) => {
+        const p = nextPos.get(n.id);
+        return p ? { ...n, position: p } : n;
+      }),
+    );
+    set((s) => ({
+      nodes: s.nodes.map((n) => {
+        const p = nextPos.get(n.id);
+        if (p) return { ...n, position: p };
+        if (n.id === groupId) {
+          return {
+            ...n,
+            style: { ...n.style, width, height },
+          };
+        }
+        return n;
+      }),
+    }));
+    afterGraphEdit();
   },
 
   importMediaFiles: async (filePaths, position) => {
@@ -1540,7 +2001,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       if (nodes.length > 0) {
         get().setSelectedNodeIds(nodes.map((n) => n.id));
       }
-      scheduleSave(get);
+      afterGraphEdit();
     } catch (e) {
       set({ statusText: `导入失败：${formatUserError(e)}` });
     }
@@ -1633,7 +2094,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
         ],
         edges: [...s.edges, makeFlowEdge(newId, targetImageNodeId, "imageNode")],
       }));
-      if (get().projectPath) scheduleSave(get);
+      afterGraphEdit();
       get().setSelectedNodeIds([newId]);
       set({ statusText: `已在左侧添加参考图节点：${rel}` });
     } catch (e) {
@@ -1644,11 +2105,20 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   copySelection: () => {
     const { selectedNodeIds, nodes, edges } = get();
     if (selectedNodeIds.length === 0) return;
+    const idsToCopy = new Set(selectedNodeIds);
+    for (const id of selectedNodeIds) {
+      const hit = nodes.find((x) => x.id === id);
+      if (hit?.type === "group") {
+        for (const sid of collectGroupSubtreeIds(nodes, id)) {
+          idsToCopy.add(sid);
+        }
+      }
+    }
     const cn = nodes
-      .filter((n) => selectedNodeIds.includes(n.id))
+      .filter((n) => idsToCopy.has(n.id))
       .map((n) => ({ ...n, data: cloneFlowNodeData(n.data) }));
     const ce = edges
-      .filter((e) => selectedNodeIds.includes(e.source) && selectedNodeIds.includes(e.target))
+      .filter((e) => idsToCopy.has(e.source) && idsToCopy.has(e.target))
       .map((e) => JSON.parse(JSON.stringify(e)) as Edge);
     setFlowClipboard(cn, ce);
     set({ statusText: `已复制 ${cn.length} 个`, flowClipboardCount: cn.length });
@@ -1663,14 +2133,51 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       copiedEdges,
     });
     const nextEdges = buildPasteEdgesFromClipboard(copiedEdges, idMap, nextNodes);
+    const pastedGroup = nextNodes.find((n) => n.type === "group");
+    const selectIds = pastedGroup ? [pastedGroup.id] : nextNodes.map((n) => n.id);
     set((s) => ({
-      nodes: [...s.nodes, ...nextNodes],
+      nodes: [...s.nodes.map((n) => ({ ...n, selected: selectIds.includes(n.id) })), ...nextNodes],
       edges: [...s.edges, ...nextEdges],
-      selectedNodeIds: nextNodes.map((n) => n.id),
-      selectedNodeId: nextNodes[0]?.id ?? null,
-      statusText: `已粘贴 ${nextNodes.length} 个`,
+      selectedNodeIds: selectIds,
+      selectedNodeId: selectIds[0] ?? null,
+      statusText: pastedGroup
+        ? `已粘贴分组副本（${nextNodes.length} 个节点）`
+        : `已粘贴 ${nextNodes.length} 个`,
     }));
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
+  },
+
+  createForkDuplicateOfSelection: () => {
+    const { selectedNodeIds, nodes, edges } = get();
+    if (selectedNodeIds.length === 0) return;
+    const built = buildForkDuplicatePaste(nodes, edges, selectedNodeIds);
+    if (!built) {
+      set({
+        statusText:
+          selectedNodeIds.length === 1 && nodes.find((n) => n.id === selectedNodeIds[0])?.type === "group"
+            ? "分组请使用工具栏「创建副本」整组复制"
+            : "无法创建副本",
+      });
+      return;
+    }
+    const { nextNodes, nextEdges, newNodeIds } = built;
+    recordBeforeDiscreteMutation(get);
+    const upstreamCount = nextEdges.length;
+    set((s) => ({
+      nodes: [
+        ...s.nodes.map((n) => ({ ...n, selected: false })),
+        ...nextNodes,
+      ],
+      edges: [...s.edges, ...nextEdges],
+      selectedNodeIds: newNodeIds,
+      selectedNodeId: newNodeIds[0] ?? null,
+      selectedEdgeIds: [],
+      statusText:
+        newNodeIds.length === 1
+          ? `已创建副本（保留 ${upstreamCount} 条上游连线）`
+          : `已创建 ${newNodeIds.length} 个副本（保留上游连线）`,
+    }));
+    afterGraphEdit();
   },
 
   deleteSelection: () => {
@@ -1690,7 +2197,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       selectedNodeId: null,
       statusText: `已删除 ${selectedNodeIds.length} 个，${selectedEdgeIds.length} 条连线`,
     }));
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
   },
 
   toggleSelectedEdgesDisabled: (disabled) => {
@@ -1711,10 +2218,11 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
       ),
       statusText: edgeToggleStatusText(disabled, selectedEdgeIds.length),
     }));
-    if (get().projectPath) scheduleSave(get);
+    afterGraphEdit();
   },
 
   undo: () => runUndo(get, set),
 
   redo: () => runRedo(get, set),
-}));
+  };
+});

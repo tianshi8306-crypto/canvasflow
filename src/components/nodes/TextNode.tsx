@@ -12,10 +12,17 @@ import { type Node, type NodeProps } from "@xyflow/react";
 import { NodeAnchors } from "@/components/nodes/anchors";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import type { FlowNodeData, TextWorkflowKind } from "@/lib/types";
-import { NodeChromeShell, NodeMetaLabel, NodeMetaStatus } from "@/components/nodes/nodeChrome";
+import {
+  NodeChromeProvider,
+  NodeChromeShell,
+  NodeMetaLabel,
+  NodeMetaStatus,
+  NodePanelPlaceholder,
+} from "@/components/nodes/nodeChrome";
 import { computeTextNodeFrameSize } from "@/lib/textNodeChrome";
 import { TextComposerPanel } from "@/components/nodes/TextComposerPanel";
 import { TextNodeBottomPortal } from "@/components/nodes/TextNodeBottomPortal";
+import { GEN_PANEL_CHROME_WIDTH } from "@/hooks/useNodeGenerationChrome";
 import { TextPreviewToolbarPortal } from "@/components/nodes/TextPreviewToolbarPortal";
 import { TextNodeResizeHandle } from "@/components/nodes/TextNodeResizeHandle";
 import { TextNodeExpandEditModal } from "@/components/nodes/TextNodeExpandEditModal";
@@ -33,9 +40,6 @@ import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import "./TextNodeChrome.css";
-
-/** 空态壳内唯一文案；编辑态 placeholder 与之相同 */
-const TEXT_EMPTY_PROMPT = "请输入内容";
 
 type TextParams = {
   textChrome?: boolean;
@@ -393,7 +397,7 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
     isGenerating && typeof nodeStatus?.progress === "number" && Number.isFinite(nodeStatus.progress)
       ? Math.round(nodeStatus.progress)
       : null;
-  const metaText = hasBody ? `${prompt.length} 字` : null;
+  const dimsText = hasBody && !isGenerating ? `${prompt.length} 字` : null;
 
   const commitLabel = useCallback(
     (next: string | undefined) => updateNodeData(id, { label: next }),
@@ -418,25 +422,9 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
       className="textNodeEmptyShell"
       onDoubleClick={enterEditing}
       onWheel={stopWheel}
-      title={TEXT_EMPTY_PROMPT}
+      title="双击编辑正文"
     >
-      <div className="textNodeEmptyShellIcon" aria-hidden>
-        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
-          <path
-            d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M14 2v6h6M8 13h8M8 17h5"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
-      <p className="textNodeEmptyShellLabel">{TEXT_EMPTY_PROMPT}</p>
+      <NodePanelPlaceholder kind="textNode" />
     </div>
   );
 
@@ -448,7 +436,6 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
           ref={editRef}
           contentEditable
           suppressContentEditableWarning
-          data-placeholder={TEXT_EMPTY_PROMPT}
           onPointerDown={stop}
           onWheel={stopWheel}
           onBlur={() => {
@@ -475,14 +462,17 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
   };
 
   return (
-    <>
-      <NodeMetaLabel
-        label={data.label ?? ""}
-        defaultLabel="文本"
-        onCommit={commitLabel}
-      />
-
-      <NodeMetaStatus dimsText={metaText} generating={isGenerating} progress={genProgress} />
+    <NodeChromeProvider>
+      {!showPreviewTopPortal ? (
+        <>
+          <NodeMetaLabel
+            label={data.label ?? ""}
+            defaultLabel="文本"
+            onCommit={commitLabel}
+          />
+          <NodeMetaStatus dimsText={dimsText} generating={isGenerating} progress={genProgress} />
+        </>
+      ) : null}
 
       <NodeChromeShell
         selected={selected}
@@ -505,6 +495,11 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
         anchorRef={previewRef}
         active={showPreviewTopPortal}
         toolbarRef={previewToolbarRef}
+        label={data.label ?? ""}
+        onCommitLabel={commitLabel}
+        dimsText={dimsText}
+        generating={isGenerating}
+        progress={genProgress}
         onFormatExec={handleFormatExec}
         showFormat={showFormatInToolbar}
         onSyncFromScript={hasScriptUpstream ? handleSyncFromScript : undefined}
@@ -539,7 +534,7 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
       <TextNodeBottomPortal
         anchorRef={previewRef}
         active={showBottomPortal}
-        panelWidth={frameSize.width}
+        panelWidth={GEN_PANEL_CHROME_WIDTH}
         panelRef={bottomPanelRef}
       >
         {showComposerPortal ? (
@@ -557,6 +552,6 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
           />
         ) : null}
       </TextNodeBottomPortal>
-    </>
+    </NodeChromeProvider>
   );
 }

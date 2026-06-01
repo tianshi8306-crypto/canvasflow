@@ -25,12 +25,13 @@ function resetStore() {
     confirmDialog: null,
     nodeDragSuppressUi: false,
     maximizedNodeId: null,
+    composeEditorNodeId: null,
+    canvasFitRequestNodeId: null,
     imageGenPanelExpandedNodeId: null,
-    imageGenPanelPinnedNodeId: null,
     audioTtsPanelNodeId: null,
     imageI2iTargetNodeId: null,
     markedNodeId: null,
-    minimapVisible: true,
+    minimapVisible: false,
     subjectListVersion: 0,
     viewportInteracting: false,
     nodeSnapAlignmentEnabled: true,
@@ -38,9 +39,10 @@ function resetStore() {
     selectionRelatedHighlightColor: "white" as const,
     snapGuidesEnabled: true,
     connectionLinesVisible: true,
-    snapGridEnabled: true,
+    snapGridEnabled: false,
     alignFeatureTriggerMode: "click" as const,
     alignDistributeGap: 40,
+    multiSelectGridCols: 3 as const,
     nodeSpacing: 120,
     nodeDirection: "right" as const,
     nodeAvoidOverlap: true,
@@ -53,9 +55,12 @@ function resetStore() {
     cursorStyle: "default" as const,
     gridDotsVisible: true,
     shortcutsOverlayOpen: false,
+    pendingAddPanelAt: null,
+    emptyGuideDismissed: false,
     anchorDragConnect: null,
     anchorMenuRequest: null,
     anchorMenuOpenedAt: 0,
+    anchorMenuDismissEpoch: 0,
     anchorConnectDrag: null,
     pendingAnchorConnection: null,
     projectPanelOpen: false,
@@ -248,6 +253,15 @@ describe("canvasUiStore — boolean flags", () => {
   it("setNodeSnapAlignmentEnabled updates the flag", () => {
     useCanvasUiStore.getState().setNodeSnapAlignmentEnabled(false);
     expect(useCanvasUiStore.getState().nodeSnapAlignmentEnabled).toBe(false);
+  });
+
+  it("multiSelectGridCols defaults to 3", () => {
+    expect(useCanvasUiStore.getState().multiSelectGridCols).toBe(3);
+  });
+
+  it("setMultiSelectGridCols updates grid columns", () => {
+    useCanvasUiStore.getState().setMultiSelectGridCols(4);
+    expect(useCanvasUiStore.getState().multiSelectGridCols).toBe(4);
   });
 
   it("viewportInteracting defaults to false", () => {

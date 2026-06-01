@@ -42,7 +42,7 @@ export const scriptNodeDispatchAgentRuntime: NodeTaskAgentRuntime<
     return { prompt: text, dispatch };
   },
   execute: async (sensed, ctx) => {
-    ctx.setStatusText("脚本 Agent 正在请求 DAG 调度…");
+    ctx.setStatusText("正在 AI 解析镜头（DAG 调度）…");
     await sensed.dispatch(ctx.nodeId, false);
     return sensed;
   },

@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { commitNodeMediaPatch } from "@/lib/nodeMediaRef";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
 
 type GenericAsyncSubmitReq = {
@@ -159,7 +160,7 @@ export const videoAsyncTaskAgentRuntime: NodeTaskAgentRuntime<Input, Sensed, Exe
   },
   validate: (executed) => executed,
   commit: ({ relPath, assetId }, ctx) => {
-    ctx.updateNodeData(ctx.nodeId, { path: relPath, ...(assetId ? { assetId } : {}) });
+    ctx.updateNodeData(ctx.nodeId, commitNodeMediaPatch(relPath, assetId));
     ctx.setStatusText("视频已下载并写入节点");
   },
 };

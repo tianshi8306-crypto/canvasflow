@@ -11,10 +11,19 @@ import {
   formatHermesBatchPlanHint,
   planHermesBatchImageJobs,
 } from "@/lib/hermes/hermesBatchSplitStrategy";
+import { runPool } from "@/lib/async/runPool";
 
 export { findImageNodesForScript } from "@/lib/storyboard/storyboardMediaNodes";
 
 export type BatchImageResult = { started: number; skipped: number; failed: number };
+
+type ImageJob = {
+  beatId: string;
+  imageNodeId: string;
+  imageCount?: number;
+};
+
+type ImageJobOutcome = "started" | "skipped" | "failed";
 
 export type HermesBatchImageOptions = {
   strategy: HermesBatchSplitStrategy;
@@ -34,9 +43,19 @@ export async function batchGenerateImagesForStoryboard(opts: {
   updateNodeData: (id: string, patch: Partial<FlowNodeData>) => void;
   setStatusText: (t: string) => void;
   beatIds?: string[];
+  /** 分镜组：仅处理该集合内的图片节点 */
+  restrictToNodeIds?: ReadonlySet<string>;
   skipIfHasImage?: boolean;
   /** Hermes 排队出图：启用打包拆镜任务规划 */
   hermesBatch?: HermesBatchImageOptions;
+  /** Hermes @参考素材：prepend 到各任务 referenceImagePaths（图生图） */
+  referenceImagePathsPrefix?: string[];
+  /** 按镜头合并角色参考（镜头表 / 项目圣经） */
+  resolveBeatReferencePaths?: (beatId: string) => string[];
+  /** Hermes 任务轨：批量进度 */
+  onProgress?: (current: number, total: number, detail?: string) => void;
+  /** 镜级并发上限（1～3）；默认 1 为顺序提交 */
+  maxConcurrent?: number;
 }): Promise<BatchImageResult> {
   const {
     scriptNodeId,
@@ -46,11 +65,21 @@ export async function batchGenerateImagesForStoryboard(opts: {
     updateNodeData,
     setStatusText,
     beatIds,
+    restrictToNodeIds,
     skipIfHasImage = true,
     hermesBatch,
+    referenceImagePathsPrefix,
+    resolveBeatReferencePaths,
+    onProgress,
+    maxConcurrent = 1,
   } = opts;
+  const refPrefix = (referenceImagePathsPrefix ?? [])
+    .map((p) => p.trim())
+    .filter(Boolean);
 
-  const imageByBeat = findImageNodesForScript(scriptNodeId, nodes, edges);
+  const imageByBeat = findImageNodesForScript(scriptNodeId, nodes, edges, {
+    restrictToNodeIds,
+  });
   const beatFilter = beatIds?.length ? new Set(beatIds) : null;
 
   let started = 0;
@@ -68,6 +97,7 @@ export async function batchGenerateImagesForStoryboard(opts: {
         nodes,
         edges,
         skipIfHasImage,
+        restrictToNodeIds,
       })
     : [...imageByBeat.entries()]
         .filter(([beatId, imageNodeId]) => {
@@ -88,14 +118,19 @@ export async function batchGenerateImagesForStoryboard(opts: {
     return { started: 0, skipped: imageByBeat.size, failed: 0 };
   }
 
+  onProgress?.(0, jobs.length, "准备");
+
   if (hermesBatch) {
     setStatusText(
-      formatHermesBatchPlanHint(hermesBatch.strategy, hermesBatch.packImageCount, jobs.length),
+      formatHermesBatchPlanHint(hermesBatch.strategy, hermesBatch.packImageCount, jobs.length) +
+        (maxConcurrent > 1 ? ` · 并发 ${maxConcurrent} 镜` : ""),
     );
+  } else if (maxConcurrent > 1) {
+    setStatusText(`批量出图：${jobs.length} 个任务，并发 ${maxConcurrent} 镜`);
   }
 
-  for (let jobIndex = 0; jobIndex < jobs.length; jobIndex++) {
-    const { beatId, imageNodeId, imageCount: jobCount } = jobs[jobIndex]!;
+  const runOneJob = async (job: ImageJob): Promise<ImageJobOutcome> => {
+    const { beatId, imageNodeId, imageCount: jobCount } = job;
     const latestNodes = useProjectStore.getState().nodes;
     const latestEdges = useProjectStore.getState().edges;
 
@@ -106,17 +141,25 @@ export async function batchGenerateImagesForStoryboard(opts: {
       projectPath,
     );
     if (!prepared.ok) {
-      skipped += 1;
       patchStoryboardShot(scriptNodeId, beatId, { status: "failed", error: prepared.reason }, updateNodeData);
-      continue;
+      return "skipped";
     }
 
     patchStoryboardShot(scriptNodeId, beatId, { status: "generating", error: undefined }, updateNodeData);
 
-    const input =
+    const beatRefs = resolveBeatReferencePaths?.(beatId) ?? [];
+    const mergedRefs = [...refPrefix, ...beatRefs, ...prepared.prepared.input.referenceImagePaths].filter(
+      (p, i, arr) => p.trim() && arr.indexOf(p) === i,
+    );
+    const baseInput =
       jobCount != null && jobCount >= 1
         ? { ...prepared.prepared.input, count: Math.min(4, Math.max(1, jobCount)) }
         : prepared.prepared.input;
+    const input = {
+      ...baseInput,
+      referenceImagePaths: mergedRefs.slice(0, 4),
+      ...(mergedRefs.length > 0 ? { task: "image_to_image" as const } : {}),
+    };
 
     try {
       await runNodeTaskAgent(imageGenerationAgentRuntime, input, {
@@ -125,16 +168,35 @@ export async function batchGenerateImagesForStoryboard(opts: {
         updateNodeData,
         setStatusText,
       });
-      started += 1;
+      return "started";
     } catch {
-      failed += 1;
       patchStoryboardShot(
         scriptNodeId,
         beatId,
         { status: "failed", error: "批量图片生成失败" },
         updateNodeData,
       );
+      return "failed";
     }
+  };
+
+  let completedJobs = 0;
+  const outcomes = await runPool(jobs, maxConcurrent, async (job) => {
+    const outcome = await runOneJob(job);
+    completedJobs += 1;
+    const beatNum = useProjectStore
+      .getState()
+      .nodes.find((n) => n.id === scriptNodeId)
+      ?.data.scriptBeats?.find((b) => b.id === job.beatId)
+      ?.shotNumber?.trim();
+    onProgress?.(completedJobs, jobs.length, beatNum ? `镜 ${beatNum}` : undefined);
+    return outcome;
+  });
+
+  for (const outcome of outcomes) {
+    if (outcome === "started") started += 1;
+    else if (outcome === "skipped") skipped += 1;
+    else if (outcome === "failed") failed += 1;
   }
 
   setStatusText(

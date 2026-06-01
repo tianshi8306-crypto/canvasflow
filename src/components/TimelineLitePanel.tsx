@@ -33,7 +33,7 @@ export function TimelineLitePanel() {
           try {
             const out = await invoke<string>("render_timeline", {
               projectPath,
-              clips,
+              clips: clips.map((relPath) => ({ relPath, inSec: 0, outSec: null })),
               outputRelPath: output,
             });
             setStatus(`完成：${out}`);

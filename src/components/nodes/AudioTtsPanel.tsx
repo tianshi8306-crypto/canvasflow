@@ -1,3 +1,4 @@
+import { isTauri } from "@tauri-apps/api/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
@@ -224,7 +225,7 @@ export function AudioTtsPanel({
           </span>
         </div>
 
-        <div className="atp-v2-bottom-bar audioTtsPanelFoot">
+        <div className="igp-bottom-bar atp-v2-bottom-bar audioTtsPanelFoot">
           <AudioModelPicker
             models={audioModels}
             value={modelId}

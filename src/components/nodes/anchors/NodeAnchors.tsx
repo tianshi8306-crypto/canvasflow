@@ -1,24 +1,17 @@
-import { SimpleAnchors } from "@/components/nodes/anchors/SimpleAnchors";
-import { MagneticNodeAnchors } from "@/components/nodes/MagneticNodeAnchors";
+import { CanvasNodeAnchors, type CanvasNodeAnchorsProps } from "./CanvasNodeAnchors";
 
 export type NodeAnchorsVariant = "simple" | "magnetic";
 
-export type NodeAnchorsProps = {
-  nodeId: string;
-  nodeType: string | undefined;
-  /** simple：极简图片节点；magnetic：标准节点（悬停显隐 + 完整菜单） */
+export type NodeAnchorsProps = CanvasNodeAnchorsProps & {
+  /** @deprecated 极简/标准已统一，保留参数兼容旧调用 */
   variant?: NodeAnchorsVariant;
 };
 
-/**
- * 统一节点锚点入口：按节点形态选择 Simple / Magnetic 实现。
- */
-export function NodeAnchors({ nodeId, nodeType, variant = "magnetic" }: NodeAnchorsProps) {
-  if (variant === "simple") {
-    return <SimpleAnchors nodeId={nodeId} nodeType={nodeType} />;
-  }
-  return <MagneticNodeAnchors nodeId={nodeId} nodeType={nodeType} />;
+/** 统一节点锚点（边框接线 + 外侧磁吸「+」） */
+export function NodeAnchors({ nodeId, nodeType }: NodeAnchorsProps) {
+  return <CanvasNodeAnchors nodeId={nodeId} nodeType={nodeType} />;
 }
 
-export { SimpleAnchors } from "./SimpleAnchors";
-export { MagneticNodeAnchors } from "../MagneticNodeAnchors";
+export { CanvasNodeAnchors } from "./CanvasNodeAnchors";
+export { CanvasNodeAnchors as SimpleAnchors } from "./CanvasNodeAnchors";
+export { CanvasNodeAnchors as MagneticNodeAnchors } from "./CanvasNodeAnchors";

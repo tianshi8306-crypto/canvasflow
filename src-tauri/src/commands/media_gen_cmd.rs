@@ -1,8 +1,7 @@
 use crate::command_common::pick_enabled_provider;
-use crate::db;
 use crate::dreamina_cli::DreaminaCliState;
 use crate::dreamina_gen;
-use crate::media;
+use crate::project_asset_store::{self, AssetWriteContext};
 use crate::settings;
 use crate::vault;
 use crate::AppState;
@@ -114,9 +113,6 @@ pub async fn generate_image_asset(
     let n = count.unwrap_or(1).max(1).min(4);
     let mut rel_paths: Vec<String> = Vec::new();
     let root = PathBuf::from(&project_path);
-    let assets_dir = root.join("assets");
-    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let conn = db::open_run_db(&root)?;
 
     for i in 0..n {
         let size = resolution.as_deref().unwrap_or("1024x1024");
@@ -195,19 +191,15 @@ pub async fn generate_image_asset(
             return Err("返回内容中未找到图片数据".into());
         };
 
-        let seq_suffix = if n > 1 { format!("_{}", i + 1) } else { String::new() };
-        let file_name = format!(
-            "gen_{}{}_{}.png",
-            chrono::Utc::now().format("%Y%m%d_%H%M%S"),
-            seq_suffix,
-            &uuid::Uuid::new_v4().to_string()[..8]
-        );
-        let out = assets_dir.join(&file_name);
-        std::fs::write(&out, bytes).map_err(|e| format!("保存图片失败：{}", e))?;
-
-        let rel = format!("assets/{}", file_name);
-        let meta_json = media::meta_json_for_image(&out);
-        let _aid = db::upsert_asset(&conn, &rel, "image", Some("generate"), meta_json.as_deref())?;
+        let seq_tag = format!("seq{}", i + 1);
+        let ctx = AssetWriteContext {
+            kind: "image",
+            source: "generate",
+            workflow: task.as_deref(),
+            node_id: None,
+            job_id: Some(seq_tag.as_str()),
+        };
+        let rel = project_asset_store::write_bytes_to_project_asset(&root, &bytes, "png", &ctx)?;
         rel_paths.push(rel);
     }
 
@@ -308,21 +300,93 @@ pub async fn generate_tts_asset(
     }
 
     let root = PathBuf::from(&project_path);
-    let assets_dir = root.join("assets");
-    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let file_name = format!(
-        "tts_{}_{}.mp3",
-        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
-        &uuid::Uuid::new_v4().to_string()[..8]
-    );
-    let out = assets_dir.join(&file_name);
-    std::fs::write(&out, &bytes).map_err(|e| format!("保存音频失败：{}", e))?;
+    let ctx = AssetWriteContext {
+        kind: "audio",
+        source: "tts",
+        workflow: None,
+        node_id: None,
+        job_id: None,
+    };
+    project_asset_store::write_bytes_to_project_asset(&root, &bytes, "mp3", &ctx)
+}
 
-    let rel = format!("assets/{}", file_name);
-    let conn = db::open_run_db(&root)?;
-    let meta_json = media::meta_json_for_av(&out, "audio");
-    let _aid = db::upsert_asset(&conn, &rel, "audio", Some("tts"), meta_json.as_deref())?;
-    Ok(rel)
+/// OpenAI 兼容 `POST /v1/audio/transcriptions`：Hermes 语音输入（Whisper）。
+#[tauri::command]
+pub async fn transcribe_speech_audio(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    audio_base64: String,
+    file_name: Option<String>,
+    language: Option<String>,
+) -> Result<String, String> {
+    use base64::Engine;
+    use reqwest::multipart;
+    use serde_json::json;
+
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(audio_base64.trim())
+        .map_err(|e| format!("音频解码失败：{}", e))?;
+    if bytes.is_empty() {
+        return Err("音频为空".into());
+    }
+
+    let settings = settings::load_settings(&app)?;
+    let provider = pick_enabled_provider(&settings)?;
+    let api_key = vault::get_api_key(&provider.id)?
+        .ok_or_else(|| format!("未配置 API Key：{}", provider.label))?;
+    let base_url = provider.base_url.trim().to_string();
+
+    let fname = file_name
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "speech.webm".to_string());
+    let mime = if fname.ends_with(".wav") {
+        "audio/wav"
+    } else if fname.ends_with(".m4a") || fname.ends_with(".mp4") {
+        "audio/mp4"
+    } else if fname.ends_with(".ogg") {
+        "audio/ogg"
+    } else {
+        "audio/webm"
+    };
+
+    let part = multipart::Part::bytes(bytes)
+        .file_name(fname)
+        .mime_str(mime)
+        .map_err(|e| e.to_string())?;
+    let mut form = multipart::Form::new()
+        .part("file", part)
+        .text("model", "whisper-1");
+    if let Some(lang) = language.filter(|s| !s.trim().is_empty()) {
+        form = form.text("language", lang.trim().to_string());
+    }
+
+    let url = format!("{}/audio/transcriptions", base_url.trim_end_matches('/'));
+    let resp = state
+        .http
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .multipart(form)
+        .send()
+        .await
+        .map_err(|e| format!("语音识别请求失败：{}", e))?;
+
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| format!("读取识别响应失败：{}", e))?;
+    if !status.is_success() {
+        let parsed: serde_json::Value =
+            serde_json::from_str(&text).unwrap_or_else(|_| json!({ "raw": text }));
+        return Err(format!(
+            "语音识别失败: {}",
+            serde_json::to_string(&parsed).unwrap_or_default()
+        ));
+    }
+
+    if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&text) {
+        if let Some(t) = parsed.get("text").and_then(|v| v.as_str()) {
+            return Ok(t.trim().to_string());
+        }
+    }
+    Ok(text.trim().to_string())
 }
 
 #[tauri::command]

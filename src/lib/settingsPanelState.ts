@@ -8,6 +8,12 @@ import type {
   KeyPreviewItem,
   ProviderConfig,
 } from "@/lib/settingsPanelTypes";
+import { ensureModelListDefaults } from "@/lib/settingsModelDefaults";
+import { normalizeVideoModelConfigOnLoad } from "@/lib/videoGeneration/seedanceApiModel";
+import { normalizeProjectAutoSaveIdleSec } from "@/lib/projectAutoSaveSettings";
+import {
+  agentSettingsFromAppSettings,
+} from "@/lib/hermes/agent/hermesAgentSettings";
 import { DESKTOP_SHELL_HINT } from "@/lib/tauriEnv";
 
 type HasKeyMaps = {
@@ -24,9 +30,10 @@ type SaveSettingsResult = HasKeyMaps & {
 };
 
 export function normalizeLoadedSettings(s: AppSettings): AppSettings {
-  return {
+  const normalized: AppSettings = {
     ...s,
     abortWorkflowOnFailure: s.abortWorkflowOnFailure ?? false,
+    hermesMemoryRoot: s.hermesMemoryRoot?.trim() ? s.hermesMemoryRoot.trim() : null,
     // 外观
     themePreset: s.themePreset ?? "dark",
     fontSize: s.fontSize ?? "medium",
@@ -51,6 +58,7 @@ export function normalizeLoadedSettings(s: AppSettings): AppSettings {
     alignDistributeGap: s.alignDistributeGap ?? 40,
     // 素材
     uploadQuality: s.uploadQuality ?? "standard",
+    projectAutoSaveIdleSec: normalizeProjectAutoSaveIdleSec(s.projectAutoSaveIdleSec),
     imageModels: (s.imageModels ?? []).map((m) => ({
       ...m,
       vendorName: m.vendorName ?? m.modelName ?? "",
@@ -58,13 +66,15 @@ export function normalizeLoadedSettings(s: AppSettings): AppSettings {
       modelVariant: m.modelVariant ?? m.model ?? "",
       apiBaseUrl: m.apiBaseUrl ?? "",
     })),
-    videoModels: (s.videoModels ?? []).map((m) => ({
-      ...m,
-      vendorName: m.vendorName ?? "",
-      modelName: m.modelName ?? "",
-      modelVariant: m.modelVariant ?? m.model ?? "",
-      apiBaseUrl: m.apiBaseUrl ?? "",
-    })),
+    videoModels: (s.videoModels ?? []).map((m) =>
+      normalizeVideoModelConfigOnLoad({
+        ...m,
+        vendorName: m.vendorName ?? "",
+        modelName: m.modelName ?? "",
+        modelVariant: m.modelVariant ?? m.model ?? "",
+        apiBaseUrl: m.apiBaseUrl ?? "",
+      }),
+    ),
     audioModels: (s.audioModels ?? []).map((m) => ({
       ...m,
       vendorName: m.vendorName ?? "",
@@ -73,6 +83,10 @@ export function normalizeLoadedSettings(s: AppSettings): AppSettings {
       apiBaseUrl: m.apiBaseUrl ?? "",
     })),
   };
+  return ensureModelListDefaults({
+    ...normalized,
+    ...agentSettingsFromAppSettings(s),
+  });
 }
 
 export function mergeImportedSettings(prev: AppSettings, parsed: Partial<AppSettings>): AppSettings {

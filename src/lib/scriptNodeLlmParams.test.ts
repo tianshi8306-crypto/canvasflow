@@ -6,8 +6,8 @@ import {
 import type { TextNodeProviderOption } from "@/lib/textNodeProviders";
 
 const providers: TextNodeProviderOption[] = [
-  { id: "openai", label: "OpenAI", priority: 2, enabled: true },
-  { id: "deepseek", label: "DeepSeek", priority: 1, enabled: true },
+  { id: "openai", label: "OpenAI", model: "gpt-4", priority: 2, enabled: true },
+  { id: "deepseek", label: "DeepSeek", model: "deepseek-chat", priority: 1, enabled: true },
 ];
 
 describe("scriptNodeLlmInvokeParams", () => {

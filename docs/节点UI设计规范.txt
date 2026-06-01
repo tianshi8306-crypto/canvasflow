@@ -1,0 +1,1089 @@
+
+
+---
+
+# 无限画布节点前端UI设计规范（RunningHub官方最终版）
+**版本**：v2.0（基于RunningHub官方产品文档完整修正）
+**适用范围**：AI创作平台无限画布节点编辑器开发
+**核心原则**：100%对齐RunningHub官方交互体验，兼顾专业效率与AI原生特性
+
+---
+
+## 一、设计原则（官方核心准则）
+1. **AI原生优先**：所有设计围绕AI生成流程优化，突出算力消耗、生成状态、参考图绑定等核心信息
+2. **双模式兼容**：同时支持人类手动编辑与Agent自动生成，两种模式下交互逻辑保持一致
+3. **效率至上**：提供双击生成、一键布局、批量操作等专业快捷键，减少重复操作
+4. **状态可视化**：所有节点状态（生成中/完成/错误/缓存）必须有明确的视觉反馈
+5. **强制信息展示**：算力消耗、替换按钮、刷新按钮为AI生成节点强制元素，不可省略
+
+---
+
+## 二、基础设计系统（官方实测值）
+### 2.1 颜色系统（完全匹配RunningHub深色主题）
+| 类别 | 色值（HEX） | 使用场景 |
+|------|-------------|----------|
+| 主色调 | #3B82F6 | 选中状态、主按钮、高亮连接线、VIDEO类型端口 |
+| 画布背景 | #0F172A | 无限画布本体 |
+| 节点背景 | #1E293B | 普通节点主体背景 |
+| 标题栏背景 | #334155 | 所有节点标题栏 |
+| 默认边框 | #475569 | 未选中、未执行节点边框 |
+| 文本主色 | #F8FAFC | 标题、参数名称、算力消耗数值 |
+| 文本次色 | #94A3B8 | 描述、次要信息、参数值 |
+| 成功色 | #10B981 | 生成完成、IMAGE类型端口 |
+| 警告/缓存色 | #F59E0B | 警告提示、缓存状态、TEXT类型端口 |
+| 错误色 | #EF4444 | 生成失败、错误信息 |
+| 生成中色 | #8B5CF6 | AI生成中状态、AUDIO类型端口 |
+| 节点类型色 | #F97316 | NODEFRAME帧容器类型端口 |
+| 条件编码色 | #EC4899 | CONDITIONING类型端口 |
+| 模型色 | #6366F1 | MODEL类型端口 |
+| 潜空间色 | #14B8A6 | LATENT类型端口 |
+| 任意类型色 | #94A3B8 | ANY类型端口 |
+
+### 2.2 尺寸与间距规范（官方像素级对齐）
+| 元素 | 尺寸 | 说明 |
+|------|------|------|
+| 节点最小宽度 | 180px | 基础文本/数值节点 |
+| 节点最大宽度 | 480px | AI生成节点（需显示预览图和参数） |
+| 标题栏高度 | 32px | 所有节点统一高度 |
+| 内容区行高 | 28px | 参数行标准高度 |
+| 端口直径 | 10px | 输入输出端口 |
+| 端口间距 | 14px | 相邻端口垂直距离 |
+| 节点内边距 | 10px | 内容区与边框间距 |
+| 节点外边距 | 20px | 推荐节点间最小距离 |
+| 圆角半径 | 6px | 节点整体圆角 |
+| 预览图尺寸 | 120×120px | 节点内参考图/生成结果缩略图 |
+| 底部状态栏高度 | 24px | AI生成节点强制 |
+
+### 2.3 字体与排版
+- **字体栈**：-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif
+- **标题字体**：字重600，字号14px，行高32px
+- **参数名称**：字重500，字号13px，行高28px
+- **参数值**：字重400，字号13px，行高28px
+- **算力消耗**：字重600，字号12px，行高24px（强制加粗）
+- **描述文本**：字重400，字号12px，行高16px，颜色#94A3B8
+
+---
+
+## 三、标准节点核心结构（RunningHub官方规范）
+### 3.1 通用节点完整结构
+所有节点必须遵循以下四层结构，AI生成节点额外包含预览区和底部状态栏：
+```
+┌─────────────────────────────────┐
+│ 🎨 节点标题 ⚙️ 🔄 ✅ × │ ← 标题栏（32px，强制元素）
+├─────────────────────────────────┤
+│ [参考图预览区] 120×120px │ ← 可选：@引用的参考图/生成结果
+│ ↑替换 │ ← 预览区右上角强制按钮
+├─────────────────────────────────┤
+│ 参数1: [输入控件] │ ← 内容区
+│ 参数2: [滑块+数字输入] │
+│ 参数3: [下拉选择] │
+├─────────────────────────────────┤
+│ 1080p·5s·Seedance2.0 ¥7.4 │ ← 底部状态栏（AI节点强制）
+└─────────────────────────────────┘
+```
+
+### 3.2 标题栏设计（强制元素）
+- **左侧**：节点分类图标 + 节点名称（最多16字符，超出显示省略号）
+- **右侧（从左到右）**：
+  1. 设置按钮（⚙️）：打开高级参数面板
+  2. 刷新按钮（🔄）：AI生成节点强制，点击重新生成
+  3. 状态图标：✅完成/⏳生成中/⚠️警告/❌错误/💾缓存
+  4. 关闭按钮（×）：删除节点
+- **交互**：
+  - 点击标题栏拖动节点
+  - 双击标题栏折叠/展开节点
+  - 右键点击显示完整上下文菜单
+
+### 3.3 预览区设计（AI节点强制）
+- 位置：标题栏下方，内容区上方
+- 尺寸：120×120px，居中显示
+- 右上角强制显示**↑替换**按钮，点击可上传新参考图或重新生成
+- 绑定参考图时显示@标识，悬停显示引用的素材名称
+- 点击预览图可放大查看原图，支持滚轮缩放
+
+### 3.4 底部状态栏设计（AI节点强制）
+- 高度：24px，背景色#27374D
+- 左侧：生成参数摘要（分辨率·时长·模型版本），如`1080p·5s·Seedance2.0`
+- 右侧：算力消耗（如`¥7.4`），强制加粗白色字体
+- 生成中时：状态栏上方显示进度条，带百分比和剩余时间（如`65% · 剩余3s`）
+
+### 3.5 端口设计（官方标准）
+#### 3.5.1 位置与布局
+- 输入端口：节点左侧，与对应参数行垂直对齐
+- 输出端口：节点右侧，与对应输出项垂直对齐
+- 多端口自动垂直排列，间距14px，最多支持15个端口
+
+#### 3.5.2 状态与交互
+- 默认状态：实心圆形，颜色对应数据类型
+- 悬停状态：放大至12px，显示数据类型提示（如"VIDEO"）
+- 连接状态：端口颜色与连接线一致，显示白色中心点
+- 绑定状态：显示@符号，悬停显示引用素材名称
+- 禁用状态：灰色半透明，不可连接
+
+---
+
+## 四、RunningHub专属特殊节点UI设计
+### 4.1 分镜大师节点（核心专业节点）
+**核心结构**：
+```
+┌─────────────────────────────────────────┐
+│ 🎬 分镜大师 ⚙️ 🔄 ✅ × │
+├─────────────────────────────────────────┤
+│ 多机位九宫格 | 剧情推演四宫格 | 25宫格 │ ← 顶部模式切换栏
+├─────────────────────────────────────────┤
+│ ┌─────┐ ┌─────┐ ┌─────┐ │
+│ │ 01 │ │ 02 │ │ 03 │ │ ← 网格分镜区
+│ └─────┘ └─────┘ └─────┘ │
+│ ┌─────┐ ┌─────┐ ┌─────┐ │
+│ │ 04 │ │ 05 │ │ 06 │ │
+│ └─────┘ └─────┘ └─────┘ │
+├─────────────────────────────────────────┤
+│ 运镜控制 | 情绪重塑 | 深度视差 | 动态场效 │ ← 右侧参数面板
+├─────────────────────────────────────────┤
+│ 统一风格 | 统一光影 | 批量生成 | 导出分镜表 │ ← 底部全局控制栏
+└─────────────────────────────────────────┘
+```
+**交互特性**：
+- 点击单个分镜格子展开详细参数编辑面板
+- 拖拽分镜格子调整顺序
+- 支持单独生成单个分镜或批量生成所有分镜
+- 导出分镜表为PDF、PNG或JSON格式
+
+### 4.2 3D导演台/世界模型节点
+**核心结构**：
+```
+┌─────────────────────────────────────────┐
+│ 🎥 3D导演台 ⚙️ 🔄 ✅ × │
+├─────────────────────────────────────────┤
+│ 基础模型 | 人物 | 道具 | 场景 | 交通工具 │ ← 左侧模型库
+├─────────────────────────────────────────┤
+│ │ X: 0 │
+│ │ Y: 0 │ ← 右侧参数面板
+│ 3D视图区 │ Z: 0 │
+│ │ 旋转: 0│
+│ │ 缩放: 1│
+├─────────────────────────────────────────┤
+│ 📦添加 | ✋移动 | 🔄旋转 | 🔍缩放 | 📷截屏 │ ← 底部工具栏
+└─────────────────────────────────────────┘
+```
+**交互特性**：
+- 拖拽模型库中的模型到3D视图区自动添加
+- 选中模型显示XYZ三色坐标轴，直接拖拽调整位置/旋转/缩放
+- 滚轮缩放视图，中键平移，右键旋转视角
+- 支持一键切换2D/3D模式，导出3D场景为渲染图或视频
+
+### 4.3 Agent智能体节点
+**核心结构**：
+```
+┌─────────────────────────────────────────┐
+│ 🤖 RH智能体 ⚙️ 🔄 ✅ × │
+├─────────────────────────────────────────┤
+│ 品牌设计 | 产品套图 | TVC广告 | AI漫剧 │ ← 顶部技能栏
+├─────────────────────────────────────────┤
+│ 输入你的创作需求... │
+│ [+上传参考图] @图片1 @视频1 │ ← 输入区
+│ [AUTO] [Ask] │
+├─────────────────────────────────────────┤
+│ 历史记录1: 生成机甲打怪兽短片 │ ← 右侧历史面板
+│ 历史记录2: 修改机甲颜色为蓝色 │
+└─────────────────────────────────────────┘
+```
+**交互特性**：
+- 点击技能按钮自动填充对应提示词模板
+- 拖拽画布内素材到输入区自动添加@引用
+- 生成结果自动同步到画布，支持一键二次编辑
+- 支持多轮对话迭代，历史记录可点击复用
+
+### 4.4 剪辑编辑器节点
+**核心结构**：
+```
+┌─────────────────────────────────────────┐
+│ ✂️ 剪辑编辑器 ⚙️ 🔄 ✅ × │
+├─────────────────────────────────────────┤
+│ 素材 | 音频 | 文本 | 设置 │ ← 左侧素材面板
+├─────────────────────────────────────────┤
+│ │ 变换 │
+│ 预览窗口 │ 混合 │ ← 右侧属性面板
+│ (16:9) │ 变速 │
+│ │ 关键帧 │
+├─────────────────────────────────────────┤
+│ ⏸️ 00:00:00 / 00:00:10 │ 导出 │ ← 播放控制栏
+├─────────────────────────────────────────┤
+│ [主轨道] ────────────────────── │
+│ [音频轨道]────────────────────── │ ← 时间轴
+│ [封面轨道]────────────────────── │
+└─────────────────────────────────────────┘
+```
+**交互特性**：
+- 拖拽画布内素材直接到时间轴轨道
+- 时间轴支持缩放、吸附、分割、裁剪、复制
+- 预览窗口与时间轴播放头实时同步
+- 导出视频自动保存到画布和个人资产库
+
+---
+
+## 五、节点状态系统（官方完整定义）
+| 状态 | 视觉表现 | 触发条件 |
+|------|----------|----------|
+| 默认 | 边框#475569，背景#1E293B | 未选中、未执行 |
+| 选中 | 边框#3B82F6，阴影0 0 0 2px rgba(59,130,246,0.3) | 用户点击节点 |
+| 生成中 | 边框#8B5CF6，标题栏显示⏳动画，状态栏显示进度条 | AI正在执行生成任务 |
+| 完成 | 边框#10B981，标题栏显示✅图标 | 生成成功 |
+| 错误 | 边框#EF4444，标题栏显示❌图标，内容区显示错误信息 | 生成失败 |
+| 缓存 | 边框#F59E0B，标题栏显示💾图标 | 使用历史缓存结果 |
+| 禁用 | 透明度0.5，所有控件不可编辑 | 用户手动禁用节点 |
+| 折叠 | 仅显示标题栏，内容区隐藏 | 双击标题栏折叠 |
+| 资产化 | 标题栏显示📦图标 | 已保存到个人资产库 |
+| 打组 | 组节点边框加粗2px，显示组名称和成员数量 | 多个节点被打包成组 |
+
+---
+
+## 六、核心交互规范（官方标准）
+### 6.1 节点基础操作
+1. **创建节点**：
+   - 双击画布空白处直接唤起AI生成节点（官方核心快捷操作）
+   - 从左侧节点库拖拽节点到画布
+   - Agent自动生成节点到鼠标位置
+2. **编辑节点**：
+   - 点击参数控件直接编辑
+   - 拖拽节点边缘调整宽度
+   - 右键节点显示上下文菜单：创建资产、打组、布局、AI编辑、复制、删除、重命名
+3. **批量操作**：
+   - 框选多个节点，顶部出现批量操作栏：打组、布局（宫格/水平/垂直）、复制、删除、创建资产
+   - Ctrl+D快速克隆选中节点
+   - Ctrl+A全选所有节点
+
+### 6.2 端口与连接线交互
+1. **创建连接**：从输出端口拖拽到输入端口，自动吸附最近端口
+2. **断开连接**：点击连接线按Delete键，或拖拽端点到空白处
+3. **批量连接**：拖拽一个输出端口到多个输入端口，自动创建多条连接
+4. **连接线状态**：
+   - 生成中：紫色流动动画
+   - 错误：红色虚线
+   - 缓存：黄色虚线
+   - 选中：蓝色实线，宽度3px
+
+### 6.3 画布与节点联动
+1. **视图控制**：
+   - F键：聚焦选中节点
+   - Z键：适配所有节点到视口
+   - 空格键+拖拽：平移画布
+   - 鼠标滚轮：缩放画布（0.25x–4x）
+2. **对齐与布局**：
+   - 节点拖拽时显示对齐线，自动吸附网格和其他节点边缘
+   - 选中多个节点后点击“布局”按钮，自动排列为指定格式
+3. **小地图**：
+   - 右下角显示画布缩略图，不同状态节点用对应颜色标识
+   - 点击小地图任意位置快速定位
+   - 拖拽小地图视口框平移画布
+
+### 6.4 官方完整快捷键（节点相关）
+| 快捷键 | 功能 |
+|--------|------|
+| Delete/Backspace | 删除选中节点/连接线 |
+| Ctrl+A/Cmd+A | 全选所有节点 |
+| Escape | 取消选择 |
+| F | 聚焦选中节点 |
+| Z | 适配所有节点到视口 |
+| Ctrl+C/Cmd+C | 复制选中节点 |
+| Ctrl+V/Cmd+V | 粘贴节点 |
+| Ctrl+D/Cmd+D | 克隆选中节点 |
+| Ctrl+Z/Cmd+Z | 撤销 |
+| Ctrl+Y/Cmd+Y | 重做 |
+| 空格键+拖拽 | 平移画布 |
+| 鼠标滚轮 | 缩放画布 |
+| 方向键 | 微移选中节点（1px） |
+| Shift+方向键 | 大步移动选中节点（10px） |
+| Shift+A | 3D节点添加模型 |
+| Shift+L | 3D节点打开灯光面板 |
+| Ctrl+Shift+P | 3D节点截屏 |
+| Ctrl+S/Cmd+S | 保存3D工程 |
+
+---
+
+## 七、性能与体验优化要求
+### 7.1 渲染优化
+1. **视口裁剪**：只渲染当前视口内的节点，超出视口的节点仅渲染边框和标题栏
+2. **折叠优化**：节点折叠时不渲染内容区和预览图，仅保留标题栏
+3. **预览图懒加载**：节点预览图进入视口时才加载，使用缩略图，点击放大时加载原图
+4. **大量节点降级**：节点数量>50时自动禁用网格和对齐辅助，连接线简化为直线
+
+### 7.2 生成体验优化
+1. **实时进度**：显示生成步骤、百分比和剩余时间
+2. **可取消生成**：生成中节点显示取消按钮，点击立即终止并释放算力
+3. **失败重试**：生成失败节点显示重试按钮，支持一键重新生成
+4. **版本管理**：每个节点保存最近3个生成版本，底部提供版本切换按钮
+
+### 7.3 无障碍设计
+1. **屏幕阅读器支持**：所有节点和端口添加ARIA标签
+2. **键盘全操作**：支持Tab键切换节点，Enter键激活，方向键调整位置
+3. **高对比度模式**：提供高对比度主题选项
+4. **状态语音提示**：节点状态变化时可触发语音提示（默认关闭）
+
+---
+
+## 八、强制设计规则（不可违反）
+1. **算力消耗强制显示**：所有AI生成节点必须在底部状态栏显示算力消耗，字体≥12px且加粗
+2. **替换按钮强制存在**：所有带预览图的节点必须在预览区右上角显示“↑替换”按钮
+3. **刷新按钮强制存在**：所有AI生成节点必须在标题栏显示刷新按钮
+4. **状态图标强制更新**：节点状态变化时必须立即更新对应图标
+5. **双模式兼容**：所有节点必须同时支持手动编辑和AI自动生成
+6. **参考图引用标识**：绑定参考图的端口必须显示@符号，悬停显示素材名称
+
+---
+# 无限画布节点前端实现代码包（RunningHub官方对齐版）
+基于上一轮最终版UI规范，提供可直接运行的前端实现代码，包含CSS变量系统、标准节点React组件、状态管理和Canvas连接线渲染。
+
+---
+
+## 一、全局CSS变量系统（完整定义）
+```css
+/* runninghub-node-theme.css */
+:root {
+  /* ===== 基础颜色系统 ===== */
+  --rh-primary: #3B82F6;
+  --rh-canvas-bg: #0F172A;
+  --rh-node-bg: #1E293B;
+  --rh-node-header-bg: #334155;
+  --rh-node-border: #475569;
+  --rh-text-primary: #F8FAFC;
+  --rh-text-secondary: #94A3B8;
+  --rh-success: #10B981;
+  --rh-warning: #F59E0B;
+  --rh-error: #EF4444;
+  --rh-generating: #8B5CF6;
+  --rh-nodeframe: #F97316;
+  --rh-conditioning: #EC4899;
+  --rh-model: #6366F1;
+  --rh-latent: #14B8A6;
+  --rh-any: #94A3B8;
+
+  /* ===== 尺寸规范 ===== */
+  --rh-node-min-width: 180px;
+  --rh-node-max-width: 480px;
+  --rh-node-header-height: 32px;
+  --rh-node-content-row-height: 28px;
+  --rh-port-diameter: 10px;
+  --rh-port-spacing: 14px;
+  --rh-node-padding: 10px;
+  --rh-node-margin: 20px;
+  --rh-node-radius: 6px;
+  --rh-preview-size: 120px;
+  --rh-node-footer-height: 24px;
+
+  /* ===== 字体系统 ===== */
+  --rh-font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --rh-font-size-title: 14px;
+  --rh-font-size-param: 13px;
+  --rh-font-size-cost: 12px;
+  --rh-font-size-desc: 12px;
+  --rh-font-weight-title: 600;
+  --rh-font-weight-param: 500;
+  --rh-font-weight-cost: 600;
+
+  /* ===== 阴影与动画 ===== */
+  --rh-node-selected-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  --rh-transition-fast: 0.15s ease;
+  --rh-transition-medium: 0.3s ease;
+}
+
+/* 节点基础样式 */
+.rh-node {
+  position: absolute;
+  min-width: var(--rh-node-min-width);
+  max-width: var(--rh-node-max-width);
+  background: var(--rh-node-bg);
+  border: 1px solid var(--rh-node-border);
+  border-radius: var(--rh-node-radius);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: all var(--rh-transition-fast);
+  user-select: none;
+  z-index: 1;
+}
+
+.rh-node.selected {
+  border-color: var(--rh-primary);
+  box-shadow: var(--rh-node-selected-shadow);
+  z-index: 10;
+}
+
+.rh-node.generating {
+  border-color: var(--rh-generating);
+}
+
+.rh-node.completed {
+  border-color: var(--rh-success);
+}
+
+.rh-node.error {
+  border-color: var(--rh-error);
+}
+
+.rh-node.cached {
+  border-color: var(--rh-warning);
+}
+
+.rh-node.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.rh-node.collapsed .rh-node-content,
+.rh-node.collapsed .rh-node-footer {
+  display: none;
+}
+```
+
+---
+
+## 二、标准节点React组件（TypeScript）
+```tsx
+// RunningHubNode.tsx
+import React, { useState, useRef, useCallback } from 'react';
+import './runninghub-node-theme.css';
+
+// 节点状态类型
+export type NodeState = 'default' | 'selected' | 'generating' | 'completed' | 'error' | 'cached' | 'disabled';
+
+// 端口类型
+export interface Port {
+  id: string;
+  type: 'input' | 'output';
+  dataType: 'IMAGE' | 'VIDEO' | 'AUDIO' | 'TEXT' | 'CONDITIONING' | 'MODEL' | 'LATENT' | 'NODEFRAME' | 'ANY';
+  label?: string;
+  connected: boolean;
+  reference?: string; // 绑定的素材ID
+}
+
+// 节点数据类型
+export interface NodeData {
+  id: string;
+  type: string;
+  title: string;
+  icon: string;
+  position: { x: number; y: number };
+  state: NodeState;
+  ports: Port[];
+  params: Record<string, any>;
+  previewUrl?: string;
+  cost?: number;
+  modelVersion?: string;
+  resolution?: string;
+  duration?: number;
+  progress?: number;
+  errorMessage?: string;
+}
+
+interface RunningHubNodeProps {
+  data: NodeData;
+  onSelect: (id: string) => void;
+  onMove: (id: string, position: { x: number; y: number }) => void;
+  onDelete: (id: string) => void;
+  onRefresh: (id: string) => void;
+  onReplace: (id: string) => void;
+  onPortConnect: (fromPortId: string, toPortId: string) => void;
+}
+
+const RunningHubNode: React.FC<RunningHubNodeProps> = ({
+  data,
+  onSelect,
+  onMove,
+  onDelete,
+  onRefresh,
+  onReplace,
+  onPortConnect
+}) => {
+  const nodeRef = useRef<HTMLDivElement>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // 状态图标映射
+  const stateIcons: Record<NodeState, string> = {
+    default: '',
+    selected: '',
+    generating: '⏳',
+    completed: '✅',
+    error: '❌',
+    cached: '💾',
+    disabled: ''
+  };
+
+  // 端口颜色映射
+  const portColors: Record<string, string> = {
+    IMAGE: 'var(--rh-success)',
+    VIDEO: 'var(--rh-primary)',
+    AUDIO: 'var(--rh-generating)',
+    TEXT: 'var(--rh-warning)',
+    CONDITIONING: 'var(--rh-conditioning)',
+    MODEL: 'var(--rh-model)',
+    LATENT: 'var(--rh-latent)',
+    NODEFRAME: 'var(--rh-nodeframe)',
+    ANY: 'var(--rh-any)'
+  };
+
+  // 节点拖拽开始
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('.rh-node-header')) {
+      e.preventDefault();
+      onSelect(data.id);
+      setIsDragging(true);
+      setDragOffset({
+        x: e.clientX - data.position.x,
+        y: e.clientY - data.position.y
+      });
+    }
+  }, [data.id, data.position, onSelect]);
+
+  // 节点拖拽移动
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    if (isDragging) {
+      onMove(data.id, {
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y
+      });
+    }
+  }, [isDragging, data.id, dragOffset, onMove]);
+
+  // 节点拖拽结束
+  const handleMouseUp = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // 注册全局拖拽事件
+  React.useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  // 渲染端口
+  const renderPorts = () => {
+    const inputPorts = data.ports.filter(p => p.type === 'input');
+    const outputPorts = data.ports.filter(p => p.type === 'output');
+
+    return (
+      <>
+        {/* 输入端口 */}
+        {inputPorts.map((port, index) => (
+          <div
+            key={port.id}
+            className="rh-port rh-port-input"
+            style={{
+              position: 'absolute',
+              left: -5,
+              top: var(--rh-node-header-height) + index * var(--rh-port-spacing) + var(--rh-node-padding),
+              width: var(--rh-port-diameter),
+              height: var(--rh-port-diameter),
+              borderRadius: '50%',
+              background: portColors[port.dataType],
+              border: '2px solid var(--rh-node-bg)',
+              cursor: 'crosshair',
+              zIndex: 20
+            }}
+            title={`${port.label || port.dataType} (输入)`}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              // 触发连接开始逻辑
+            }}
+          >
+            {port.reference && <span style={{ position: 'absolute', left: -12, top: -2, fontSize: '10px' }}>@</span>}
+          </div>
+        ))}
+
+        {/* 输出端口 */}
+        {outputPorts.map((port, index) => (
+          <div
+            key={port.id}
+            className="rh-port rh-port-output"
+            style={{
+              position: 'absolute',
+              right: -5,
+              top: var(--rh-node-header-height) + index * var(--rh-port-spacing) + var(--rh-node-padding),
+              width: var(--rh-port-diameter),
+              height: var(--rh-port-diameter),
+              borderRadius: '50%',
+              background: portColors[port.dataType],
+              border: '2px solid var(--rh-node-bg)',
+              cursor: 'crosshair',
+              zIndex: 20
+            }}
+            title={`${port.label || port.dataType} (输出)`}
+            onMouseDown={(e) => {
+              e.stopPropagation();
+              // 触发连接开始逻辑
+            }}
+          />
+        ))}
+      </>
+    );
+  };
+
+  return (
+    <div
+      ref={nodeRef}
+      className={`rh-node ${data.state} ${isCollapsed ? 'collapsed' : ''}`}
+      style={{
+        left: data.position.x,
+        top: data.position.y
+      }}
+      onMouseDown={handleMouseDown}
+      onClick={() => onSelect(data.id)}
+    >
+      {/* 标题栏 */}
+      <div
+        className="rh-node-header"
+        style={{
+          height: var(--rh-node-header-height),
+          padding: `0 var(--rh-node-padding)`,
+          background: var(--rh-node-header-bg),
+          borderTopLeftRadius: var(--rh-node-radius),
+          borderTopRightRadius: var(--rh-node-radius),
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'move'
+        }}
+        onDoubleClick={() => setIsCollapsed(!isCollapsed)}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span>{data.icon}</span>
+          <span style={{
+            fontSize: var(--rh-font-size-title),
+            fontWeight: var(--rh-font-weight-title),
+            color: var(--rh-text-primary),
+            maxWidth: '120px',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap'
+          }}>
+            {data.title}
+          </span>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            style={{ background: 'none', border: 'none', color: var(--rh-text-secondary), cursor: 'pointer', fontSize: '14px' }}
+            onClick={(e) => { e.stopPropagation(); /* 打开设置面板 */ }}
+          >
+            ⚙️
+          </button>
+          <button
+            style={{ background: 'none', border: 'none', color: var(--rh-text-secondary), cursor: 'pointer', fontSize: '14px' }}
+            onClick={(e) => { e.stopPropagation(); onRefresh(data.id); }}
+          >
+            🔄
+          </button>
+          <span style={{ fontSize: '14px' }}>{stateIcons[data.state]}</span>
+          <button
+            style={{ background: 'none', border: 'none', color: var(--rh-text-secondary), cursor: 'pointer', fontSize: '14px' }}
+            onClick={(e) => { e.stopPropagation(); onDelete(data.id); }}
+          >
+            ×
+          </button>
+        </div>
+      </div>
+
+      {/* 预览区（AI节点强制） */}
+      {data.previewUrl && !isCollapsed && (
+        <div
+          className="rh-node-preview"
+          style={{
+            position: 'relative',
+            padding: var(--rh-node-padding),
+            display: 'flex',
+            justifyContent: 'center'
+          }}
+        >
+          <img
+            src={data.previewUrl}
+            alt="预览"
+            style={{
+              width: var(--rh-preview-size),
+              height: var(--rh-preview-size),
+              objectFit: 'cover',
+              borderRadius: '4px'
+            }}
+          />
+          <button
+            style={{
+              position: 'absolute',
+              top: '14px',
+              right: '14px',
+              background: 'rgba(0,0,0,0.6)',
+              border: 'none',
+              color: 'white',
+              padding: '2px 6px',
+              borderRadius: '4px',
+              fontSize: '11px',
+              cursor: 'pointer'
+            }}
+            onClick={(e) => { e.stopPropagation(); onReplace(data.id); }}
+          >
+            ↑替换
+          </button>
+        </div>
+      )}
+
+      {/* 内容区 */}
+      <div
+        className="rh-node-content"
+        style={{
+          padding: `0 var(--rh-node-padding) var(--rh-node-padding)`,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '8px'
+        }}
+      >
+        {/* 这里渲染节点参数控件 */}
+        {Object.entries(data.params).map(([key, value]) => (
+          <div
+            key={key}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              height: var(--rh-node-content-row-height)
+            }}
+          >
+            <label style={{
+              fontSize: var(--rh-font-size-param),
+              fontWeight: var(--rh-font-weight-param),
+              color: var(--rh-text-primary)
+            }}>
+              {key}
+            </label>
+            <input
+              type="text"
+              value={value}
+              style={{
+                width: '120px',
+                background: 'var(--rh-node-header-bg)',
+                border: '1px solid var(--rh-node-border)',
+                borderRadius: '4px',
+                color: 'var(--rh-text-primary)',
+                padding: '2px 6px',
+                fontSize: '12px'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        ))}
+
+        {/* 错误信息 */}
+        {data.state === 'error' && data.errorMessage && (
+          <div style={{
+            color: 'var(--rh-error)',
+            fontSize: '12px',
+            padding: '4px',
+            background: 'rgba(239, 68, 68, 0.1)',
+            borderRadius: '4px'
+          }}>
+            {data.errorMessage}
+          </div>
+        )}
+      </div>
+
+      {/* 底部状态栏（AI节点强制） */}
+      {(data.cost !== undefined || data.progress !== undefined) && !isCollapsed && (
+        <div
+          className="rh-node-footer"
+          style={{
+            height: var(--rh-node-footer-height),
+            padding: `0 var(--rh-node-padding)`,
+            background: '#27374D',
+            borderBottomLeftRadius: var(--rh-node-radius),
+            borderBottomRightRadius: var(--rh-node-radius),
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '11px',
+            color: 'var(--rh-text-secondary)'
+          }}
+        >
+          <div>
+            {data.resolution && `${data.resolution} · `}
+            {data.duration && `${data.duration}s · `}
+            {data.modelVersion}
+          </div>
+          <div style={{ fontWeight: 'var(--rh-font-weight-cost)', color: 'var(--rh-text-primary)' }}>
+            ¥{data.cost?.toFixed(1)}
+          </div>
+        </div>
+      )}
+
+      {/* 生成进度条 */}
+      {data.state === 'generating' && data.progress !== undefined && !isCollapsed && (
+        <div style={{
+          position: 'absolute',
+          bottom: 'var(--rh-node-footer-height)',
+          left: 0,
+          right: 0,
+          height: '3px',
+          background: 'var(--rh-node-header-bg)'
+        }}>
+          <div style={{
+            height: '100%',
+            width: `${data.progress}%`,
+            background: 'var(--rh-generating)',
+            transition: 'width 0.2s linear'
+          }} />
+        </div>
+      )}
+
+      {/* 端口 */}
+      {renderPorts()}
+    </div>
+  );
+};
+
+export default RunningHubNode;
+```
+
+---
+
+## 三、节点状态管理（Redux Toolkit）
+```typescript
+// nodeSlice.ts
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { NodeData, NodeState, Port } from './RunningHubNode';
+
+interface NodesState {
+  nodes: Record<string, NodeData>;
+  selectedNodeId: string | null;
+  connections: Array<{ id: string; fromPortId: string; toPortId: string }>;
+}
+
+const initialState: NodesState = {
+  nodes: {},
+  selectedNodeId: null,
+  connections: []
+};
+
+const nodeSlice = createSlice({
+  name: 'nodes',
+  initialState,
+  reducers: {
+    addNode: (state, action: PayloadAction<NodeData>) => {
+      state.nodes[action.payload.id] = action.payload;
+    },
+    deleteNode: (state, action: PayloadAction<string>) => {
+      delete state.nodes[action.payload];
+      // 删除关联的连接
+      state.connections = state.connections.filter(conn => {
+        const fromNodeId = conn.fromPortId.split('-')[0];
+        const toNodeId = conn.toPortId.split('-')[0];
+        return fromNodeId !== action.payload && toNodeId !== action.payload;
+      });
+      if (state.selectedNodeId === action.payload) {
+        state.selectedNodeId = null;
+      }
+    },
+    updateNodePosition: (state, action: PayloadAction<{ id: string; position: { x: number; y: number } }>) => {
+      state.nodes[action.payload.id].position = action.payload.position;
+    },
+    updateNodeState: (state, action: PayloadAction<{ id: string; state: NodeState }>) => {
+      state.nodes[action.payload.id].state = action.payload.state;
+    },
+    updateNodeProgress: (state, action: PayloadAction<{ id: string; progress: number }>) => {
+      state.nodes[action.payload.id].progress = action.payload.progress;
+    },
+    selectNode: (state, action: PayloadAction<string | null>) => {
+      state.selectedNodeId = action.payload;
+    },
+    addConnection: (state, action: PayloadAction<{ id: string; fromPortId: string; toPortId: string }>) => {
+      state.connections.push(action.payload);
+      // 更新端口连接状态
+      const [fromNodeId, fromPortIndex] = action.payload.fromPortId.split('-');
+      const [toNodeId, toPortIndex] = action.payload.toPortId.split('-');
+      
+      const fromPort = state.nodes[fromNodeId].ports.find(p => p.id === action.payload.fromPortId);
+      const toPort = state.nodes[toNodeId].ports.find(p => p.id === action.payload.toPortId);
+      
+      if (fromPort) fromPort.connected = true;
+      if (toPort) toPort.connected = true;
+    },
+    deleteConnection: (state, action: PayloadAction<string>) => {
+      const conn = state.connections.find(c => c.id === action.payload);
+      if (conn) {
+        const [fromNodeId] = conn.fromPortId.split('-');
+        const [toNodeId] = conn.toPortId.split('-');
+        
+        const fromPort = state.nodes[fromNodeId]?.ports.find(p => p.id === conn.fromPortId);
+        const toPort = state.nodes[toNodeId]?.ports.find(p => p.id === conn.toPortId);
+        
+        if (fromPort) fromPort.connected = false;
+        if (toPort) toPort.connected = false;
+      }
+      state.connections = state.connections.filter(c => c.id !== action.payload);
+    }
+  }
+});
+
+export const {
+  addNode,
+  deleteNode,
+  updateNodePosition,
+  updateNodeState,
+  updateNodeProgress,
+  selectNode,
+  addConnection,
+  deleteConnection
+} = nodeSlice.actions;
+
+export default nodeSlice.reducer;
+```
+
+---
+
+## 四、Canvas连接线渲染组件
+```tsx
+// ConnectionCanvas.tsx
+import React, { useRef, useEffect } from 'react';
+import { useSelector } from 'react-redux';
+import { RootState } from './store';
+
+interface ConnectionCanvasProps {
+  width: number;
+  height: number;
+}
+
+const ConnectionCanvas: React.FC<ConnectionCanvasProps> = ({ width, height }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { nodes, connections } = useSelector((state: RootState) => state.nodes);
+
+  // 绘制贝塞尔曲线连接线
+  const drawConnection = (
+    ctx: CanvasRenderingContext2D,
+    fromX: number,
+    fromY: number,
+    toX: number,
+    toY: number,
+    color: string,
+    isAnimating: boolean = false,
+    isSelected: boolean = false
+  ) => {
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+
+    // 贝塞尔曲线控制点
+    const controlPointOffset = Math.abs(toX - fromX) * 0.5;
+    ctx.bezierCurveTo(
+      fromX + controlPointOffset, fromY,
+      toX - controlPointOffset, toY,
+      toX, toY
+    );
+
+    ctx.strokeStyle = color;
+    ctx.lineWidth = isSelected ? 3 : 2;
+    ctx.stroke();
+
+    // 生成中动画效果
+    if (isAnimating) {
+      const time = Date.now() * 0.003;
+      const dashOffset = (time % 1) * 20;
+      ctx.setLineDash([5, 5]);
+      ctx.lineDashOffset = -dashOffset;
+      ctx.strokeStyle = '#8B5CF6';
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+  };
+
+  // 渲染所有连接线
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 清空画布
+    ctx.clearRect(0, 0, width, height);
+
+    // 绘制所有连接
+    connections.forEach(conn => {
+      const [fromNodeId, fromPortIndex] = conn.fromPortId.split('-');
+      const [toNodeId, toPortIndex] = conn.toPortId.split('-');
+
+      const fromNode = nodes[fromNodeId];
+      const toNode = nodes[toNodeId];
+
+      if (!fromNode || !toNode) return;
+
+      const fromPort = fromNode.ports.find(p => p.id === conn.fromPortId);
+      const toPort = toNode.ports.find(p => p.id === conn.toPortId);
+
+      if (!fromPort || !toPort) return;
+
+      // 计算端口位置
+      const fromPortY = fromNode.position.y + 32 + fromNode.ports.filter(p => p.type === 'output').indexOf(fromPort) * 14 + 5;
+      const fromX = fromNode.position.x + (fromNode.ref?.current?.offsetWidth || 180);
+      const fromY = fromPortY;
+
+      const toPortY = toNode.position.y + 32 + toNode.ports.filter(p => p.type === 'input').indexOf(toPort) * 14 + 5;
+      const toX = toNode.position.x;
+      const toY = toPortY;
+
+      // 端口颜色映射
+      const portColors: Record<string, string> = {
+        IMAGE: '#10B981',
+        VIDEO: '#3B82F6',
+        AUDIO: '#8B5CF6',
+        TEXT: '#F59E0B',
+        CONDITIONING: '#EC4899',
+        MODEL: '#6366F1',
+        LATENT: '#14B8A6',
+        NODEFRAME: '#F97316',
+        ANY: '#94A3B8'
+      };
+
+      const isGenerating = fromNode.state === 'generating' || toNode.state === 'generating';
+      const isSelected = false; // 可通过选中状态判断
+
+      drawConnection(
+        ctx,
+        fromX,
+        fromY,
+        toX,
+        toY,
+        portColors[fromPort.dataType],
+        isGenerating,
+        isSelected
+      );
+    });
+
+    // 动画循环
+    const animationId = requestAnimationFrame(() => {
+      // 强制重绘以更新动画
+    });
+
+    return () => cancelAnimationFrame(animationId);
+  }, [nodes, connections, width, height]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={width}
+      height={height}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        pointerEvents: 'none',
+        zIndex: 0
+      }}
+    />
+  );
+};
+
+export default ConnectionCanvas;
+```
+
+---
+
+

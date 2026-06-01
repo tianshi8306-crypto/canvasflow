@@ -45,15 +45,17 @@ export function FloatMenuSection({
   children: ReactNode;
 }) {
   return (
-    <div className="canvasFloatMenuSection">
-      {title ? <div className="canvasFloatMenuSectionTitle">{title}</div> : null}
+    <>
+      {title ? (
+        <div className="canvasPaneCtxMenu__sectionTitle canvasFloatMenuTitle">{title}</div>
+      ) : null}
       {children}
-    </div>
+    </>
   );
 }
 
 export function FloatMenuDivider() {
-  return <div className="canvasFloatMenuDivider" role="separator" />;
+  return <div className="canvasPaneCtxMenu__sep" role="separator" />;
 }
 
 type ItemProps = {
@@ -78,19 +80,17 @@ export function FloatMenuItem({
   return (
     <button
       type="button"
-      className={`canvasFloatMenuRow${active ? " canvasFloatMenuRow--active" : ""}`}
+      className={`canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l2 canvasFloatMenuRow${active ? " canvasFloatMenuRow--active" : ""}`}
       disabled={disabled}
       title={detail}
       onClick={onClick}
     >
-      {icon ? <span className="canvasFloatMenuRowIcon">{icon}</span> : null}
-      <span className="canvasFloatMenuRowMain">
-        <span className="canvasFloatMenuRowLabel">{label}</span>
-        {detail && !kbd ? (
-          <span className="canvasFloatMenuRowDetail">{detail}</span>
-        ) : null}
-      </span>
-      {kbd ? <span className="canvasFloatMenuRowKbd">{kbd}</span> : null}
+      {icon ? <span className="canvasPaneCtxMenu__icon">{icon}</span> : null}
+      <span className="canvasPaneCtxMenu__label">{label}</span>
+      {detail && !kbd ? (
+        <span className="canvasFloatMenuRowDetail">{detail}</span>
+      ) : null}
+      {kbd ? <span className="canvasPaneCtxMenu__shortcut">{kbd}</span> : null}
     </button>
   );
 }

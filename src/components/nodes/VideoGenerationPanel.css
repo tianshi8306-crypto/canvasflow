@@ -1,0 +1,1316 @@
+/* 视频生成参数面板（Portal / 放大态）；节点预览样式见 MinimalVideoNode.css */
+
+/* 底栏 Portal：紧凑高度（对齐参考图 1 / 图片节点 500×180 量级） */
+
+.videoGenPanel--chrome.nodeChrome--panel {
+  /* 顶栏 Tab / 快捷钮 / 底栏控件共用圆角矩形（对齐图片 igp-control-*） */
+  --vgp-control-h: var(--gen-control-h, 36px);
+  --vgp-control-radius-square: var(--gen-control-radius, 8px);
+  --vgp-control-radius-pill: var(--vgp-control-radius-square);
+  --vgp-panel-bg: var(--gen-panel-bg, #2b2b2b);
+  --vgp-control-border: 1px solid var(--border-button, #4d4d4d);
+  --vgp-control-bg: var(--bg-button);
+  --vgp-control-bg-hover: var(--bg-button-hover);
+  --vgp-control-text: rgba(255, 255, 255, 0.88);
+  --vgp-control-text-muted: #9e9e9e;
+  --vgp-cta-bg-ready: #f0f0f0;
+  --vgp-cta-bg-ready-hover: #ffffff;
+  --vgp-cta-fg-ready: #121212;
+  --vgp-cta-bg-disabled: #2b2b2b;
+  --vgp-cta-fg-disabled: #616161;
+  --vgp-cta-bg-generating: #ffffff;
+  --vgp-cta-fg-generating: #121212;
+  --vgp-cta-border-generating: var(--border-button, #4d4d4d);
+
+  /* 参考图条：500px 面板内均匀容纳 11 个完整缩略图（见 docs/design/gen-panel-design-system.md） */
+  --vgp-ref-thumb-size: var(--gen-ref-thumb-size, 37px);
+  --vgp-ref-thumb-gap: var(--gen-ref-thumb-gap, 4px);
+  --vgp-ref-thumb-radius: var(--vgp-control-radius-square);
+
+  width: 500px;
+  max-width: calc(100vw - 16px);
+  height: auto;
+  min-height: 0;
+  max-height: min(calc(100vh - 88px), 360px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 14px;
+  box-sizing: border-box;
+  font-size: 13px;
+  color: #e0e0e0;
+}
+
+
+
+.videoGenPanel--chrome .mmPanel--chrome {
+
+  gap: 6px;
+
+  width: 100%;
+
+  flex: 1;
+
+  min-height: 0;
+
+  overflow-x: hidden;
+
+  overflow-y: auto;
+
+}
+
+.videoGenPanel--chrome .mmPanel--chrome.mmPanel--generating {
+  position: relative;
+}
+
+.videoGenCenterCapsuleOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.videoGenCenterCapsule {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  padding: 9px 18px 9px 20px;
+  border-radius: 999px;
+  background: rgba(64, 64, 64, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.videoGenCenterCapsule-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.videoGenCenterCapsule-cancel {
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.videoGenCenterCapsule-cancel:hover:not(:disabled) {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.videoGenCenterCapsule-cancel:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+
+
+/* 顶栏：标签 + 右上展开 */
+
+.videoGenPanel--chrome .mmChromeHead--compact {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  min-width: 0;
+
+}
+
+
+
+.videoGenPanel--chrome .mmChromeIconBtn {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  width: 28px;
+
+  height: 28px;
+
+  padding: 0;
+
+  border-radius: 8px;
+
+  border: 1px solid var(--border-button, #4d4d4d);
+
+  background: var(--bg-button, #2b2b2b);
+
+  color: #bdbdbd;
+
+  cursor: pointer;
+
+  flex-shrink: 0;
+
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+
+}
+
+
+
+.videoGenPanel--chrome .mmChromeIconBtn:hover:not(:disabled) {
+
+  background: var(--bg-button-hover, rgba(255, 255, 255, 0.06));
+
+  color: #f0f0f0;
+
+  border-color: #5a5a5a;
+
+}
+
+
+
+.videoGenPanel--chrome .mmChromeExpandBtn {
+
+  margin-left: 2px;
+
+}
+
+
+
+.videoGenPanel--chrome .mmChromeHeadActions {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+
+  margin-left: auto;
+
+  flex-shrink: 0;
+
+}
+
+
+
+.videoGenPanel--chrome .mmTabs--compact {
+
+  flex: 1;
+
+  min-width: 0;
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 4px;
+
+  padding: 0;
+
+  background: transparent;
+
+  overflow-x: auto;
+
+  scrollbar-width: none;
+
+  -webkit-mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 20px), transparent 100%);
+
+  mask-image: linear-gradient(90deg, #000 0, #000 calc(100% - 20px), transparent 100%);
+
+}
+
+
+
+.videoGenPanel--chrome .mmTabs--compact::-webkit-scrollbar {
+
+  display: none;
+
+}
+
+
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: var(--vgp-control-h);
+  padding: 0 10px;
+  font-size: 11px;
+  line-height: 1.1;
+  border-radius: var(--vgp-control-radius-square);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text-muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab:hover {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-control-text);
+  transform: none;
+}
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab--active {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-control-text);
+  font-weight: 500;
+}
+
+/* 创作模式 Tab：可点击切换；锁定态显示锁图标 */
+.videoGenPanel--chrome .mmTabs--compact .mmTab--clickable {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab--inactive {
+  opacity: 0.72;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.videoGenPanel--chrome .mmTabs--compact .mmTab--inactive:hover {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-control-text);
+  opacity: 1;
+}
+
+.videoGenPanel--chrome .mmTab--locked {
+  padding-right: 6px;
+}
+
+.videoGenPanel--chrome .mmTabLock {
+  margin-left: 3px;
+  font-size: 9px;
+  line-height: 1;
+  opacity: 0.85;
+}
+
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbsWrapper {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+  margin-left: 0;
+  width: 100%;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact.mmToolsAndThumbs--hasRefs .mmThumbsScrollZone::before {
+  display: none;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact.mmToolsAndThumbs--hasRefs .mmThumbsScrollZone::after {
+  background: linear-gradient(270deg, var(--vgp-panel-bg) 0%, transparent 100%);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbs {
+  gap: var(--vgp-ref-thumb-gap);
+  padding: 2px 0 3px;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb {
+  width: var(--vgp-ref-thumb-size);
+  height: var(--vgp-ref-thumb-size);
+  border-radius: var(--vgp-ref-thumb-radius);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbBadge {
+  top: 2px;
+  right: 2px;
+  left: auto;
+  min-width: 14px;
+  height: 14px;
+  padding: 0 3px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbDelete {
+  top: 2px;
+  right: 2px;
+  width: 14px;
+  height: 14px;
+  font-size: 10px;
+  line-height: 12px;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--labelOnly {
+  background: #fff;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--reorderable {
+  cursor: grab;
+  touch-action: none;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--reorder-dragging {
+  opacity: 0.48;
+  cursor: grabbing;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--reorder-drop {
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.9);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--text {
+  background: var(--bg-button);
+  border-color: var(--border-button);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--text .mmThumbInner {
+  background: transparent;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--text .mmThumbBadge {
+  background: rgba(255, 255, 255, 0.92);
+  color: #111;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbTextMicro {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbTextMicro-inner {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 220px;
+  max-height: 220px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.94);
+  white-space: pre-wrap;
+  word-break: break-word;
+  transform: scale(0.155);
+  transform-origin: top left;
+  user-select: none;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbTextMicro-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbPendingIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--audio,
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--video.mmThumb--pending {
+  background: var(--bg-button);
+  border-color: var(--border-button);
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumb--audio .mmThumbInner {
+  background: transparent;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbAudioGlyph {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbAudioCenterPlay {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0 0 0 1px;
+  border: none;
+  border-radius: 3px;
+  background: #4a9eff;
+  color: #fff;
+  font-size: 8px;
+  line-height: 1;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbAudioCenterPlay:disabled {
+  opacity: 0.42;
+  cursor: default;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbNodeLabel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 2px 3px;
+  gap: 1px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbNodeLabel-kind {
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  color: #333;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbNodeLabel-text {
+  font-size: 8px;
+  line-height: 1.1;
+  color: #555;
+  text-align: center;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.videoGenPanel--chrome .mmToolsAndThumbs--compact .mmThumbsScrollZone {
+  padding: 4px 0 5px;
+  border-radius: 0;
+  background: transparent;
+  border: none;
+}
+
+/* iter-98：参考 Focus Preview（LibTV 面板内大预览） */
+.videoGenPanel--chrome .mmRefFocusPreview {
+  display: flex;
+  align-items: stretch;
+  gap: 10px;
+  min-height: 0;
+  max-height: 128px;
+  padding: 6px 8px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.32);
+  box-sizing: border-box;
+}
+
+.videoGenPanel--chrome .mmRefFocusPreviewMedia {
+  flex-shrink: 0;
+  width: 72px;
+  height: 72px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #0a0a0b;
+}
+
+.videoGenPanel--chrome .mmRefFocusPreviewImg,
+.videoGenPanel--chrome .mmRefFocusPreviewMedia img,
+.videoGenPanel--chrome .mmRefFocusPreviewMedia video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.videoGenPanel--chrome .mmRefFocusPreviewAudio {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.videoGenPanel--chrome .mmRefFocusPreviewMeta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.videoGenPanel--chrome .mmRefFocusPreviewLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.videoGenPanel--chrome .mmRefFocusPreviewChip,
+.mmThumbHoverPopChip {
+  position: relative;
+  transform: none;
+  max-width: 100%;
+}
+
+.videoGenPanel--chrome .mmRefFocusPreviewToken {
+  font-size: 11px;
+  font-family: ui-monospace, monospace;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.videoGenPanel--chrome .mmThumb--selected {
+  outline: none;
+}
+
+/* 提示词区 */
+
+.videoGenPanel--chrome .mmPromptArea--compact .vgp-prompt-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 提示词：wrapper 保持 grid 叠层（勿改 flex-column，否则会与 mention-overlay 上下拆开） */
+.videoGenPanel--chrome .mmPromptArea--compact .video-prompt-mention--compact.mention-input-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+  align-content: stretch;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .video-prompt-mention--compact .mention-overlay,
+.videoGenPanel--chrome .mmPromptArea--compact .video-prompt-mention--compact .mention-textarea.mmPromptInput {
+  grid-area: 1 / 1;
+  min-height: 44px;
+  max-height: 96px;
+  height: 100%;
+  border-radius: 0;
+  border: none;
+  border-color: transparent;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .video-prompt-mention--compact .mention-overlay {
+  overflow: hidden;
+}
+
+.videoGenPanel--chrome .mention-pill--video-ref,
+.videoGenPanel--chrome .mention-pill--video-named {
+  background: rgba(38, 38, 42, 0.95);
+  border: none;
+  color: rgba(255, 255, 255, 0.92);
+  border-radius: var(--vgp-control-radius-square);
+}
+
+.videoGenPanel--chrome .mention-pill--video-ref.mention-pill--ref-active,
+.videoGenPanel--chrome .mention-pill--video-named.mention-pill--ref-active {
+  background: rgba(48, 48, 54, 0.98);
+}
+
+.mention-dropdown--video-ref .mention-dropdown-hint {
+  font-size: 10px;
+  opacity: 0.55;
+  margin-left: 4px;
+}
+
+.mention-dropdown--video-ref .mention-dropdown-token {
+  margin-left: auto;
+  font-size: 10px;
+  opacity: 0.65;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .mmPromptInput:focus {
+  border: none;
+  outline: none;
+  background: transparent;
+}
+
+.videoGenPanel--chrome .mmPromptArea--compact .mmPromptFooter {
+  padding: 2px 0 0;
+  justify-content: flex-end;
+}
+
+.videoGenPanel--chrome .mmPromptLen {
+  font-size: 11px;
+  color: #616161;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmFootPromptLen {
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0 2px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--vgp-control-text-muted, #9e9e9e);
+  font-family: ui-monospace, monospace;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+
+
+/* 状态轨：Portal / 展开态固定在底栏上方 */
+.videoGenPanel--chrome .mmStatusRail {
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 6px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--cf-charcoal-inset, #0e0e0e) 40%, rgba(255, 255, 255, 0.08));
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmProgress--rail {
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--cf-accent, var(--cf-accent-focus)) 10%, transparent);
+}
+
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureErrors {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: visible;
+  margin-bottom: 0;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureErrorItem {
+  font-size: 11px;
+  line-height: 1.35;
+  color: #e8e8e8;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureTechnicalWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureTechnicalToggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--vgp-control-text-muted, #9e9e9e);
+  font-size: 10px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureTechnicalToggle:hover {
+  color: #cfcfcf;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureTechnicalBody {
+  max-height: 140px;
+  overflow-y: auto;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureTechnicalLine {
+  margin: 0;
+  font-size: 10px;
+  line-height: 1.35;
+  color: #a8a8a8;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: ui-monospace, monospace;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureTechnicalLine--solo {
+  margin-top: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmFailureHint {
+  flex-shrink: 0;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmResultBanner--rail {
+  padding: 6px 8px;
+  font-size: 11px;
+}
+
+.videoGenPanel--chrome .mmStatusRail .mmValidationErrors--rail {
+  font-size: 10px;
+  padding: 6px 8px;
+}
+
+/* 底栏：模型 + 输出参数 + 生成钮（圆角矩形，对齐顶栏 Tab） */
+
+.videoGenPanel--chrome .mmFoot--chrome {
+
+  display: flex;
+
+  align-items: center;
+
+  gap: 8px;
+
+  flex-wrap: nowrap;
+
+  padding: 0;
+
+  border-top: none;
+
+  background: transparent;
+
+  position: relative;
+
+}
+
+
+
+.videoGenPanel--chrome .mmFoot--chrome .mmModelSelect {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: min(180px, 38vw);
+  min-height: var(--vgp-control-h);
+  padding: 6px 24px 6px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--vgp-control-radius-pill);
+  border: var(--vgp-control-border);
+  background-color: var(--vgp-control-bg);
+  color: var(--vgp-control-text);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmModelSelect:hover {
+  background-color: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmModelSelect:focus {
+  outline: none;
+  border-color: var(--border-button, #4d4d4d);
+  background-color: var(--vgp-control-bg-hover);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmOutputCombo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  width: auto;
+  max-width: none;
+  min-height: var(--vgp-control-h);
+  padding: 6px 24px 6px 10px;
+  border-radius: var(--vgp-control-radius-pill);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  justify-content: flex-start;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmOutputCombo:hover,
+.videoGenPanel--chrome .mmFoot--chrome .mmOutputCombo--open {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmFootPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+  min-height: var(--vgp-control-h);
+  padding: 6px 22px 6px 10px;
+  border-radius: var(--vgp-control-radius-pill);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  position: relative;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmFootPill:hover,
+.videoGenPanel--chrome .mmFoot--chrome .mmFootPill--open {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.videoGenPanel--chrome .mmFootPillLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 72px;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmFootPill--output {
+  gap: 6px;
+  padding: 6px 10px 6px 8px;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmFootPill--output .mmFootPillLabel--output {
+  max-width: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.videoGenPanel--chrome .mmFootPillAspectIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
+.videoGenPanel--chrome .mmFootPillAspectIcon .textNodeTtvWireViewport {
+  width: 18px;
+  height: 14px;
+}
+
+.videoGenPanel--chrome .mmFootPillAudioIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--vgp-control-text-muted, #9e9e9e);
+  opacity: 0.75;
+}
+
+.videoGenPanel--chrome .mmFootPillAudioIcon--on {
+  color: var(--vgp-control-text);
+  opacity: 1;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmFootAudioBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: var(--vgp-control-h);
+  height: var(--vgp-control-h);
+  min-height: var(--vgp-control-h);
+  border-radius: var(--vgp-control-radius-square);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text-muted, #9e9e9e);
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmFootAudioBtn:hover {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .mmFootAudioBtn--on {
+  color: var(--cf-accent, #3b82f6);
+  border-color: color-mix(in srgb, var(--cf-accent, #3b82f6) 45%, transparent);
+  background: color-mix(in srgb, var(--cf-accent, #3b82f6) 12%, var(--vgp-control-bg));
+}
+
+.videoGenPanel--chrome .mmThumbsWrapper {
+  position: relative;
+}
+
+.videoGenPanel--chrome .mmSwapFirstLast {
+  position: absolute;
+  top: -18px;
+  right: 0;
+  z-index: 2;
+  padding: 2px 8px;
+  font-size: 10px;
+  line-height: 1.3;
+  border-radius: var(--vgp-control-radius-square);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text-muted);
+  cursor: pointer;
+}
+
+.videoGenPanel--chrome .mmSwapFirstLast:hover {
+  background: var(--vgp-control-bg-hover);
+  color: var(--vgp-control-text);
+}
+
+
+
+.videoGenPanel--chrome .mmOutputComboLabel {
+
+  overflow: hidden;
+
+  text-overflow: ellipsis;
+
+}
+
+
+
+/* Portal 弹出层：锚定在底栏 pill 上方，对齐参考图 */
+.mmGenSettings.mmGenSettings--portal {
+  position: fixed;
+  max-height: min(420px, calc(100vh - 80px));
+  overflow-y: auto;
+  background: var(--bg-panel-elevated, #333333);
+  border: 1px solid var(--border-node, #4d4d4d);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  box-sizing: border-box;
+  scrollbar-width: thin;
+}
+
+.mmGenSettings--portal .mmGenSettingsLabel {
+  font-size: 12px;
+  color: #9e9e9e;
+  margin-bottom: 4px;
+}
+
+.mmGenSettings--portal .mmGenSettingsRatioGrid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+}
+
+.mmGenSettings--portal .mmGenSettingsRatioBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px;
+  border-radius: 8px;
+  border: 1px solid var(--border-button, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: #e0e0e0;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.mmGenSettings--portal .mmGenSettingsRatioBtn--active {
+  border-color: var(--border-button, #4d4d4d);
+  background: var(--bg-button-active);
+}
+
+.mmGenSettings--portal .mmGenSettingsSeg {
+  display: flex;
+  gap: 6px;
+}
+
+.mmGenSettings--portal .mmGenSettingsSegBtn {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-button, #4d4d4d);
+  background: var(--bg-button, #2b2b2b);
+  color: #e0e0e0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.mmGenSettings--portal .mmGenSettingsSegBtn--active {
+  border-color: var(--border-button, #4d4d4d);
+  background: var(--bg-button-active);
+  font-weight: 600;
+}
+
+.mmGenSettings--portal .mmGenSettingsSection + .mmGenSettingsSection {
+  margin-top: 14px;
+}
+
+
+
+/* 视频模型 Portal 选择器（与图片 igp-model-* 同构） */
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-picker {
+  position: relative;
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  max-width: min(180px, 38vw);
+  min-height: var(--vgp-control-h);
+  padding: 6px 24px 6px 10px;
+  border-radius: var(--vgp-control-radius-pill);
+  border: var(--vgp-control-border);
+  background: var(--vgp-control-bg);
+  color: var(--vgp-control-text);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger:hover:not(:disabled),
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger.open {
+  background: var(--vgp-control-bg-hover);
+  border-color: var(--border-button, #4d4d4d);
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger-label {
+  max-width: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  color: #f0f0f0;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger-chevron {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  color: #9e9e9e;
+  transform: rotate(180deg);
+  transition: transform 0.15s ease;
+}
+
+.videoGenPanel--chrome .mmFoot--chrome .igp-model-trigger.open .igp-model-trigger-chevron {
+  transform: rotate(0deg);
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome {
+  box-sizing: border-box;
+  min-width: 280px;
+  background: #1c1c1c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.65);
+  overflow: hidden;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-menu-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #e8e8e8;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item:hover:not(:disabled),
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item.selected {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item.disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(145deg, #3d3d3d, #252525);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 600;
+  color: #f5f5f5;
+  flex-shrink: 0;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.igp-model-menu.vgp-model-menu--portal.videoGenPanel--chrome .igp-model-item-subtitle {
+  display: block;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: #9e9e9e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 生成钮：LibTV 白底 + 上箭头（圆角矩形，与底栏控件一致） */
+.videoGenPanel--chrome .igp-generate-btn.igp-generate-btn--circle {
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  border-radius: var(--vgp-control-radius-square);
+  margin-left: auto;
+  gap: 0;
+}
+
+.videoGenPanel--chrome .igp-generate-btn.igp-generate-btn--circle:not(:disabled):not(.generating) {
+  background: #f5f5f5;
+  color: #111;
+  border-color: rgba(255, 255, 255, 0.14);
+}
+
+.videoGenPanel--chrome .igp-generate-btn.igp-generate-btn--circle:not(:disabled):not(.generating):hover {
+  background: #fff;
+}
+
+.videoGenPanel--chrome .igp-generate-btn.igp-generate-btn--circle:not(:disabled):not(.generating) svg {
+  color: #111;
+}
+
+.videoGenPanel--chrome .igp-generate-btn.igp-generate-btn--circle.generating {
+  background: #f0f0f0;
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #111;
+}
+
+.videoGenPanel--chrome .igp-generate-btn.igp-generate-btn--circle.generating svg {
+  color: #111;
+  fill: currentColor;
+}
+
+.videoGenPanel--chrome .igp-generate-btn.igp-generate-btn--circle:disabled:not(.generating) {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-cta-fg-disabled);
+  opacity: 0.55;
+}
+
+.videoGenPanel--chrome .igp-generate-btn.igp-generate-btn--circle:disabled:not(.generating) svg {
+  color: var(--vgp-cta-fg-disabled);
+}
+
+.videoGenPanel--chrome .igp-generate-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--vgp-control-h);
+  height: var(--vgp-control-h);
+  min-height: var(--vgp-control-h);
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: var(--vgp-control-radius-square);
+  cursor: pointer;
+  opacity: 1;
+  flex-shrink: 0;
+  margin-left: auto;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.videoGenPanel--chrome .igp-generate-btn:not(:disabled):not(.generating) {
+  background: var(--vgp-cta-bg-ready);
+  color: var(--vgp-cta-fg-ready);
+}
+
+.videoGenPanel--chrome .igp-generate-btn:not(:disabled):not(.generating):hover {
+  background: var(--vgp-cta-bg-ready-hover);
+}
+
+.videoGenPanel--chrome .igp-generate-btn:disabled:not(.generating) {
+  background: var(--vgp-cta-bg-disabled);
+  border-color: var(--border-button, #4d4d4d);
+  color: var(--vgp-cta-fg-disabled);
+  cursor: not-allowed;
+}
+
+.videoGenPanel--chrome .igp-generate-btn.generating {
+  background: var(--vgp-cta-bg-generating);
+  border-color: var(--vgp-cta-border-generating);
+  color: var(--vgp-cta-fg-generating);
+}
+
+.videoGenPanel--chrome .igp-generate-btn.generating:hover {
+  background: var(--vgp-cta-bg-ready-hover);
+}
+
+.videoGenPanel--chrome .igp-generate-btn svg {
+  width: 18px;
+  height: 18px;
+  color: inherit;
+}
+
+.videoGenPanel--chrome .igp-generate-btn:not(:disabled):not(.generating) svg {
+  color: var(--vgp-cta-fg-ready);
+}
+
+.videoGenPanel--chrome .igp-generate-btn:disabled:not(.generating) svg {
+  color: var(--vgp-cta-fg-disabled);
+}
+
+.videoGenPanel--chrome .igp-generate-btn.generating svg {
+  fill: currentColor;
+  color: var(--vgp-cta-fg-generating);
+}
+
+.videoGenPanel--chrome .igp-generate-btn-label {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.videoGenPanel--chrome .mmGenerateBtnLabel {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* 放大态：见 ImageGenerationPanelExpandedModal.css（.vgp-layout-expanded） */

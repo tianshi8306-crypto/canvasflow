@@ -18,6 +18,7 @@ export type VideoPreviewToolbarMenuOption = {
   id: string;
   label: string;
   mode?: VideoPreviewToolbarMenuMode;
+  kind?: "stub";
   stubMessage?: string;
 };
 
@@ -51,18 +52,16 @@ export const VIDEO_PREVIEW_TOOLBAR_PRIMARY: VideoPreviewToolbarItem[] = [
 
   {
     id: "hd",
-
     label: "高清",
-
-    kind: "workflow",
+    kind: "stub",
+    stubMessage: "视频高清增强即将支持",
   },
 
   {
     id: "parse",
-
     label: "解析",
-
-    kind: "workflow",
+    kind: "stub",
+    stubMessage: "视频内容解析即将支持",
   },
 
   {
@@ -75,7 +74,12 @@ export const VIDEO_PREVIEW_TOOLBAR_PRIMARY: VideoPreviewToolbarItem[] = [
     hasMenu: true,
 
     menuOptions: [
-      { id: "subtitle-auto", label: "自动去除", mode: "subtitle-auto" },
+      {
+        id: "subtitle-auto",
+        label: "自动去除",
+        kind: "stub",
+        stubMessage: "自动去字幕 API 即将支持",
+      },
       { id: "subtitle-region", label: "框选去除", mode: "subtitle-region" },
     ],
   },
@@ -91,16 +95,19 @@ export const VIDEO_PREVIEW_TOOLBAR_PRIMARY: VideoPreviewToolbarItem[] = [
 
     menuOptions: [
       { id: "audio-vocal", label: "提取人声", mode: "vocal" },
-      { id: "audio-bgm", label: "提取背景音乐", mode: "bgm" },
+      {
+        id: "audio-bgm",
+        label: "提取背景音乐",
+        kind: "stub",
+        stubMessage: "AI 伴奏分离即将支持",
+      },
     ],
   },
 ];
 
-/** 预览顶栏右侧：下载、展开（上传在预览区右上角） */
-
+/** 预览顶栏右侧：下载、展开（生成参数已移至底栏） */
 export const VIDEO_PREVIEW_TOOLBAR_UTILITY: VideoPreviewToolbarItem[] = [
   { id: "download", label: "下载", kind: "utility" },
-
   { id: "maximize", label: "展开", kind: "utility" },
 ];
 

@@ -96,6 +96,12 @@
   color: #e0e0e0;
 }
 
+.video-output-settings-popover .vos-res-btn--disabled,
+.video-output-settings-popover .vos-res-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .video-output-settings-popover .vos-row {
   display: flex;
   align-items: center;
@@ -116,7 +122,7 @@
 
 .video-output-settings-popover .vos-slider {
   width: 100%;
-  accent-color: #3b82f6;
+  accent-color: var(--cf-accent-focus);
 }
 
 .video-output-settings-popover .vos-toggle {
@@ -131,7 +137,7 @@
 }
 
 .video-output-settings-popover .vos-toggle--on {
-  background: #3b82f6;
+  background: var(--cf-accent-focus);
 }
 
 .video-output-settings-popover .vos-toggle-thumb {

@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "tools": [
+    {
+      "name": "canvas_add_text_node",
+      "toolId": "canvas.add_text_node",
+      "description": "在画布上创建文本节点",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "initialPrompt": { "type": "string" } }
+      }
+    },
+    {
+      "name": "canvas_ensure_script",
+      "toolId": "canvas.ensure_script",
+      "description": "确保画布存在脚本节点",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "script_update_brief",
+      "toolId": "script.update_brief",
+      "description": "更新脚本梗概",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "briefText": { "type": "string" } }
+      }
+    },
+    {
+      "name": "script_generate_outline",
+      "toolId": "script.generate_outline",
+      "description": "从梗概生成镜头表",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "script_generate_storyboard",
+      "toolId": "script.generate_storyboard",
+      "description": "为镜头生成分镜文案",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "storyboard_patch_shot",
+      "toolId": "storyboard.patch_shot",
+      "description": "增量修改指定镜号的分镜字段",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "shotNumber": { "type": "string" },
+          "visualPrompt": { "type": "string" },
+          "motionPrompt": { "type": "string" }
+        }
+      }
+    },
+    {
+      "name": "chain_spawn_media_nodes",
+      "toolId": "chain.spawn_media_nodes",
+      "description": "为分镜创建图片与视频节点并连线",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "image_generate_for_beats",
+      "toolId": "image.generate_for_beats",
+      "description": "按镜号批量提交关键帧出图",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "beatIds": { "type": "array", "items": { "type": "integer" } }
+        }
+      }
+    },
+    {
+      "name": "video_generate_for_beats",
+      "toolId": "video.generate_for_beats",
+      "description": "按镜号批量提交视频生成",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "beatIds": { "type": "array", "items": { "type": "integer" } }
+        }
+      }
+    },
+    {
+      "name": "film_workflow_check",
+      "toolId": "film.workflow_check",
+      "description": "检查制片链路断点与待办（只读）",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "compose_export_script",
+      "toolId": "compose.export_script",
+      "description": "合成时间线并导出成片",
+      "inputSchema": {
+        "type": "object",
+        "properties": { "autoRender": { "type": "boolean" } }
+      }
+    },
+    {
+      "name": "agent_delegate_parallel",
+      "toolId": "agent.delegate_parallel",
+      "description": "并行子 Agent：多路同时执行画布工具",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "tasks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "toolId": { "type": "string" },
+                "label": { "type": "string" },
+                "args": { "type": "object" }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

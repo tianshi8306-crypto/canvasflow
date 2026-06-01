@@ -11,9 +11,12 @@ export type ComposeClip = {
   label?: string;
 };
 
-const DEFAULT_EXPORT_PATH = "assets/exports/final.mp4";
+import { DEFAULT_EXPORT_REL_PATH } from "@/lib/compose/timelineExportFormat";
 
-export { DEFAULT_EXPORT_PATH };
+/** @deprecated 使用 `DEFAULT_EXPORT_REL_PATH` */
+const DEFAULT_EXPORT_PATH = DEFAULT_EXPORT_REL_PATH;
+
+export { DEFAULT_EXPORT_PATH, DEFAULT_EXPORT_REL_PATH };
 
 async function resolveVideoOutputRelPath(
   projectPath: string,

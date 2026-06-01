@@ -4,6 +4,14 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import {
+  clearDreaminaAuthCache,
+  dreaminaAuthStateFromCacheEntry,
+  readDreaminaAuthCache,
+  withDreaminaAuthMeta,
+  writeDreaminaAuthCache,
+} from "@/lib/dreaminaAuthCache";
+import { notifyDreaminaAuthUpdated } from "@/lib/dreaminaAuthEvents";
 
 /** 即梦 CLI 登录运行态 */
 export interface DreaminaLoginRuntime {
@@ -46,6 +54,12 @@ export interface DreaminaAuthState {
   avatarUrl?: string;
   installed: boolean;
   runtime: DreaminaLoginRuntime | null;
+  /** 上次成功检测时间（epoch ms） */
+  checkedAt?: number;
+  /** 本轮展示来自本地缓存，未调用 CLI */
+  fromCache?: boolean;
+  /** 缓存临近/已过期时的提示 */
+  staleHint?: string | null;
 }
 
 export function formatDreaminaCredit(credit: Record<string, unknown> | null | undefined): string {
@@ -84,11 +98,51 @@ function mapCliStatusToAuthState(status: DreaminaCliStatus): DreaminaAuthState {
   };
 }
 
-/** 检测即梦登录状态（调用 dreamina user_credit） */
-export async function checkDreaminaAuthState(refresh = false): Promise<DreaminaAuthState> {
+export type CheckDreaminaAuthOptions = {
+  /** 为 true 时仅读 localStorage，不调用 CLI（用于设置页展示） */
+  preferCache?: boolean;
+};
+
+async function fetchDreaminaAuthFromCli(refresh: boolean): Promise<DreaminaAuthState> {
+  const status = await invoke<DreaminaCliStatus>("dreamina_cli_status", { refresh });
+  const state = mapCliStatusToAuthState(status);
+  const checkedAt = Date.now();
+  writeDreaminaAuthCache(state, checkedAt);
+  const withMeta = withDreaminaAuthMeta(state, checkedAt, false);
+  notifyDreaminaAuthUpdated(withMeta);
+  return withMeta;
+}
+
+/**
+ * 检测即梦登录状态。
+ * refresh=false 且 preferCache：只读本地缓存，不跑 CLI（设置页打开时用）。
+ * refresh=true：调用 CLI（生成失败、手动刷新、登录完成）。
+ */
+export async function checkDreaminaAuthState(
+  refresh = false,
+  options: CheckDreaminaAuthOptions = {},
+): Promise<DreaminaAuthState> {
+  const preferCache = options.preferCache ?? !refresh;
+
+  if (!refresh && preferCache) {
+    const entry = readDreaminaAuthCache();
+    if (entry) {
+      return dreaminaAuthStateFromCacheEntry(entry);
+    }
+    return {
+      isLoggedIn: false,
+      statusText: "尚未检测",
+      message: "打开设置不会自动检测；即梦生成失败后将自动校验，或点击下方刷新",
+      creditText: "登录后显示余额",
+      installed: true,
+      runtime: null,
+      fromCache: true,
+      staleHint: null,
+    };
+  }
+
   try {
-    const status = await invoke<DreaminaCliStatus>("dreamina_cli_status", { refresh });
-    return mapCliStatusToAuthState(status);
+    return await fetchDreaminaAuthFromCli(refresh);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "检测失败";
     return {
@@ -98,6 +152,9 @@ export async function checkDreaminaAuthState(refresh = false): Promise<DreaminaA
       creditText: "登录后显示余额",
       installed: false,
       runtime: null,
+      checkedAt: Date.now(),
+      fromCache: false,
+      staleHint: null,
     };
   }
 }
@@ -136,7 +193,13 @@ export async function fetchDreaminaQrBase64(): Promise<string | null> {
 /** 退出登录 */
 export async function clearDreaminaToken(): Promise<DreaminaAuthState> {
   const status = await invoke<DreaminaCliStatus>("dreamina_cli_logout");
-  return mapCliStatusToAuthState(status);
+  clearDreaminaAuthCache();
+  const state = mapCliStatusToAuthState(status);
+  const checkedAt = Date.now();
+  writeDreaminaAuthCache(state, checkedAt);
+  const withMeta = withDreaminaAuthMeta(state, checkedAt, false);
+  notifyDreaminaAuthUpdated(withMeta);
+  return withMeta;
 }
 
 /** 登录是否已结束（成功/失败/复用） */

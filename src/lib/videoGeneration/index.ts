@@ -11,6 +11,8 @@ export {
   startVideoGenerationViaBridge,
   getVideoJobViaBridge,
   cancelVideoJobViaBridge,
+  recoverDreaminaVideoViaBridge,
+  type DreaminaVideoRecoverRequest,
 } from "@/lib/videoGeneration/bridge";
 export {
   resolveVideoGenerationMode,

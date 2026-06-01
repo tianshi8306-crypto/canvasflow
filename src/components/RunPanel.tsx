@@ -51,8 +51,21 @@ export function RunPanel() {
     let retries = 0;
     let failures = 0;
     let lastError = "";
+    let lastReferenceVideoPaths: string[] = [];
     for (const ev of latestEvents) {
-      if (ev.kind === "script_parse_request") requests += 1;
+      if (ev.kind === "script_parse_request") {
+        requests += 1;
+        try {
+          const p = JSON.parse(ev.payloadJson || "{}") as {
+            referenceVideoPaths?: string[];
+          };
+          if (Array.isArray(p.referenceVideoPaths) && p.referenceVideoPaths.length > 0) {
+            lastReferenceVideoPaths = p.referenceVideoPaths;
+          }
+        } catch {
+          /* ignore */
+        }
+      }
       if (ev.kind === "script_parse_response") responses += 1;
       if (ev.kind === "script_parse_retry") retries += 1;
       if (ev.kind === "script_parse_failed") {
@@ -66,7 +79,7 @@ export function RunPanel() {
       }
     }
     if (requests === 0 && responses === 0 && retries === 0 && failures === 0) return null;
-    return { requests, responses, retries, failures, lastError };
+    return { requests, responses, retries, failures, lastError, lastReferenceVideoPaths };
   }, [latestEvents]);
   const latestAgentSummary = useMemo(
     () => (latestEvents ? summarizeAgentPhases(latestEvents) : null),
@@ -201,6 +214,18 @@ export function RunPanel() {
               {scriptParseSummary.lastError ? (
                 <div style={{ marginTop: 6, color: "var(--danger)", whiteSpace: "pre-wrap" }}>
                   {scriptParseSummary.lastError}
+                </div>
+              ) : null}
+              {scriptParseSummary.lastReferenceVideoPaths.length > 0 ? (
+                <div style={{ marginTop: 8, color: "var(--muted)" }}>
+                  <div style={{ fontWeight: 600, marginBottom: 4 }}>reference_video_paths</div>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {scriptParseSummary.lastReferenceVideoPaths.map((p) => (
+                      <li key={p} className="mono" style={{ wordBreak: "break-all" }}>
+                        {p}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
             </div>

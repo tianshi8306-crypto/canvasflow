@@ -1,3 +1,4 @@
+import { DOUBAO_SEEDANCE_API_MODEL } from "@/lib/videoGeneration/seedanceApiModel";
 import type { ImageModelConfig } from "./settingsPanelTypes";
 
 export function newImageModelTemplate(): ImageModelConfig {
@@ -38,7 +39,7 @@ export function newVideoModelTemplate(): ImageModelConfig {
     modelName: "",
     modelVariant: "",
     label: "视频模型",
-    model: "doubao_seedance_2_0",
+    model: DOUBAO_SEEDANCE_API_MODEL,
     apiBaseUrl: "",
     enabled: true,
     priority: 0,

@@ -5,11 +5,20 @@ import { FlowCanvas } from "@/components/FlowCanvas";
 import { AppTopBar } from "@/components/AppTopBar";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { ScriptNodeFullscreenOverlay } from "@/components/ScriptNodeFullscreenOverlay";
+import { ComposeEditorOverlay } from "@/components/compose/ComposeEditorOverlay";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { HermesScriptVersionDiffOverlay } from "@/components/hermes/HermesScriptVersionDiffOverlay";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
+import { isCanvasShortcutBlockedTarget, useCanvasShortcutActions } from "@/hooks/canvas/useCanvasShortcutActions";
+import { nudgeDeltaFromArrowKey } from "@/lib/nodeCanvasNudge";
+import { bindActiveTabToProject } from "@/lib/canvasTabSync";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
-import { initHermesAutoChain } from "@/lib/hermes";
+import { HermesOrbSuggestionBridge } from "@/components/hermes/HermesOrbSuggestionBridge";
+import { AppUpdateDialog } from "@/components/AppUpdateDialog";
+import { useAppUpdateAtStartup } from "@/hooks/useAppUpdateAtStartup";
+import { initHermesAutoChain, syncCanvasMcpBridgeContext } from "@/lib/hermes";
+import "@/styles/hermes-shell.css";
 import {
   isPassiveAudioAsset,
   AUDIO_PASSIVE_REFERENCE_STATUS,
@@ -19,103 +28,171 @@ import {
   TEXT_PASSIVE_CONTAINER_STATUS,
 } from "@/lib/textNodeContainerMode";
 import { useNodeStatusListener } from "@/hooks/useNodeStatus";
+import { useProjectAutoSaveSettingsSync } from "@/hooks/useProjectAutoSaveSettingsSync";
+import type { SettingsCategory } from "@/components/SettingsNav";
+
+type OpenSettingsDetail = {
+  category?: SettingsCategory;
+  focusSectionId?: string;
+};
 
 export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpenRequest, setSettingsOpenRequest] = useState<{
+    category: SettingsCategory | null;
+    focusSectionId: string | null;
+    nonce: number;
+  }>({ category: null, focusSectionId: null, nonce: 0 });
+  useProjectAutoSaveSettingsSync();
 
   const scriptFullscreenNodeId = useProjectStore((s) => s.scriptFullscreenNodeId);
+  const composeEditorNodeId = useCanvasUiStore((s) => s.composeEditorNodeId);
   const projectPath = useProjectStore((s) => s.projectPath);
   const lastRunId = useProjectStore((s) => s.lastRunId);
   const setLastRunId = useProjectStore((s) => s.setLastRunId);
   const groupSelectedNodes = useProjectStore((s) => s.groupSelectedNodes);
+  const ungroupSelectedNodes = useProjectStore((s) => s.ungroupSelectedNodes);
   const copySelection = useProjectStore((s) => s.copySelection);
   const pasteSelection = useProjectStore((s) => s.pasteSelection);
   const deleteSelection = useProjectStore((s) => s.deleteSelection);
+  const nudgeSelectedNodes = useProjectStore((s) => s.nudgeSelectedNodes);
+  const newProject = useProjectStore((s) => s.newProject);
+  const openProject = useProjectStore((s) => s.openProject);
+  const saveProject = useProjectStore((s) => s.saveProject);
   const undo = useProjectStore((s) => s.undo);
   const redo = useProjectStore((s) => s.redo);
+  const {
+    duplicateSelection,
+    runGenerateShortcut,
+    openAddPanelCenter,
+    toggleShortcutsOverlay,
+  } = useCanvasShortcutActions();
   const setTextGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setTextGenPanelPinnedNodeId);
   const setAudioTtsPanelPinnedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelPinnedNodeId);
   const setAudioTtsPanelNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelNodeId);
   const setStatusText = useProjectStore((s) => s.setStatusText);
+  const toggleHermes = useCanvasUiStore((s) => s.toggleHermes);
+  const collapseHermes = useCanvasUiStore((s) => s.collapseHermes);
+  const hermesMode = useCanvasUiStore((s) => s.hermesMode);
+  const hermesJobDrawerOpen = useCanvasUiStore((s) => s.hermesJobDrawerOpen);
+  const closeHermesJobDrawer = useCanvasUiStore((s) => s.closeHermesJobDrawer);
+  const confirmDialog = useCanvasUiStore((s) => s.confirmDialog);
+  const { pendingUpdate, dismissPendingUpdate } = useAppUpdateAtStartup();
 
   useEffect(() => {
     const onKeydown = (ev: KeyboardEvent) => {
-      const target = ev.target as HTMLElement | null;
-      const active = document.activeElement as HTMLElement | null;
-      const textNodeEditingMode = Boolean(
-        document.querySelector(
-          [
-            ".textNodeCard--editing",
-            ".textNodeWriteSelfEditable:focus",
-            ".textNodeEditable--integrated:focus",
-            ".textNodeExpandPanel textarea:focus",
-            ".scriptGenComposerInput:focus",
-          ].join(","),
-        ),
-      );
-      const isEditableEl = (el: HTMLElement | null) =>
-        Boolean(
-          el &&
-            (el.tagName === "INPUT" ||
-              el.tagName === "TEXTAREA" ||
-              (typeof el.isContentEditable === "boolean" && el.isContentEditable) ||
-              el.closest("input, textarea, [contenteditable='true'], [contenteditable='plaintext-only']")),
-        );
-      const editingInput = isEditableEl(target) || isEditableEl(active);
-
+      const shouldBlockCanvasShortcut = isCanvasShortcutBlockedTarget(ev.target);
       const mod = ev.ctrlKey || ev.metaKey;
       const key = ev.key.toLowerCase();
+
+      if (ev.key === "?" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        toggleShortcutsOverlay();
+        return;
+      }
+
+      const nudgeDelta = nudgeDeltaFromArrowKey(ev.key, ev.shiftKey);
+      if (
+        nudgeDelta &&
+        !mod &&
+        !ev.altKey &&
+        !shouldBlockCanvasShortcut &&
+        useProjectStore.getState().selectedNodeIds.length > 0
+      ) {
+        ev.preventDefault();
+        nudgeSelectedNodes(nudgeDelta.dx, nudgeDelta.dy);
+        return;
+      }
+
+      if (key === "tab" && !mod && !ev.altKey && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        openAddPanelCenter();
+        return;
+      }
+
+      if (mod && ev.shiftKey && key === "h" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        toggleHermes();
+        return;
+      }
+
       const isRedoCombo =
         (mod && key === "z" && ev.shiftKey) || (mod && key === "y" && !ev.shiftKey);
       const isUndoCombo = mod && key === "z" && !ev.shiftKey;
 
       if (isRedoCombo) {
-        if (!editingInput) {
+        if (!shouldBlockCanvasShortcut) {
           ev.preventDefault();
           redo();
         }
         return;
       }
       if (isUndoCombo) {
-        if (!editingInput) {
+        if (!shouldBlockCanvasShortcut) {
           ev.preventDefault();
           undo();
         }
         return;
       }
 
-      const isGroup = mod && key === "g";
-      const isCopy = mod && key === "c";
+      if (mod && !ev.shiftKey && !ev.altKey && key === "n" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        void newProject();
+        return;
+      }
+      if (mod && !ev.shiftKey && !ev.altKey && key === "o" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        void openProject();
+        return;
+      }
+      if (mod && !ev.shiftKey && !ev.altKey && key === "s" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        void saveProject();
+        return;
+      }
+
+      const isUngroup = mod && ev.altKey && ev.shiftKey && key === "g";
+      const isGroup = mod && key === "g" && !ev.shiftKey && !ev.altKey;
+      const isDup = mod && ev.shiftKey && key === "c";
+      const isGenerate = mod && key === "enter";
+      const isCopy = mod && key === "c" && !ev.shiftKey;
       const isPaste = mod && key === "v";
       const isDelete = ev.key === "Delete" || ev.key === "Backspace";
-      const isOpenTextComposer = mod && ev.shiftKey && key === "g";
-      const shouldBlockCanvasShortcut = editingInput || textNodeEditingMode;
-      if (isGroup) {
-        if (!shouldBlockCanvasShortcut) {
-          ev.preventDefault();
-          groupSelectedNodes();
-        }
+      const isOpenTextComposer = mod && ev.shiftKey && key === "g" && !ev.altKey;
+
+      if (isUngroup && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        ungroupSelectedNodes();
         return;
       }
-      if (isCopy) {
-        if (!shouldBlockCanvasShortcut) {
-          ev.preventDefault();
-          copySelection();
-        }
+      if (isGroup && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        groupSelectedNodes();
         return;
       }
-      if (isPaste) {
-        if (!shouldBlockCanvasShortcut) {
-          ev.preventDefault();
-          pasteSelection();
-        }
+      if (isDup && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        duplicateSelection();
         return;
       }
-      if (isDelete) {
-        if (!shouldBlockCanvasShortcut) {
-          ev.preventDefault();
-          deleteSelection();
-        }
+      if (isGenerate && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        runGenerateShortcut();
+        return;
+      }
+      if (isCopy && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        copySelection();
+        return;
+      }
+      if (isPaste && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        pasteSelection();
+        return;
+      }
+      if (isDelete && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        deleteSelection();
         return;
       }
       if (isOpenTextComposer && !shouldBlockCanvasShortcut) {
@@ -150,13 +227,22 @@ export default function App() {
   }, [
     copySelection,
     deleteSelection,
+    nudgeSelectedNodes,
+    duplicateSelection,
     groupSelectedNodes,
+    newProject,
+    openAddPanelCenter,
+    openProject,
     pasteSelection,
     redo,
+    runGenerateShortcut,
+    saveProject,
     setStatusText,
     setAudioTtsPanelNodeId,
     setAudioTtsPanelPinnedNodeId,
     setTextGenPanelPinnedNodeId,
+    toggleShortcutsOverlay,
+    ungroupSelectedNodes,
     undo,
   ]);
 
@@ -186,9 +272,25 @@ export default function App() {
   }, [lastRunId, projectPath, setLastRunId]);
 
   useEffect(() => {
-    const onOpenSettings = () => setSettingsOpen(true);
+    const onOpenSettings = (ev: Event) => {
+      const detail = (ev as CustomEvent<OpenSettingsDetail>).detail;
+      setSettingsOpenRequest((prev) => ({
+        category: detail?.category ?? null,
+        focusSectionId: detail?.focusSectionId ?? null,
+        nonce: prev.nonce + 1,
+      }));
+      setSettingsOpen(true);
+    };
     window.addEventListener("r3-open-settings", onOpenSettings);
     return () => window.removeEventListener("r3-open-settings", onOpenSettings);
+  }, []);
+
+  // 已有画布内容但无 Tab 时补一条（兼容旧会话 / 热更新）
+  useEffect(() => {
+    const { tabs } = useCanvasUiStore.getState();
+    if (tabs.length > 0) return;
+    const { nodes, projectPath } = useProjectStore.getState();
+    if (nodes.length > 0 || projectPath) bindActiveTabToProject();
   }, []);
 
   // 初始化 Hermes 自动串联
@@ -196,6 +298,50 @@ export default function App() {
     const cleanup = initHermesAutoChain();
     return cleanup;
   }, []);
+
+  useEffect(() => {
+    collapseHermes();
+  }, [collapseHermes]);
+
+  useEffect(() => {
+    syncCanvasMcpBridgeContext(projectPath);
+  }, [projectPath]);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+      if (
+        scriptFullscreenNodeId ||
+        composeEditorNodeId ||
+        confirmDialog?.open ||
+        pendingUpdate ||
+        settingsOpen
+      ) {
+        return;
+      }
+      if (hermesJobDrawerOpen) {
+        e.preventDefault();
+        closeHermesJobDrawer();
+        return;
+      }
+      if (hermesMode === "expanded") {
+        e.preventDefault();
+        collapseHermes();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    collapseHermes,
+    closeHermesJobDrawer,
+    composeEditorNodeId,
+    confirmDialog?.open,
+    pendingUpdate,
+    hermesJobDrawerOpen,
+    hermesMode,
+    scriptFullscreenNodeId,
+    settingsOpen,
+  ]);
 
   // 初始化节点状态监听器
   useNodeStatusListener();
@@ -207,10 +353,22 @@ export default function App() {
       <div className="mainSplit">
         <FlowCanvas />
       </div>
+      <HermesOrbSuggestionBridge />
 
-      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialCategory={settingsOpenRequest.category}
+        focusSectionId={settingsOpenRequest.focusSectionId}
+        openRequestNonce={settingsOpenRequest.nonce}
+      />
       {scriptFullscreenNodeId ? <ScriptNodeFullscreenOverlay /> : null}
+      {composeEditorNodeId ? <ComposeEditorOverlay /> : null}
       <ConfirmDialog />
+      {pendingUpdate ? (
+        <AppUpdateDialog pending={pendingUpdate} onClose={dismissPendingUpdate} />
+      ) : null}
+      <HermesScriptVersionDiffOverlay />
     </div>
   );
 }

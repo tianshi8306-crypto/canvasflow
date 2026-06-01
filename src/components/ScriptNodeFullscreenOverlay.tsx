@@ -1,14 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
-import { invoke, isTauri } from "@tauri-apps/api/core";
+import { isTauri } from "@tauri-apps/api/core";
+import {
+  SCRIPT_AI_PARSE_BUSY_LABEL,
+  SCRIPT_AI_REPARSE_BUTTON_LABEL,
+} from "@/lib/scriptNodeActionLabels";
+import { preflightScriptNodeLlm, scriptNodeLlmInvokeParams } from "@/lib/scriptNodeLlmParams";
 import type { ScriptBeat } from "@/lib/types";
 import { normalizeScriptBeat, normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
+import {
+  buildScriptNodeExportPayload,
+  downloadScriptNodeExportJson,
+} from "@/lib/scriptNodeExport";
 import { ScriptBeatsEditorTable } from "@/components/ScriptBeatsEditorTable";
 import { ScriptCreativeViewGrid } from "@/components/ScriptCreativeViewGrid";
 import { useProjectStore } from "@/store/projectStore";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { scriptNodeDispatchAgentRuntime } from "@/lib/nodeAgentRuntime/dagnodeDispatchAgents";
 import { scriptStoryboardGenerateAgentRuntime } from "@/lib/nodeAgentRuntime/scriptStoryboardAgent";
+import { resolveStoryboardBeatScope } from "@/lib/scriptStoryboardScope";
+import { scriptParseCompleteStatus } from "@/lib/scriptNodeFeedback";
+import { useScriptNodeTaskState } from "@/hooks/useScriptNodeTaskState";
+import { pickImagePathsForImport } from "@/lib/tauriMediaPaths";
+import { importStoryboardImageForBeat } from "@/lib/scriptStoryboardImageImport";
+import { formatUserError } from "@/lib/errors";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
+import { ScriptDocumentImportButton } from "@/components/script/ScriptDocumentImportButton";
 
 /** 脚本节点全屏：脚本表格 / 创意分镜缩略图网格 */
 export function ScriptNodeFullscreenOverlay() {
@@ -19,13 +36,18 @@ export function ScriptNodeFullscreenOverlay() {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const closeScriptFullscreen = useProjectStore((s) => s.closeScriptFullscreen);
   const runNodeSubgraph = useProjectStore((s) => s.runNodeSubgraph);
-  const isGraphRunning = useProjectStore((s) => s.isGraphRunning);
 
   const [tab, setTab] = useState<"script" | "creative">("script");
-  const [busy, setBusy] = useState<null | "regen" | "storyboard" | "export">(null);
-  const lastExportUrlRef = useRef<string | null>(null);
-
+  const [exportBusy, setExportBusy] = useState(false);
+  const [highlightBeatId, setHighlightBeatId] = useState<string | null>(null);
+  const pendingPickBeatIdRef = useRef<string | null>(null);
+  const creativeImageInputRef = useRef<HTMLInputElement | null>(null);
+  const inspectorStoryboardFocus = useCanvasUiStore((s) => s.inspectorStoryboardFocus);
+  const setInspectorStoryboardFocus = useCanvasUiStore((s) => s.setInspectorStoryboardFocus);
   const node = useMemo(() => nodes.find((n) => n.id === nodeId) ?? null, [nodes, nodeId]);
+  const { isBusy, isStoryboardBusy, isGraphRunning, panelFeedback } = useScriptNodeTaskState(
+    nodeId ?? "",
+  );
 
   useEffect(() => {
     if (nodeId && !nodes.some((n) => n.id === nodeId)) {
@@ -36,6 +58,11 @@ export function ScriptNodeFullscreenOverlay() {
   const beats = node?.data.scriptBeats ?? [];
   const storedSelection = node?.data.scriptBeatSelection;
   const themePrompt = node?.data.prompt ?? "";
+  const nodeParams =
+    node?.data.params && typeof node.data.params === "object"
+      ? (node.data.params as Record<string, unknown>)
+      : undefined;
+  const llmParams = useMemo(() => scriptNodeLlmInvokeParams(nodeParams), [nodeParams]);
   const displayTitle =
     node?.data.label?.trim() || (themePrompt.trim() ? themePrompt.slice(0, 80) : "脚本生成器");
 
@@ -44,13 +71,6 @@ export function ScriptNodeFullscreenOverlay() {
     () => (storedSelection ?? []).filter((id) => rows.some((r) => r.id === id)),
     [storedSelection, rows],
   );
-
-  useEffect(() => {
-    return () => {
-      if (lastExportUrlRef.current) URL.revokeObjectURL(lastExportUrlRef.current);
-      lastExportUrlRef.current = null;
-    };
-  }, []);
 
   const persistBeats = (next: ScriptBeat[]) => {
     if (!nodeId) return;
@@ -83,11 +103,122 @@ export function ScriptNodeFullscreenOverlay() {
     return () => window.removeEventListener("keydown", onKey);
   }, [nodeId, closeScriptFullscreen]);
 
+  const focusBeatInCreative = useCallback(
+    (beatId: string) => {
+      const beat = rows.find((b) => b.id === beatId);
+      if (!beat) {
+        setTab("creative");
+        setStatusText("已切换到创意视图");
+        return;
+      }
+      setTab("creative");
+      setHighlightBeatId(beatId);
+      requestAnimationFrame(() => {
+        document
+          .querySelector(`[data-beat-id="${beatId}"]`)
+          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      });
+      setStatusText(`已在创意视图聚焦镜号 ${beat.shotNumber || "—"}`);
+    },
+    [rows, setStatusText],
+  );
+
+  useEffect(() => {
+    if (!nodeId || !inspectorStoryboardFocus || inspectorStoryboardFocus.scriptNodeId !== nodeId) {
+      return;
+    }
+    const beatId = inspectorStoryboardFocus.beatId;
+    setInspectorStoryboardFocus(null);
+    focusBeatInCreative(beatId);
+  }, [
+    focusBeatInCreative,
+    inspectorStoryboardFocus,
+    nodeId,
+    setInspectorStoryboardFocus,
+  ]);
+
+  const applyImportedImage = useCallback(
+    (beatId: string, filePaths: string[]) => {
+      if (!nodeId || !projectPath?.trim() || filePaths.length === 0) return;
+      void (async () => {
+        try {
+          const result = await importStoryboardImageForBeat(
+            projectPath,
+            filePaths,
+            node?.data.storyboardShots,
+            beatId,
+          );
+          if (!result) return;
+          updateNodeData(nodeId, { storyboardShots: result.shots });
+          setStatusText(`已关联分镜图：${result.relPath}`);
+        } catch (e) {
+          setStatusText(`导入分镜图失败：${formatUserError(e)}`);
+        }
+      })();
+    },
+    [node?.data.storyboardShots, nodeId, projectPath, setStatusText, updateNodeData],
+  );
+
+  const onPickCreativeImage = useCallback(
+    (beatId: string) => {
+      if (!projectPath?.trim()) {
+        setStatusText("请先打开工程后再关联分镜图");
+        return;
+      }
+      pendingPickBeatIdRef.current = beatId;
+      void (async () => {
+        if (isTauri()) {
+          const paths = await pickImagePathsForImport(false);
+          if (paths?.length) applyImportedImage(beatId, paths);
+          pendingPickBeatIdRef.current = null;
+        } else {
+          creativeImageInputRef.current?.click();
+        }
+      })();
+    },
+    [applyImportedImage, projectPath, setStatusText],
+  );
+
   if (!nodeId || !node) return null;
 
-  const canRegen = Boolean(projectPath?.trim() && themePrompt.trim() && !busy && !isGraphRunning);
-  const canStoryboard = Boolean(projectPath?.trim() && rows.length > 0 && !busy);
-  const canExport = Boolean(rows.length > 0 && !busy);
+  const failedShotCount = (node.data.storyboardShots ?? []).filter((s) => s.status === "failed").length;
+
+  const locateBeatInScript = (beatId: string) => {
+    setTab("script");
+    setHighlightBeatId(beatId);
+    const beat = rows.find((b) => b.id === beatId);
+    setStatusText(
+      beat
+        ? `已定位到脚本表：镜号 ${beat.shotNumber || "—"}（可在此修改后重新生成分镜）`
+        : "已切换到脚本视图",
+    );
+  };
+
+  const onCreativeImageFiles = (ev: ChangeEvent<HTMLInputElement>) => {
+    const beatId = pendingPickBeatIdRef.current;
+    const input = ev.currentTarget;
+    const files = Array.from(input.files ?? []);
+    input.value = "";
+    pendingPickBeatIdRef.current = null;
+    if (!beatId || files.length === 0) return;
+    const paths = files
+      .map((f) => (f as File & { path?: string }).path)
+      .filter((p): p is string => Boolean(p && typeof p === "string"));
+    if (paths.length === 0) {
+      setStatusText("未拿到本地文件路径：请在 Tauri 桌面端选择文件");
+      return;
+    }
+    applyImportedImage(beatId, paths);
+  };
+
+  const selectAllBeats = () => setSelection(rows.map((r) => r.id));
+  const clearBeatSelection = () => setSelection([]);
+
+  const taskLocked = isBusy || exportBusy;
+  const parseBusy = isGraphRunning || (isBusy && !isStoryboardBusy);
+  const canRegen = Boolean(projectPath?.trim() && themePrompt.trim() && !taskLocked);
+  const canStoryboard = Boolean(projectPath?.trim() && rows.length > 0 && !taskLocked);
+  const canExport = Boolean(rows.length > 0 && !exportBusy);
 
   const onRegen = () => {
     if (!projectPath?.trim()) {
@@ -100,33 +231,9 @@ export function ScriptNodeFullscreenOverlay() {
       return;
     }
     void (async () => {
-      setBusy("regen");
       try {
-        if (isTauri()) {
-          try {
-            const settings = await invoke<{ providers?: Array<{ id: string; label: string; enabled: boolean; priority: number }> }>(
-              "load_settings",
-            );
-            const enabledProviders = (settings.providers ?? [])
-              .filter((p) => p.enabled)
-              .sort((a, b) => a.priority - b.priority);
-            const effectiveProvider = enabledProviders[0];
-            if (!effectiveProvider) {
-              setStatusText("没有可用 Provider，请先到设置中启用一个模型通道");
-              return;
-            }
-            const hasKey = await invoke<boolean>("has_api_key", { providerId: effectiveProvider.id });
-            if (!hasKey) {
-              setStatusText(`未配置 API Key：${effectiveProvider.label}。请先到顶栏“设置”中填写`);
-              return;
-            }
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            setStatusText(`解析前检查失败：${msg}`);
-            return;
-          }
-        }
-        setStatusText("脚本节点正在解析中，请稍候…");
+        if (!(await preflightScriptNodeLlm(nodeParams, setStatusText))) return;
+        setStatusText("脚本节点正在 AI 解析中，请稍候…");
         await runNodeTaskAgent(
           scriptNodeDispatchAgentRuntime,
           { prompt: promptText, dispatch: runNodeSubgraph },
@@ -134,11 +241,9 @@ export function ScriptNodeFullscreenOverlay() {
         );
         const latestNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
         const latestBeats = normalizeScriptBeats(latestNode?.data.scriptBeats ?? []);
-        setStatusText(
-          latestBeats.length > 0 ? `脚本解析完成：共 ${latestBeats.length} 条镜头` : "脚本解析完成：未生成镜头，请调整要求后重试",
-        );
-      } finally {
-        setBusy(null);
+        setStatusText(scriptParseCompleteStatus(latestBeats.length));
+      } catch {
+        /* runNodeTaskAgent 已写入状态 */
       }
     })();
   };
@@ -149,21 +254,31 @@ export function ScriptNodeFullscreenOverlay() {
       return;
     }
     if (rows.length === 0) {
-      setStatusText("请先生成脚本镜头后再生成分镜");
+      setStatusText("请先 AI 解析脚本镜头后再生成分镜");
       return;
     }
-    const picked = selectedIds.length > 0 ? rows.filter((b) => selectedIds.includes(b.id)) : rows;
+    const scopeResult = resolveStoryboardBeatScope(rows, storedSelection);
+    if (!scopeResult.ok) {
+      setStatusText(scopeResult.message);
+      return;
+    }
+    const picked = scopeResult.scope.beats;
     void (async () => {
-      setBusy("storyboard");
       try {
+        if (!(await preflightScriptNodeLlm(nodeParams, setStatusText))) return;
         await runNodeTaskAgent(
           scriptStoryboardGenerateAgentRuntime,
-          { targetBeats: picked, themePrompt, prevShots: node.data.storyboardShots },
+          {
+            targetBeats: picked,
+            themePrompt,
+            prevShots: node.data.storyboardShots,
+            llmParams,
+          },
           { nodeId, projectPath, updateNodeData, setStatusText },
         );
         setTab("creative");
-      } finally {
-        setBusy(null);
+      } catch {
+        /* runNodeTaskAgent 已写入状态 */
       }
     })();
   };
@@ -174,37 +289,19 @@ export function ScriptNodeFullscreenOverlay() {
       return;
     }
     void (async () => {
-      setBusy("export");
+      setExportBusy(true);
       try {
-        const payload = {
-          version: 1,
-          exportedAt: Date.now(),
+        const payload = buildScriptNodeExportPayload({
           nodeId,
-          title: displayTitle,
+          label: node.data.label,
           themePrompt,
-          scriptBeats: rows,
-          storyboardShots: node.data.storyboardShots ?? [],
-        };
-        const json = JSON.stringify(payload, null, 2);
-        const blob = new Blob([json], { type: "application/json;charset=utf-8" });
-        const url = URL.createObjectURL(blob);
-        if (lastExportUrlRef.current) URL.revokeObjectURL(lastExportUrlRef.current);
-        lastExportUrlRef.current = url;
-        const safeTitle = (displayTitle || "script")
-          .replace(/[\\/:*?"<>|]/g, "_")
-          .replace(/\s+/g, " ")
-          .trim()
-          .slice(0, 40);
-        const file = `${safeTitle || "script"}-export-${new Date().toISOString().slice(0, 10)}.json`;
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = file;
-        document.body.appendChild(a);
-        a.click();
-        a.remove();
+          beats: rows,
+          storyboardShots: node.data.storyboardShots,
+        });
+        const file = downloadScriptNodeExportJson(payload);
         setStatusText(`已导出：${file}`);
       } finally {
-        setBusy(null);
+        setExportBusy(false);
       }
     })();
   };
@@ -228,12 +325,12 @@ export function ScriptNodeFullscreenOverlay() {
             className="scriptLibFloatActionBtn"
             disabled={!canRegen}
             onClick={onRegen}
-            title="按当前输入与上游素材重新解析脚本镜头"
+            title={`${SCRIPT_AI_REPARSE_BUTTON_LABEL}（使用底栏所选模型）`}
           >
             <span className="scriptLibFloatActionIco" aria-hidden>
               ↻
             </span>
-            重新生成
+            {parseBusy ? SCRIPT_AI_PARSE_BUSY_LABEL : SCRIPT_AI_REPARSE_BUTTON_LABEL}
           </button>
           <button
             type="button"
@@ -247,6 +344,13 @@ export function ScriptNodeFullscreenOverlay() {
             </span>
             生成分镜
           </button>
+          {nodeId ? (
+            <ScriptDocumentImportButton
+              scriptNodeId={nodeId}
+              disabled={parseBusy || isStoryboardBusy}
+              className="scriptLibFloatActionBtn"
+            />
+          ) : null}
           <button
             type="button"
             className="scriptLibFloatActionBtn scriptLibFloatActionBtn--iconOnly"
@@ -314,13 +418,57 @@ export function ScriptNodeFullscreenOverlay() {
           </div>
         </div>
 
+        {panelFeedback ? (
+          <div
+            className={`scriptLibFeedback igp-feedback igp-feedback--${panelFeedback.tone === "error" ? "block" : panelFeedback.tone === "warn" ? "warn" : "info"}`}
+            role={panelFeedback.tone === "error" ? "alert" : "status"}
+          >
+            {panelFeedback.message}
+          </div>
+        ) : null}
+
         <div className="scriptLibFullscreenBody">
           {tab === "creative" ? (
             <div className="scriptCreativeWrap">
+              <input
+                ref={creativeImageInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
+                style={{ display: "none" }}
+                onChange={onCreativeImageFiles}
+              />
+              <div className="scriptCreativeToolbar" role="status">
+                <span>
+                  已选 {selectedIds.length} / {rows.length} 镜（与脚本表、生成分镜勾选一致）
+                </span>
+                <div className="scriptCreativeToolbarActions">
+                  {selectedIds.length < rows.length ? (
+                    <button type="button" className="btn" onClick={selectAllBeats}>
+                      全选
+                    </button>
+                  ) : null}
+                  {selectedIds.length > 0 ? (
+                    <button type="button" className="btn" onClick={clearBeatSelection}>
+                      清空勾选
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+              {failedShotCount > 0 ? (
+                <p className="scriptCreativeFailedBar" role="status">
+                  {failedShotCount} 条分镜失败 — 点击「定位镜头」回到脚本表修改，或在创意视图「聚焦镜头」后重试
+                </p>
+              ) : null}
               <ScriptCreativeViewGrid
                 beats={rows}
                 shots={node.data.storyboardShots}
                 projectPath={projectPath}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                highlightBeatId={highlightBeatId}
+                onLocateBeatInScript={locateBeatInScript}
+                onPickImage={onPickCreativeImage}
+                onFocusStoryboardBeat={focusBeatInCreative}
               />
             </div>
           ) : (
@@ -333,6 +481,8 @@ export function ScriptNodeFullscreenOverlay() {
                 onPersistRows={persistBeats}
                 projectPath={projectPath}
                 onStatusText={setStatusText}
+                highlightBeatId={highlightBeatId}
+                onHighlightDone={() => setHighlightBeatId(null)}
               />
             </div>
           )}

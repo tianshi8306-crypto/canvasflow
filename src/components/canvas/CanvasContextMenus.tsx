@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import type { AssetSummary } from "@/shared/api/assets";
 import { useAssetIdVisibilityPreference } from "@/hooks/useAssetIdVisibilityPreference";
 import { clampContextMenuPosition } from "@/lib/clampFloatingUi";
-import { assetNodeKindForMediaType } from "@/lib/canvasAssets";
+import { assetNodeKindForMediaType, type AssetGalleryGroup } from "@/lib/canvasAssets";
 import { formatUserError } from "@/lib/errors";
 import {
   edgeLocateNodeStatusText,
@@ -16,10 +16,19 @@ import { getUndoRedoAvailability } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import type { FlowNodeData } from "@/lib/types";
+import { upsertMaterialLibraryItem, materialCategoryLabel, type MaterialCategory } from "@/lib/materialLibrary";
 import {
   isPassiveTextContainer,
   TEXT_PASSIVE_CONTAINER_STATUS,
 } from "@/lib/textNodeContainerMode";
+import {
+  IconMenuAudio,
+  IconMenuFfmpeg,
+  IconMenuImage,
+  IconMenuScript,
+  IconMenuText,
+  IconMenuVideo,
+} from "@/components/canvas/canvasMenuNodeIcons";
 
 function canvasModHints(): { copy: string; paste: string; del: string; undo: string; redo: string } {
   const mac =
@@ -33,64 +42,12 @@ function canvasModHints(): { copy: string; paste: string; del: string; undo: str
   };
 }
 
-function IconText() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M6 7h12M6 12h12M6 17h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconImage() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path
-        d="M4 18V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <path d="m8 14 2.5-3 2.5 3 3.5-4.5L20 15" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-      <circle cx="9" cy="9" r="1.2" fill="currentColor" />
-    </svg>
-  );
-}
-
-function IconVideo() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="3" y="5" width="14" height="14" rx="2.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M10.5 10.2 14.2 12l-3.7 1.8V10.2Z" fill="currentColor" />
-    </svg>
-  );
-}
-
-function IconScissors() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-      <circle cx="17" cy="17" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9.5 9.5 14.5 14.5M14.5 9.5 9.5 14.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconAudio() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M6 15V9l4-2v10l-4-2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-      <path d="M14 9v6M17 7v10M20 5v14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function IconScript() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" strokeWidth="1.3" />
-      <path d="M8 9h8M8 12h6M8 15h8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-    </svg>
-  );
-}
+const IconText = IconMenuText;
+const IconImage = IconMenuImage;
+const IconVideo = IconMenuVideo;
+const IconScissors = IconMenuFfmpeg;
+const IconAudio = IconMenuAudio;
+const IconScript = IconMenuScript;
 
 function IconUpload() {
   return (
@@ -133,7 +90,7 @@ function PaneL1Row({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l1"
+      className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l1 canvasFloatMenuRow"
     >
       <span>{children}</span>
       {shortcut ? <span className="canvasPaneCtxMenu__shortcut">{shortcut}</span> : null}
@@ -160,7 +117,7 @@ function CtxRow({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l1"
+      className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l1 canvasFloatMenuRow"
     >
       <span style={{ flex: 1, textAlign: "left" }}>{children}</span>
       {shortcut ? <span className="canvasPaneCtxMenu__shortcut">{shortcut}</span> : null}
@@ -187,7 +144,7 @@ function PaneAddRow({
       disabled={disabled}
       title={title}
       onClick={onClick}
-      className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l2"
+      className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l2 canvasFloatMenuRow"
     >
       <span className="canvasPaneCtxMenu__icon">{icon}</span>
       <span className="canvasPaneCtxMenu__label">{label}</span>
@@ -217,7 +174,7 @@ function CanvasPaneLevel1({
   const { canUndo, canRedo } = getUndoRedoAvailability();
 
   return (
-    <div role="menu" className="canvasPaneCtxMenu__shell">
+    <div role="menu" className="canvasPaneCtxMenu__shell canvasFloatMenuBody">
       <PaneL1Row
         onClick={() => {
           void onRequestUploadFiles();
@@ -286,7 +243,7 @@ function CanvasPaneLevel1({
 export type CanvasContextMenusProps = {
   menuState: FlowCanvasMenuState;
   projectPath: string | null;
-  galleryAssets: AssetSummary[] | undefined;
+  galleryAssetGroups: AssetGalleryGroup<AssetSummary>[] | undefined;
   galleryLoading: boolean;
   galleryError: Error | null;
   onDismiss: () => void;
@@ -298,7 +255,6 @@ export type CanvasContextMenusProps = {
     clientY: number,
   ) => void;
   pickAssetFromGallery: (asset: Pick<AssetSummary, "relPath" | "mediaType" | "assetId">) => void;
-  syncMaterialsIndex: () => Promise<void>;
   copySelection: () => void;
   pasteSelection: () => void;
   deleteSelection: () => void;
@@ -313,7 +269,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
   const {
     menuState,
     projectPath,
-    galleryAssets,
+    galleryAssetGroups,
     galleryLoading,
     galleryError,
     onDismiss,
@@ -331,9 +287,6 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
   } = props;
 
   const w = flowMenuWidth(menuState);
-  /** 左键双击「添加」与空白处右键菜单共用同一套 pane 浮层样式 */
-  const usesPaneMenuChrome = menuState.mode === "context-pane" || menuState.mode === "add-panel";
-
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const flowClipboardCount = useProjectStore((s) => s.flowClipboardCount);
@@ -341,7 +294,18 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const setTextGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setTextGenPanelPinnedNodeId);
   const selectedEdgeIds = useProjectStore((s) => s.selectedEdgeIds);
+  const selectedNodeIds = useProjectStore((s) => s.selectedNodeIds);
+  const alignSelectedNodes = useProjectStore((s) => s.alignSelectedNodes);
+  const distributeSelectedNodes = useProjectStore((s) => s.distributeSelectedNodes);
   const toggleSelectedEdgesDisabled = useProjectStore((s) => s.toggleSelectedEdgesDisabled);
+  const createForkDuplicateOfSelection = useProjectStore((s) => s.createForkDuplicateOfSelection);
+
+  const topLevelSelectedCount = selectedNodeIds.filter((id) => {
+    const nn = nodes.find((n) => n.id === id);
+    return nn && !nn.parentId;
+  }).length;
+  const showMultiAlign = topLevelSelectedCount >= 2;
+  const canDistribute = topLevelSelectedCount >= 3;
 
   const ctxNode =
     menuState.mode === "context-node" && menuState.nodeId
@@ -349,6 +313,12 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
       : null;
   const isTextNodeCtx = ctxNode?.type === "textNode";
   const isImageNodeCtx = ctxNode?.type === "imageNode";
+  const isMediaNodeCtx =
+    ctxNode?.type === "imageNode" || ctxNode?.type === "videoNode" || ctxNode?.type === "audioNode";
+  const ctxMediaType =
+    ctxNode?.type === "imageNode" ? "image" : ctxNode?.type === "videoNode" ? "video" : ctxNode?.type === "audioNode" ? "audio" : null;
+  const ctxMediaRef =
+    isMediaNodeCtx && ctxNode ? { relPath: ctxNode.data.path?.trim() ?? "", assetId: ctxNode.data.assetId?.trim() ?? "" } : null;
   const ctxEdge =
     menuState.mode === "context-edge" && menuState.edgeId
       ? edges.find((e) => e.id === menuState.edgeId)
@@ -359,9 +329,29 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
   const sk = canvasModHints();
   const [showAssetIds, setShowAssetIds] = useAssetIdVisibilityPreference();
 
+  const saveCtxMediaToLibrary = (category: MaterialCategory) => {
+    if (!ctxNode || !ctxMediaType || !ctxMediaRef?.relPath) {
+      setStatusText("当前节点没有可保存的素材");
+      onDismiss();
+      return;
+    }
+    const fallbackName = ctxMediaRef.relPath.split(/[/\\]/).pop() || "素材";
+    const name = (ctxNode.data.label?.trim() || fallbackName).slice(0, 80);
+    upsertMaterialLibraryItem({
+      name,
+      category,
+      mediaType: ctxMediaType,
+      relPath: ctxMediaRef.relPath,
+      assetId: ctxMediaRef.assetId || undefined,
+      projectPath: projectPath ?? undefined,
+    });
+    setStatusText(`已保存到素材库：${name}（${materialCategoryLabel(category)}）`);
+    onDismiss();
+  };
+
   const menuRoot = (
     <div
-      className={usesPaneMenuChrome ? "canvasPaneCtxMenuRoot" : "canvasFlowFloatingShell"}
+      className="canvasPaneCtxMenuRoot canvasFloatMenuShell"
       style={{
         position: "fixed",
         left: menuState.x,
@@ -377,7 +367,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
         menuState.addPanelTab === "gallery" ? (
           <div
             role="menu"
-            className="canvasPaneCtxMenu__shell"
+            className="canvasPaneCtxMenu__shell canvasFloatMenuBody"
             style={{ maxHeight: FLOW_MENU.galleryPanelMaxHeight, display: "flex", flexDirection: "column" }}
           >
             <button
@@ -389,7 +379,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
             >
               ← 返回
             </button>
-            <div className="canvasPaneCtxMenu__sectionTitle">从图库选择</div>
+            <div className="canvasPaneCtxMenu__sectionTitle canvasFloatMenuTitle">从图库选择</div>
             <label
               style={{
                 display: "flex",
@@ -413,9 +403,9 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
               <div style={{ color: "var(--accent-2)", fontSize: 13, padding: "0 14px 10px" }}>
                 加载失败：{formatUserError(galleryError)}
               </div>
-            ) : !galleryAssets?.length ? (
+            ) : !galleryAssetGroups?.length ? (
               <div style={{ color: "var(--muted)", fontSize: 13, padding: "0 14px 10px" }}>
-                暂无素材。可先上传，或使用空白处右键「同步到素材索引」。
+                暂无素材。可先上传，或在设置 → 常规中同步素材索引。
               </div>
             ) : (
               <div
@@ -424,63 +414,73 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
                   maxHeight: FLOW_MENU.galleryListMaxHeight,
                   display: "flex",
                   flexDirection: "column",
-                  gap: 4,
+                  gap: 8,
                   paddingBottom: 6,
                 }}
               >
-                {galleryAssets.map((a) => {
-                  const canNode = assetNodeKindForMediaType(a.mediaType) !== null;
-                  return (
-                    <button
-                      key={a.assetId}
-                      type="button"
-                      disabled={!canNode}
-                      title={
-                        canNode
-                          ? `${a.relPath}${showAssetIds ? `\n${a.assetId}` : ""}`
-                          : `${a.relPath}（仅支持从图片/视频/音频创建）`
-                      }
-                      className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l2"
-                      style={{
-                        opacity: canNode ? 1 : 0.45,
-                        cursor: canNode ? "pointer" : "not-allowed",
-                        alignItems: "flex-start",
-                      }}
-                      onClick={() => pickAssetFromGallery(a)}
+                {galleryAssetGroups.map((group) => (
+                  <div key={group.category} style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <div
+                      className="canvasPaneCtxMenu__sectionTitle canvasFloatMenuTitle"
+                      style={{ padding: "4px 14px 2px", fontSize: 11, opacity: 0.85 }}
                     >
-                      <span className="canvasPaneCtxMenu__icon" aria-hidden>
-                        <IconLibrary />
-                      </span>
-                      <span className="canvasPaneCtxMenu__label">
-                        <span className="mono" style={{ wordBreak: "break-all", fontSize: 12, display: "block" }}>
-                          {a.relPath}
-                        </span>
-                        {showAssetIds ? (
-                          <span
-                            className="mono"
-                            style={{
-                              color: "var(--muted)",
-                              fontSize: 10,
-                              wordBreak: "break-all",
-                              display: "block",
-                              marginTop: 2,
-                            }}
-                            title={a.assetId}
-                          >
-                            {a.assetId}
+                      {group.label}
+                    </div>
+                    {group.items.map((a) => {
+                      const canNode = assetNodeKindForMediaType(a.mediaType) !== null;
+                      return (
+                        <button
+                          key={a.assetId}
+                          type="button"
+                          disabled={!canNode}
+                          title={
+                            canNode
+                              ? `${a.relPath}${showAssetIds ? `\n${a.assetId}` : ""}`
+                              : `${a.relPath}（仅支持从图片/视频/音频创建）`
+                          }
+                          className="canvasPaneCtxMenu__row canvasPaneCtxMenu__row--l2 canvasFloatMenuRow"
+                          style={{
+                            opacity: canNode ? 1 : 0.45,
+                            cursor: canNode ? "pointer" : "not-allowed",
+                            alignItems: "flex-start",
+                          }}
+                          onClick={() => pickAssetFromGallery(a)}
+                        >
+                          <span className="canvasPaneCtxMenu__icon" aria-hidden>
+                            <IconLibrary />
                           </span>
-                        ) : null}
-                        <span style={{ color: "var(--muted)", fontSize: 11 }}>{a.mediaType}</span>
-                      </span>
-                    </button>
-                  );
-                })}
+                          <span className="canvasPaneCtxMenu__label">
+                            <span className="mono" style={{ wordBreak: "break-all", fontSize: 12, display: "block" }}>
+                              {a.relPath}
+                            </span>
+                            {showAssetIds ? (
+                              <span
+                                className="mono"
+                                style={{
+                                  color: "var(--muted)",
+                                  fontSize: 10,
+                                  wordBreak: "break-all",
+                                  display: "block",
+                                  marginTop: 2,
+                                }}
+                                title={a.assetId}
+                              >
+                                {a.assetId}
+                              </span>
+                            ) : null}
+                            <span style={{ color: "var(--muted)", fontSize: 11 }}>{a.mediaType}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
               </div>
             )}
           </div>
         ) : (
-          <div role="menu" className="canvasPaneCtxMenu__shell">
-            <div className="canvasPaneCtxMenu__sectionTitle">添加节点</div>
+          <div role="menu" className="canvasPaneCtxMenu__shell canvasFloatMenuBody">
+            <div className="canvasPaneCtxMenu__sectionTitle canvasFloatMenuTitle">添加节点</div>
             <PaneAddRow
               label="文本"
               icon={<IconText />}
@@ -506,7 +506,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
               }}
             />
             <PaneAddRow
-              label="视频合成"
+              label="剪辑"
               icon={<IconScissors />}
               onClick={() => {
                 createNodeAtClientPoint("ffmpegConcat", menuState.x, menuState.y);
@@ -530,7 +530,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
               }}
             />
             <PaneSep loose />
-            <div className="canvasPaneCtxMenu__sectionTitle">添加资源</div>
+            <div className="canvasPaneCtxMenu__sectionTitle canvasFloatMenuTitle">添加资源</div>
             <PaneAddRow
               label="上传"
               icon={<IconUpload />}
@@ -554,7 +554,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
         )
       ) : menuState.mode === "context-node" ? (
         isTextNodeCtx && ctxNode && menuState.nodeId ? (
-          <div className="canvasPaneCtxMenu__shell" role="menu">
+          <div className="canvasPaneCtxMenu__shell canvasFloatMenuBody" role="menu">
             <CtxRow
               onClick={() => {
                 if (isPassiveTextContainer(ctxNode.id, nodes, edges)) {
@@ -570,9 +570,15 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
             </CtxRow>
             <PaneSep />
             <CtxRow shortcut={sk.copy} onClick={() => { copySelection(); onDismiss(); }}>
-              复制节点
+              复制
             </CtxRow>
             <CtxRow onClick={() => { copySelection(); pasteSelection(); onDismiss(); }}>
+              复制节点
+            </CtxRow>
+            <CtxRow
+              title="复制参数并保留上游连线，便于 A/B 试验"
+              onClick={() => { createForkDuplicateOfSelection(); onDismiss(); }}
+            >
               创建副本
             </CtxRow>
             <CtxRow
@@ -625,31 +631,102 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
             </CtxRow>
           </div>
         ) : isImageNodeCtx && ctxNode && menuState.nodeId ? (
-          <div className="canvasPaneCtxMenu__shell" role="menu">
+          <div className="canvasPaneCtxMenu__shell canvasFloatMenuBody" role="menu">
             <CtxRow onClick={() => {
               onDismiss();
               onOpenSubjectCreation(menuState.nodeId!);
             }}>
               创建主体
             </CtxRow>
+            {ctxMediaRef?.relPath ? (
+              <>
+                <PaneSep />
+                <CtxRow onClick={() => saveCtxMediaToLibrary("role")}>保存到素材库：人物</CtxRow>
+                <CtxRow onClick={() => saveCtxMediaToLibrary("scene")}>保存到素材库：场景</CtxRow>
+                <CtxRow onClick={() => saveCtxMediaToLibrary("prop")}>保存到素材库：物品</CtxRow>
+                {ctxMediaType === "image" ? (
+                  <CtxRow onClick={() => saveCtxMediaToLibrary("style")}>保存到素材库：风格</CtxRow>
+                ) : null}
+              </>
+            ) : null}
             <PaneSep />
             <CtxRow onClick={() => { copySelection(); onDismiss(); }}>复制</CtxRow>
-            <CtxRow onClick={() => { copySelection(); pasteSelection(); onDismiss(); }}>复制副本</CtxRow>
+            <CtxRow onClick={() => { copySelection(); pasteSelection(); onDismiss(); }}>复制节点</CtxRow>
+            <CtxRow
+              title="复制参数并保留上游连线，便于 A/B 试验"
+              onClick={() => { createForkDuplicateOfSelection(); onDismiss(); }}
+            >
+              创建副本
+            </CtxRow>
             <CtxRow onClick={() => { undo(); onDismiss(); }}>撤销</CtxRow>
             <CtxRow onClick={() => { redo(); onDismiss(); }}>重做</CtxRow>
             <CtxRow onClick={() => { deleteSelection(); onDismiss(); }}>删除</CtxRow>
           </div>
         ) : (
-          <div className="canvasPaneCtxMenu__shell" role="menu">
+          <div className="canvasPaneCtxMenu__shell canvasFloatMenuBody" role="menu">
+            {ctxMediaRef?.relPath ? (
+              <>
+                <CtxRow onClick={() => saveCtxMediaToLibrary("role")}>保存到素材库：人物</CtxRow>
+                <CtxRow onClick={() => saveCtxMediaToLibrary("scene")}>保存到素材库：场景</CtxRow>
+                <CtxRow onClick={() => saveCtxMediaToLibrary("prop")}>保存到素材库：物品</CtxRow>
+                {ctxMediaType === "image" ? (
+                  <CtxRow onClick={() => saveCtxMediaToLibrary("style")}>保存到素材库：风格</CtxRow>
+                ) : null}
+                <PaneSep />
+              </>
+            ) : null}
+            {showMultiAlign ? (
+              <>
+                <div className="canvasPaneCtxMenu__sectionTitle canvasFloatMenuTitle">对齐</div>
+                <CtxRow onClick={() => { alignSelectedNodes("left"); onDismiss(); }}>左对齐</CtxRow>
+                <CtxRow onClick={() => { alignSelectedNodes("right"); onDismiss(); }}>右对齐</CtxRow>
+                <CtxRow onClick={() => { alignSelectedNodes("top"); onDismiss(); }}>顶对齐</CtxRow>
+                <CtxRow onClick={() => { alignSelectedNodes("bottom"); onDismiss(); }}>底对齐</CtxRow>
+                <CtxRow onClick={() => { alignSelectedNodes("centerH"); onDismiss(); }}>水平居中</CtxRow>
+                <CtxRow onClick={() => { alignSelectedNodes("centerV"); onDismiss(); }}>垂直居中</CtxRow>
+                <CtxRow
+                  disabled={!canDistribute}
+                  title={canDistribute ? undefined : "至少选中 3 个未嵌套节点"}
+                  onClick={() => { distributeSelectedNodes("horizontal"); onDismiss(); }}
+                >
+                  水平等距
+                </CtxRow>
+                <CtxRow
+                  disabled={!canDistribute}
+                  title={canDistribute ? undefined : "至少选中 3 个未嵌套节点"}
+                  onClick={() => { distributeSelectedNodes("vertical"); onDismiss(); }}
+                >
+                  垂直等距
+                </CtxRow>
+                <PaneSep />
+              </>
+            ) : null}
+            {selectedNodeIds.length >= 1 ? (
+              <CtxRow
+                onClick={() => {
+                  useCanvasUiStore.getState().openSaveWorkflowDialog();
+                  onDismiss();
+                }}
+              >
+                保存为工作流…
+              </CtxRow>
+            ) : null}
+            {selectedNodeIds.length >= 1 ? <PaneSep /> : null}
             <CtxRow onClick={() => { copySelection(); onDismiss(); }}>复制</CtxRow>
-            <CtxRow onClick={() => { copySelection(); pasteSelection(); onDismiss(); }}>复制副本</CtxRow>
+            <CtxRow onClick={() => { copySelection(); pasteSelection(); onDismiss(); }}>复制节点</CtxRow>
+            <CtxRow
+              title="复制参数并保留上游连线，便于 A/B 试验"
+              onClick={() => { createForkDuplicateOfSelection(); onDismiss(); }}
+            >
+              创建副本
+            </CtxRow>
             <CtxRow onClick={() => { undo(); onDismiss(); }}>撤销</CtxRow>
             <CtxRow onClick={() => { redo(); onDismiss(); }}>重做</CtxRow>
             <CtxRow onClick={() => { deleteSelection(); onDismiss(); }}>删除</CtxRow>
           </div>
         )
       ) : menuState.mode === "context-edge" ? (
-        <div className="canvasPaneCtxMenu__shell" role="menu">
+        <div className="canvasPaneCtxMenu__shell canvasFloatMenuBody" role="menu">
           <CtxRow
             disabled={selectedEdgeCount === 0}
             onClick={() => { toggleSelectedEdgesDisabled(!allSelectedEdgesDisabled); onDismiss(); }}
@@ -684,7 +761,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
         </div>
       ) : menuState.mode === "context-pane" ? (
         menuState.paneAddSubmenu ? (
-          <div role="menu" className="canvasPaneCtxMenu__shell">
+          <div role="menu" className="canvasPaneCtxMenu__shell canvasFloatMenuBody">
             <button
               type="button"
               className="canvasPaneCtxMenu__back"
@@ -696,7 +773,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
             >
               ← 返回
             </button>
-            <div className="canvasPaneCtxMenu__sectionTitle">添加节点</div>
+            <div className="canvasPaneCtxMenu__sectionTitle canvasFloatMenuTitle">添加节点</div>
             <PaneAddRow
               label="文本"
               icon={<IconText />}
@@ -722,7 +799,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
               }}
             />
             <PaneAddRow
-              label="视频合成"
+              label="剪辑"
               icon={<IconScissors />}
               onClick={() => {
                 createNodeAtClientPoint("ffmpegConcat", menuState.x, menuState.y);
@@ -746,7 +823,7 @@ function CanvasContextMenusInner(props: CanvasContextMenusProps) {
               }}
             />
             <PaneSep loose />
-            <div className="canvasPaneCtxMenu__sectionTitle">添加资源</div>
+            <div className="canvasPaneCtxMenu__sectionTitle canvasFloatMenuTitle">添加资源</div>
             <PaneAddRow
               label="上传"
               icon={<IconUpload />}

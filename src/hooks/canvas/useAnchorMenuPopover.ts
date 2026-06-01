@@ -15,6 +15,11 @@ export type AnchorMenuOpen = {
 export function useAnchorMenuPopover(nodeId: string) {
   const [open, setOpen] = useState<AnchorMenuOpen | null>(null);
   const menuRequest = useCanvasUiStore((s) => s.anchorMenuRequest);
+  const dismissEpoch = useCanvasUiStore((s) => s.anchorMenuDismissEpoch);
+
+  useEffect(() => {
+    setOpen(null);
+  }, [dismissEpoch]);
 
   useEffect(() => {
     if (!menuRequest || menuRequest.nodeId !== nodeId) return;
@@ -23,6 +28,7 @@ export function useAnchorMenuPopover(nodeId: string) {
       x: menuRequest.x,
       y: menuRequest.y,
     });
+    useCanvasUiStore.setState({ anchorMenuOpenedAt: Date.now() });
     useCanvasUiStore.getState().setAnchorMenuRequest(null);
   }, [menuRequest, nodeId]);
 

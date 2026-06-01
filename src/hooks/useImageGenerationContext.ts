@@ -4,6 +4,7 @@ import {
   resolveImageGenerationContext,
   type ImageGenerationContext,
 } from "@/lib/imageGeneration";
+import { readImageReferenceEdgeOrder } from "@/lib/imageGeneration/imageReferenceEdgeOrder";
 import { useProjectStore } from "@/store/projectStore";
 
 const EMPTY: ImageGenerationContext = {
@@ -34,6 +35,11 @@ export function useImageGenerationContext(
     return JSON.stringify(getImageEditIntent(n?.data));
   }, [nodes, nodeId]);
 
+  const referenceEdgeOrderKey = useMemo(() => {
+    const n = nodes.find((x) => x.id === nodeId);
+    return JSON.stringify(readImageReferenceEdgeOrder(n?.data.params));
+  }, [nodes, nodeId]);
+
   useEffect(() => {
     let cancelled = false;
     void resolveImageGenerationContext(nodes, edges, nodeId, projectPath).then((next) => {
@@ -42,7 +48,7 @@ export function useImageGenerationContext(
     return () => {
       cancelled = true;
     };
-  }, [nodes, edges, nodeId, projectPath, promptRevision, editIntentKey]);
+  }, [nodes, edges, nodeId, projectPath, promptRevision, editIntentKey, referenceEdgeOrderKey]);
 
   return ctx;
 }

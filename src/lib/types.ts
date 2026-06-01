@@ -1,4 +1,5 @@
 import type { Edge, Node, Viewport } from "@xyflow/react";
+import type { ComposeTimelineClip } from "@/lib/compose/timelineClips";
 import type { VideoNodePersisted } from "@/lib/videoNodeTypes";
 
 export type ScriptRole = {
@@ -6,6 +7,8 @@ export type ScriptRole = {
   name: string;
   description: string;
   imagePath: string;
+  /** 角色参考图素材 ID（与 imagePath 双写，M3） */
+  imageAssetId?: string;
   reference: string;
   action: string;
   emotion: string;
@@ -34,9 +37,13 @@ export type ScriptBeat = {
   character1Desc: string;
   /** 角色图 1（工程相对路径） */
   character1Image: string;
+  /** 角色图 1 素材 ID（与 character1Image 双写，M3） */
+  character1ImageAssetId?: string;
   character2: string;
   character2Desc: string;
   character2Image: string;
+  /** 角色图 2 素材 ID（与 character2Image 双写，M3） */
+  character2ImageAssetId?: string;
   /** 新版角色模型（主模型）：支持 1-n 角色。旧字段继续保留用于兼容历史工程与旧 UI。 */
   characters?: ScriptRole[];
   /** 参考 */
@@ -117,8 +124,19 @@ export type NodeStatus = {
   progress?: number;
 };
 
+/** 画布 group 节点语义（默认 workflow） */
+export type GroupNodeKind = "workflow" | "storyboard";
+
 export type FlowNodeData = {
   label?: string;
+  /** 仅 type=group：分组种类 */
+  groupKind?: GroupNodeKind;
+  /** 分镜组绑定的脚本节点 id */
+  groupScriptNodeId?: string;
+  /** 分镜组镜头范围（空则按组内节点 params.scriptBeatId 推导） */
+  groupScriptBeatIds?: string[];
+  /** 组框色标（见 canvasGroupColors） */
+  groupColorToken?: string;
   /** 文本/脚本梗概；`audioNode` 为待 TTS 文案；`imageNode`/`imageAsset` 为生成提示词（与展开面板、属性侧栏同步） */
   prompt?: string;
   /** 各节点自定义参数；图片/音频/视频可与脚本镜头绑定 `scriptBeatId`、`shotNumber` */
@@ -133,7 +151,13 @@ export type FlowNodeData = {
   /** 仅 videoNode：上传/生成元数据与草稿（`video.draft.prompt` 与展开面板、属性侧栏同步） */
   video?: VideoNodePersisted;
   inputs?: string[];
+  /** 剪辑节点：时间线片段（含入出点）；优先于 legacy `inputs` */
+  timelineClips?: ComposeTimelineClip[];
   output?: string;
+  /** ffmpegConcat：导出容器/编码（与 output 扩展名同步；iter-60 ProRes/GIF） */
+  exportFormat?: import("@/lib/compose/timelineExportFormat").TimelineExportFormat;
+  /** ffmpegConcat：导出分辨率与码率（见 timelineExportEncode） */
+  exportEncode?: import("@/lib/compose/timelineExportEncode").TimelineExportEncodeSettings;
   /** 脚本节点：结构化条目，供工作台表格/卡片与恢复 */
   scriptBeats?: ScriptBeat[];
   /** 脚本工作台：已勾选镜头 id（与 canvasflow.json 一并保存） */

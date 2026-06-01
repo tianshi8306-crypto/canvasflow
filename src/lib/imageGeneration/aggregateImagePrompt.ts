@@ -1,11 +1,15 @@
 import type { Edge, Node } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
-import { isEdgeDisabled } from "@/lib/edgeState";
 import { buildPromptFromScriptBeatBinding } from "@/lib/incomingScriptBinding";
 import { IMAGE_GENERATION_PROMPT_MAX_CHARS } from "@/lib/promptLimits";
-
-const MAX_UPSTREAM_TEXT_SEGMENTS = 3;
-const TEXT_SOURCE_TYPES = new Set(["textNode", "llm"]);
+import {
+  collectIncomingImagePanelItems,
+  MAX_INCOMING_IMAGE_TEXT_REFS,
+} from "@/lib/imageGeneration/collectIncomingImagePanelItems";
+import {
+  orderIncomingImagePanelRefs,
+  readImageReferenceEdgeOrder,
+} from "@/lib/imageGeneration/imageReferenceEdgeOrder";
 
 function dedupeAdjacent(parts: string[]): string[] {
   const out: string[] = [];
@@ -16,37 +20,6 @@ function dedupeAdjacent(parts: string[]): string[] {
     out.push(t);
   }
   return out;
-}
-
-function collectUpstreamTextSegments(
-  nodes: Node<FlowNodeData>[],
-  edges: Edge[],
-  targetNodeId: string,
-): { segments: string[]; truncated: boolean } {
-  const incoming = edges.filter(
-    (e) =>
-      !isEdgeDisabled(e) &&
-      e.target === targetNodeId &&
-      (!e.targetHandle || e.targetHandle === "in"),
-  );
-
-  const items: { y: number; text: string }[] = [];
-  const seen = new Set<string>();
-
-  for (const e of incoming) {
-    if (seen.has(e.source)) continue;
-    const n = nodes.find((x) => x.id === e.source);
-    if (!n?.type || !TEXT_SOURCE_TYPES.has(n.type)) continue;
-    const text = (n.data.prompt ?? "").trim();
-    if (!text) continue;
-    seen.add(e.source);
-    items.push({ y: n.position.y, text });
-  }
-
-  items.sort((a, b) => a.y - b.y);
-  const truncated = items.length > MAX_UPSTREAM_TEXT_SEGMENTS;
-  const segments = items.slice(0, MAX_UPSTREAM_TEXT_SEGMENTS).map((i) => i.text);
-  return { segments, truncated };
 }
 
 /** 超长时保留尾部「本节点 prompt」整段，前部从前往后填充。 */
@@ -89,6 +62,7 @@ export type AggregateImagePromptResult = {
 
 /**
  * 按规格 §3 聚合图片生成提示词（同步，不含风格后缀）。
+ * 上游文本顺序与参考条 referenceEdgeOrder 一致（无持久化顺序时按 Y）。
  */
 export function aggregateImagePrompt(
   nodes: Node<FlowNodeData>[],
@@ -99,7 +73,17 @@ export function aggregateImagePrompt(
   const localPrompt = (node?.data.prompt ?? "").trim();
 
   const scriptPart = buildPromptFromScriptBeatBinding(nodes, edges, targetNodeId)?.trim() ?? "";
-  const { segments, truncated: textTruncated } = collectUpstreamTextSegments(nodes, edges, targetNodeId);
+  const { items } = collectIncomingImagePanelItems(nodes, edges, targetNodeId);
+  const ordered = orderIncomingImagePanelRefs(
+    items,
+    readImageReferenceEdgeOrder(node?.data.params),
+  );
+  const textItems = ordered.filter((i) => i.kind === "text");
+  const textTruncated = textItems.length > MAX_INCOMING_IMAGE_TEXT_REFS;
+  const segments = textItems
+    .slice(0, MAX_INCOMING_IMAGE_TEXT_REFS)
+    .map((i) => i.textContent.trim())
+    .filter(Boolean);
 
   const parts = dedupeAdjacent([scriptPart, ...segments, localPrompt].filter(Boolean));
   const prompt = truncateAggregatedPrompt(parts, localPrompt);

@@ -1,0 +1,209 @@
+/* 迭代 21：时间线布局 / 胶片 / 右键菜单 */
+
+.composeEditorPreview {
+  flex: 1 1 62%;
+}
+
+.composeEditorTimelineDock {
+  min-height: 168px;
+  max-height: 36vh;
+}
+
+.composeTimelineSection {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.composeTimelineScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.composeTimelineScrollInner {
+  min-height: 88px;
+}
+
+.composeTimelineRuler {
+  height: 22px;
+}
+
+.composeTimelineRulerTick {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.composeTimelineRulerMark {
+  display: block;
+  width: 1px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.22);
+}
+
+.composeTimelineTrackLane {
+  min-height: 56px;
+  height: 56px;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.composeTimelineClips {
+  min-height: 56px;
+  height: 56px;
+}
+
+.composeTimelineClip {
+  min-height: 56px;
+  height: 56px;
+  border-right: 1px solid rgba(0, 0, 0, 0.55);
+  background: #2a2a2a;
+}
+
+.composeTimelineClip--selected {
+  outline: 2px solid rgba(255, 255, 255, 0.92);
+  outline-offset: -2px;
+  box-shadow: 0 0 0 1px rgba(20, 184, 166, 0.35);
+  z-index: 2;
+}
+
+.composeTimelineFilmstrip {
+  min-height: 56px;
+  height: 56px;
+}
+
+.composeTimelineClipBadge {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 2px 6px;
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.72) 0%, transparent 100%);
+  pointer-events: none;
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.composeTimelineClipBadgeLabel {
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 70%;
+}
+
+.composeTimelineClipBadgeDur {
+  color: rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+.composeFilmstripFrame {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  background: #1a1a1a;
+}
+
+.composeFilmstripFrame--placeholder {
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(
+    -45deg,
+    #222 0,
+    #222 6px,
+    #2a2a2a 6px,
+    #2a2a2a 12px
+  );
+}
+
+.composeTimelineFilmstripCell .nodeMutedPreview {
+  display: none;
+}
+
+.composeTimelineClipSelectionBar {
+  height: 4px;
+  background: #14b8a6;
+}
+
+.composeTimelineContextMenu {
+  position: fixed;
+  z-index: 120;
+  min-width: 168px;
+  padding: 4px;
+  border-radius: 8px;
+  background: #2a2a2a;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.55);
+}
+
+.composeTimelineContextMenu button {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.composeTimelineContextMenu button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.composeTimelineContextMenu button:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.composeTimelineContextMenuItem--danger {
+  color: #f87171 !important;
+}
+
+.composeTimelineEmpty {
+  flex: 1;
+  margin: 4px 12px 8px;
+  min-height: 72px;
+}
+
+.composeTimelineTrackLabelCol {
+  padding-bottom: 18px;
+}
+
+.composeTimelineClip--trimming {
+  cursor: default;
+}
+
+.composeTimelineTrimHandle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 14px;
+  z-index: 5;
+  cursor: ew-resize;
+}
+
+.composeTimelineTrimHandle--in {
+  left: 0;
+  border-radius: 4px 0 0 4px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.35), transparent);
+}
+
+.composeTimelineTrimHandle--out {
+  right: 0;
+  border-radius: 0 4px 4px 0;
+  background: linear-gradient(270deg, rgba(255, 255, 255, 0.35), transparent);
+}
+
+.composeTimelineTrimHandle:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}

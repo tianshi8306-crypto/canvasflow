@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
@@ -182,30 +183,22 @@ describe("MentionInput", () => {
 
   it("filters dropdown items by query after @", async () => {
     const user = userEvent.setup();
-    render(
-      <MentionInput
-        nodeId="n1"
-        value=""
-        onChange={() => {}}
-      />
-    );
+    function ControlledMention() {
+      const [value, setValue] = useState("");
+      return <MentionInput nodeId="n1" value={value} onChange={setValue} />;
+    }
+    render(<ControlledMention />);
     const textarea = screen.getByRole("textbox");
 
-    // Type @ to show dropdown
     await user.type(textarea, "@");
     expect(document.querySelector(".mention-dropdown")).toBeInTheDocument();
     expect(document.querySelectorAll(".mention-dropdown-item")).toHaveLength(3);
 
-    // Type "l" to filter
     await user.type(textarea, "l");
 
     const items = document.querySelectorAll(".mention-dropdown-item");
-    // Should filter to nodes with "l" in type or label
-    // upstream1 (textNode) - no "l" in "textnode" or "上游文本节点"
-    // upstream2 (llm) - "l" in "llm"
-    // script1 (scriptNode) - "l" in "scriptnode" and "脚本节点" has "l" in pinyin but not literal
-    // So should show upstream2 and script1
-    expect(items.length).toBeGreaterThan(0);
+    expect(items.length).toBe(1);
+    expect(items[0]?.textContent).toContain("llm");
   });
 
   it("uses nodeLabels prop for pill display", () => {
@@ -220,5 +213,22 @@ describe("MentionInput", () => {
     const pills = document.querySelectorAll(".mention-pill");
     expect(pills).toHaveLength(1);
     expect(pills[0].textContent).toContain("自定义标签");
+  });
+
+  it("Backspace removes entire @[nodeId] token in one keypress", async () => {
+    const onChange = vi.fn();
+    render(
+      <MentionInput
+        nodeId="n1"
+        value="Hello @[upstream1] world"
+        onChange={onChange}
+        nodeLabels={{ upstream1: "角色节点" }}
+      />,
+    );
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    textarea.focus();
+    textarea.setSelectionRange(17, 17);
+    await userEvent.setup().keyboard("{Backspace}");
+    expect(onChange).toHaveBeenCalledWith("Hello  world");
   });
 });

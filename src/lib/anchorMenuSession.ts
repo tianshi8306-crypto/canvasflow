@@ -5,4 +5,5 @@ export function clearAnchorMenuSession(): void {
   const ui = useCanvasUiStore.getState();
   ui.setPendingAnchorConnection(null);
   ui.setAnchorMenuRequest(null);
+  ui.bumpAnchorMenuDismiss();
 }

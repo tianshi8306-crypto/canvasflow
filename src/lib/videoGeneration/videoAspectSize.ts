@@ -3,8 +3,14 @@ import {
   type TextToVideoAspectId,
 } from "@/lib/videoNodeTypes";
 
-export const VIDEO_NODE_MAX_EDGE = 480;
-export const VIDEO_NODE_MIN_EDGE = 96;
+import {
+  CANVAS_MEDIA_NODE_MAX_EDGE,
+  CANVAS_MEDIA_NODE_MIN_EDGE,
+  computeCanvasMediaNodeFrameSize,
+} from "@/lib/canvasMediaNodeFrame";
+
+export const VIDEO_NODE_MAX_EDGE = CANVAS_MEDIA_NODE_MAX_EDGE;
+export const VIDEO_NODE_MIN_EDGE = CANVAS_MEDIA_NODE_MIN_EDGE;
 
 const ASPECT_RATIO: Record<TextToVideoAspectId, number> = {
   auto: 16 / 9,
@@ -57,17 +63,5 @@ export function computeVideoNodeFrameSize(
   ratio: number,
   maxEdge = VIDEO_NODE_MAX_EDGE,
 ): { width: number; height: number } {
-  if (!Number.isFinite(ratio) || ratio <= 0) ratio = 16 / 9;
-  let width: number;
-  let height: number;
-  if (ratio >= 1) {
-    width = maxEdge;
-    height = Math.round(maxEdge / ratio);
-  } else {
-    height = maxEdge;
-    width = Math.round(maxEdge * ratio);
-  }
-  width = Math.max(VIDEO_NODE_MIN_EDGE, width);
-  height = Math.max(VIDEO_NODE_MIN_EDGE, height);
-  return { width, height };
+  return computeCanvasMediaNodeFrameSize(ratio, maxEdge);
 }

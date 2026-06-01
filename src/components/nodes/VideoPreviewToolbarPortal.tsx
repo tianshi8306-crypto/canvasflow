@@ -1,13 +1,11 @@
-import { createPortal } from "react-dom";
+import { useCallback, type MutableRefObject, type RefObject } from "react";
+import { NODE_CHROME_TOP_CLASS } from "@/components/nodes/nodeChrome";
+import { useNodeChromeMount } from "@/components/nodes/nodeChrome/NodeChromeContext";
+import { NodeChromePortalShell } from "@/components/nodes/nodeChrome/NodeChromePortalShell";
 import {
-  useCallback,
-  useLayoutEffect,
-  useState,
-  type MutableRefObject,
-  type RefObject,
-} from "react";
-import { NODE_CHROME_PANEL_CLASS, NODE_CHROME_TOP_CLASS } from "@/components/nodes/nodeChrome";
-import { GEN_PANEL_CHROME_Z, useNodeGenerationChrome } from "@/hooks/useNodeGenerationChrome";
+  GEN_PANEL_CHROME_ABOVE_PREVIEW_GAP,
+  useNodeGenerationChrome,
+} from "@/hooks/useNodeGenerationChrome";
 import { VideoPreviewToolbar } from "@/components/nodes/VideoPreviewToolbar";
 
 type Props = {
@@ -17,20 +15,20 @@ type Props = {
   toolbarRef?: RefObject<HTMLDivElement | null>;
 };
 
-/** 有视频且选中：预览区上方外部 Portal 功能栏 */
+/** 有视频且选中：预览区上方外部 Portal（仅功能栏；名称/分辨率钉在预览壳外缘） */
 export function VideoPreviewToolbarPortal({
   nodeId,
   anchorRef,
   active,
   toolbarRef: externalToolbarRef,
 }: Props) {
+  const chromeMount = useNodeChromeMount();
   const { pos, panelRef: innerToolbarRef } = useNodeGenerationChrome(anchorRef, {
     active,
+    mountRef: chromeMount?.mountRef,
     placement: "above",
-    aboveGap: 2,
-    aboveExtra: 0,
+    aboveGap: GEN_PANEL_CHROME_ABOVE_PREVIEW_GAP,
   });
-  const [anchorWidth, setAnchorWidth] = useState<number | null>(null);
 
   const setToolbarRef = useCallback(
     (el: HTMLDivElement | null) => {
@@ -42,42 +40,15 @@ export function VideoPreviewToolbarPortal({
     [innerToolbarRef, externalToolbarRef],
   );
 
-  useLayoutEffect(() => {
-    if (!active) {
-      setAnchorWidth(null);
-      return;
-    }
-    const el = anchorRef.current;
-    if (!el) return;
-    const measure = () => setAnchorWidth(el.getBoundingClientRect().width);
-    measure();
-    let raf = 0;
-    const tick = () => {
-      measure();
-      raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [active, anchorRef, pos]);
-
-  if (!active || !pos || typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      ref={setToolbarRef}
-      className={`${NODE_CHROME_PANEL_CLASS} ${NODE_CHROME_TOP_CLASS} videoPreviewToolbarChrome`}
-      style={{
-        position: "fixed",
-        left: `${pos.x}px`,
-        top: `${pos.y}px`,
-        transform: "translate(-50%, -100%)",
-        width: anchorWidth != null ? `${anchorWidth}px` : undefined,
-        zIndex: GEN_PANEL_CHROME_Z,
-      }}
+  return (
+    <NodeChromePortalShell
+      active={active}
+      pos={pos}
+      setPanelRef={setToolbarRef}
+      className={`videoPreviewToolbarPortalRoot previewToolbarChrome--stack ${NODE_CHROME_TOP_CLASS}`}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <VideoPreviewToolbar nodeId={nodeId} />
-    </div>,
-    document.body,
+    </NodeChromePortalShell>
   );
 }

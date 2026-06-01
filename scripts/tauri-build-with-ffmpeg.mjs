@@ -53,9 +53,19 @@ function ffmpegExeName() {
 }
 
 function getDownloadPlan() {
+  const key = platformKey();
+  const inCi = process.env.CI === "true" || process.env.GITHUB_ACTIONS === "true";
+
+  if (inCi && (key === "linux-x64" || key === "darwin-arm64" || key === "darwin-x64")) {
+    return {
+      kind: "system",
+      url: "",
+      extractHint: "CI：从系统 PATH / Homebrew 复制 ffmpeg",
+    };
+  }
+
   // 说明：
   // - 这里的 URL 可能会随上游变动；若下载失败，请手动放置 ffmpeg 到 src-tauri/bin/ 并重试。
-  const key = platformKey();
   if (key === "win32-x64") {
     return {
       kind: "zip",
@@ -122,6 +132,30 @@ function findFileRecursive(dir, fileName) {
   return null;
 }
 
+function copySystemFfmpeg(target) {
+  if (os.platform() === "linux") {
+    run("bash", ["-lc", `cp "$(command -v ffmpeg)" "${target}" && chmod +x "${target}"`]);
+    return target;
+  }
+  if (os.platform() === "darwin") {
+    run("bash", [
+      "-lc",
+      `FFMPEG="$(brew --prefix ffmpeg 2>/dev/null)/bin/ffmpeg"; if [ ! -x "$FFMPEG" ]; then FFMPEG="$(command -v ffmpeg)"; fi; cp "$FFMPEG" "${target}" && chmod +x "${target}"`,
+    ]);
+    return target;
+  }
+  die("[ffmpeg] CI system copy unsupported on this platform");
+}
+
+function patchTauriExternalBinPermanent() {
+  if (!exists(TAURI_CONF)) die(`[tauri] missing ${TAURI_CONF}`);
+  const conf = readJson(TAURI_CONF);
+  conf.bundle = conf.bundle ?? {};
+  conf.bundle.externalBin = ["bin/ffmpeg"];
+  writeJson(TAURI_CONF, conf);
+  console.log("[tauri] patched tauri.conf.json (externalBin enabled, permanent for CI)");
+}
+
 function ensureBundledFfmpeg() {
   ensureDir(BIN_DIR);
   const exe = ffmpegExeName();
@@ -132,6 +166,11 @@ function ensureBundledFfmpeg() {
   }
 
   const plan = getDownloadPlan();
+  if (plan.kind === "system") {
+    copySystemFfmpeg(target);
+    console.log(`[ffmpeg] installed ${target} from system`);
+    return target;
+  }
   if (plan.kind === "manual") {
     die(
       `[ffmpeg] 未找到 ${target}。\n` +
@@ -228,6 +267,13 @@ function main() {
   }
 
   ensureBundledFfmpeg();
+
+  if (args.has("--ci-prep")) {
+    ensureBundledFfmpeg();
+    patchTauriExternalBinPermanent();
+    console.log("[tauri] CI release prep complete");
+    return;
+  }
 
   if (args.has("--skip-build")) {
     console.log("[tauri] --skip-build set, ffmpeg prepared only");

@@ -5,27 +5,28 @@ import { getAssetById } from "@/shared/api/assets";
 
 /**
  * 解析工程素材预览用相对路径：优先 `assetId`（DB 权威），否则回退 `relPath`。
- * 非 Tauri 环境无法按 id 查询，仅使用 `relPath`。
+ * 若节点上已有 `relPath`（如刚上传），先乐观使用，避免预览空白/失败。
  */
 export function useResolvedAssetRelPath(
   relPath: string | undefined,
   assetId: string | undefined,
 ): { effectiveRelPath: string | null; loading: boolean } {
   const projectPath = useProjectStore((s) => s.projectPath);
-  const [effectiveRelPath, setEffectiveRelPath] = useState<string | null>(() => {
-    if (assetId?.trim() && isTauri()) return null;
-    return relPath?.trim() ?? null;
-  });
-  const [loading, setLoading] = useState(() => Boolean(assetId?.trim() && isTauri()));
+  const pathNow = relPath?.trim() ?? null;
+  const needsDbLookup = Boolean(assetId?.trim() && projectPath?.trim() && isTauri());
+
+  const [effectiveRelPath, setEffectiveRelPath] = useState<string | null>(pathNow);
+  const [loading, setLoading] = useState(() => needsDbLookup && !pathNow);
 
   useEffect(() => {
     const p = relPath?.trim();
     const id = assetId?.trim();
     const root = projectPath?.trim();
 
+    if (p) setEffectiveRelPath(p);
+
     if (id && root && isTauri()) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- loading state for async asset lookup
-      setLoading(true);
+      if (!p) setLoading(true);
       let cancelled = false;
       void (async () => {
         try {

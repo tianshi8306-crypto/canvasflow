@@ -1,0 +1,158 @@
+/* LibTV 浮层菜单 — 与 P1 炭黑 token 配套，见 canvas-color-system.md §6.3 */
+
+.canvasFloatMenuShell {
+  border: 1px solid var(--cf-border);
+  border-radius: var(--canvas-float-radius-lg);
+  background: var(--cf-charcoal-surface);
+  box-shadow: var(--cf-shadow-float);
+  color: var(--cf-soft-white);
+  overflow: hidden;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.canvasFloatMenuBody {
+  padding: 6px 0;
+}
+
+.canvasFloatMenuHeader {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px 6px;
+  border-bottom: 1px solid var(--cf-border);
+}
+
+.canvasFloatMenuHeaderLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cf-soft-white-secondary);
+}
+
+.canvasFloatMenuHeaderDetail {
+  font-size: 11px;
+  color: var(--cf-soft-white-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvasFloatMenuSection {
+  padding: 4px 0;
+}
+
+.canvasFloatMenuSectionTitle {
+  padding: 6px 12px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--cf-soft-white-secondary);
+}
+
+.canvasFloatMenuDivider {
+  height: 1px;
+  margin: 4px 8px;
+  background: var(--cf-border);
+}
+
+.canvasFloatMenuRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: calc(100% - 12px);
+  padding: 7px 10px;
+  margin: 1px 6px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--cf-soft-white);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease,
+    color 0.12s ease;
+}
+
+.canvasFloatMenuRow:hover:not(:disabled) {
+  background: var(--canvas-float-menu-row-hover-bg);
+  border-color: var(--canvas-float-menu-row-hover-border);
+}
+
+.canvasFloatMenuRow--active {
+  background: var(--cf-hover);
+  border-color: var(--cf-border-strong);
+}
+
+.canvasFloatMenuRow:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.canvasFloatMenuRowIcon {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid var(--cf-border);
+  background: var(--cf-charcoal-elevated);
+  flex-shrink: 0;
+  color: var(--cf-soft-white-secondary);
+}
+
+.canvasFloatMenuRowMain {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.canvasFloatMenuRowLabel {
+  line-height: 1.35;
+}
+
+.canvasFloatMenuRowDetail {
+  font-size: 11px;
+  color: var(--canvas-float-menu-muted);
+}
+
+.canvasFloatMenuRowKbd {
+  flex-shrink: 0;
+  font-size: 10px;
+  padding: 2px 5px;
+  border-radius: 4px;
+  border: 1px solid var(--canvas-float-kbd-border);
+  background: var(--canvas-float-kbd-bg);
+  color: var(--cf-soft-white-tertiary);
+}
+
+.canvasFloatMenuFootnote {
+  margin: 4px 12px 8px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--canvas-float-menu-muted);
+}
+
+.zoomMenuItem {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  color: var(--cf-soft-white);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.zoomMenuItem:hover {
+  background: var(--canvas-float-menu-row-hover-bg);
+}

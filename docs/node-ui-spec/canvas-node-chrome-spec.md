@@ -136,7 +136,8 @@
 |------|------|------|
 | 共享模块 | `nodeChrome/` | `NodeChromeShell`、`NodeMetaLabel`、`NodeMetaStatus`、Token/Shell CSS |
 | 节点壳 | `MinimalImageNode.tsx` | 布局、显隐、组合 nodeChrome 组件 |
-| 节点样式 | `MinimalImageNode.css` | 图片专用（工具条、生成面板 IGP） |
+| 节点样式 | `MinimalImageNode.css` | 图片壳（预览、顶栏、空态） |
+| 生成面板样式 | `ImageGenerationPanel.css` | IGP 底栏/Modal（`imageGenPanel--minimal`） |
 | 共享样式 | `nodeChrome/nodeChromeTokens.css`、`nodeChromeShell.css` | Token + 壳/元信息/Portal 皮肤 |
 | 顶栏 Portal | `ImagePreviewToolbarPortal.tsx` | `placement: "above"` |
 | 顶栏内容 | `ImagePreviewToolbar.tsx` | 分组 Chip、菜单 |
@@ -149,13 +150,14 @@
 | 选中展开 | `hooks/useNodeExpandedChrome.ts` | 多选/拖拽 suppress（**图片节点已接入**） |
 | 双击聚焦 | `hooks/canvas/useFocusMediaNodeViewport.ts` | 图片/视频 200% + 居中 |
 | 视频节点 | `MinimalVideoNode.tsx` | 迭代 B 基准实现 |
+| 视频面板样式 | `VideoGenerationPanel.css` | VGP 底栏/Modal（`videoGenPanel--chrome` / `mmPanel--chrome`） |
+| 视频面板编排 | `VideoMultimodalInputPanel.tsx` + `VideoRefThumbStrip` 等子组件 | 参考条、Tab、参数底栏 |
 | 锚点 | `anchors/SimpleAnchors.tsx` | 磁吸 + 菜单 |
-| 进度 | `lib/nodeAgentRuntime/imageGenProgress.ts` | 8%→92% ticker |
+| 进度 | `lib/video/videoGenerationProgressDisplay.ts`、`lib/imageGeneration/imageGenerationProgressDisplay.ts` | 分阶段诚实文案；有 API progress 才显示数字 |
 | Agent 进度 | `hooks/useNodeStatus.ts` | 全局 `node-agent-event` → `data.status` |
-| UI 状态 | `store/canvasUiStore.ts` | `imageGenPanelExpandedNodeId`、`imageGenPanelPinnedNodeId` |
+| UI 状态 | `store/canvasUiStore.ts` | `imageGenPanelExpandedNodeId`、`videoGenPanelExpandedNodeId`（**无 pin**；图片/视频选中即显示底栏） |
 | 画布分工 | `canvas/NodeSelectionToolbar.tsx` | 图片节点 return null（不叠通用工具条） |
-| 上游参考图 | `lib/imageGeneration/collectIncomingImageRefs.ts` | 含 `imageNode` / 历史 `imageAsset` |
-| 遗留 | `ImageAssetNode.tsx` | 未注册 `nodeTypes`，勿作新功能入口 |
+| 上游参考图 | `lib/imageGeneration/collectIncomingImageRefs.ts` | 含 `imageNode` |
 
 ---
 
@@ -172,15 +174,13 @@ expandedChrome = selected && !nodeDragSuppressUi && !multiSelect
 - **拖拽节点**：`nodeDragSuppressUi` 为 true 时 suppress。  
 - **图片节点**：`MinimalImageNode` 已接入；局部条件与 `expandedChrome` **AND**（见 §5.2）。
 
-### 5.2 图片节点局部（`MinimalImageNode`）
+### 5.2 图片 / 视频节点局部（`MinimalImageNode` / `MinimalVideoNode`）
 
 ```ts
 expandedChrome = useNodeExpandedChrome(selected).expandedChrome
-hasPath = Boolean(path || assetId)
-dockedBelow = genPanelPinned || pinnedGenPanelId === id
-showGenPanel = expandedChrome && (!hasPath || dockedBelow) && expandedGenPanelId !== id
-showPreviewToolbar = expandedChrome && hasPath
-showEmptyUpload = expandedChrome && !hasPath
+showGenPanel = expandedChrome && expandedGenPanelId !== id
+showPreviewToolbar = expandedChrome && hasPath   // 图片/视频有成片时
+showEmptyUpload = expandedChrome && !hasPath     // 仅图片
 ```
 
 **两层关系**：`expandedChrome`（全局单选） **AND** 上表局部条件，缺一不可。
@@ -188,25 +188,16 @@ showEmptyUpload = expandedChrome && !hasPath
 | 状态 | 顶栏 | 底栏 | 空态上传 |
 |------|------|------|----------|
 | 未选中 | 隐藏 | 隐藏 | 隐藏 |
-| 选中、无图 | 隐藏 | **显示**（empty layout） | **显示** |
-| 选中、有图 | **显示** | 隐藏（除非钉住） | 隐藏 |
-| 选中、有图、钉住 | 显示 | **显示**（default layout） | 隐藏 |
+| 选中、无图（图片） | 隐藏 | **显示**（empty layout） | **显示** |
+| 选中、有图/有成片 | **显示** | **显示**（portal layout） | 隐藏 |
 | 展开 Modal 打开 | 按上 | 底栏 Portal 隐藏（`expandedGenPanelId === id`） | — |
 
-**钉住**：底栏「钉住」→ `setImageGenPanelPinnedNodeId`（**全局唯一**）；单选其它节点时，原节点失选会清钉住。  
-**从顶栏打开底栏**：`onOpenGenPanel` → 本地 `genPanelPinned`（仅当前选中会话有效）。
+**钉住（2026-05 已移除）**：图片/视频节点不再使用 `*GenPanelPinnedNodeId`；单选即显示底栏。文本/脚本/音频 TTS 仍保留各自 pin 语义。
 
 ### 5.3 右上角元信息
 
 - 有分辨率且非生成中：显示 `宽×高`（优先 `naturalWidth/Height`，否则 `data.imageWidth/Height`）。  
-- 生成中：`data.status.status === "running"` 且 `progress` 为数字 → `生成中 N%`（优先于分辨率）。  
-- 生成结束或取消：清除 `status`，恢复分辨率。
-
-### 5.4 生成进度（非真实 API 进度）
-
-- Agent 阶段事件 + `startImageGenProgressTicker` 在 execute 段平滑推进。  
-- 后端无逐帧回调前，**禁止**在 UI 文案中写「实时 API 进度」。  
-- 取消生成：停止 ticker + `updateNodeData(id, { status: undefined })`。
+- 生成中：右上显示分阶段文案（`生成中…` 或 `生成中 N%`，仅 API 有 progress 时带数字）；取消后恢复分辨率。
 
 ### 5.5 Z 轴层级（新增浮层时参照）
 
@@ -262,8 +253,10 @@ showEmptyUpload = expandedChrome && !hasPath
 | `default` | ~180px | 标准参数行 + 生成钮 |
 | `expanded` | Modal 内 | 大输入区；与 Portal 共用 `ImageGenerationPanel` |
 
-- 生成钮：空闲 ↑ 箭头；运行中 ■ 停止（`IgpGenerateButtonIcon`）。  
-- 模型/画幅：上浮菜单，避免原生 `<select>` 堆叠。  
+- 生成钮：空闲 ↑ 箭头；运行中 ■ 停止（`IgpGenerateButtonIcon`）；失败时 **重试**。  
+- 模型/画幅：上浮菜单；张数仍用底栏 `<select>`（IGP 收工，不改为输出 pill）。  
+- **状态轨**（iter-109）：`blockReason` / 未配置模型 / 失败重试；空 prompt 等由生成钮 disabled 表达，不占一行。  
+- **生成中胶囊**（iter-110）：prompt 区遮罩 + 停止；底栏停止钮等价。  
 - **不要**恢复：红褐色提示条、底栏「T」图标、字数「0」、「约¥0.03」等已移除元素。
 
 ### 6.5 锚点（SimpleAnchors）
@@ -337,19 +330,24 @@ x = clamp(x, chromeW/2 + 8, window.innerWidth - chromeW/2 - 8)
 | Token | `--tgp-control-*`、`--tgp-cta-*` 定义于 `.textGenPanel--chrome`（`TextNodeChrome.css`） |
 | 展开 | `TextComposerPanelExpandedModal` + `tgp-layout-expanded`，与 Portal 同构仅增高输入区 |
 
+### 6.10 生成参数面板通用规范
+
+> **真源文档**：[`docs/design/gen-panel-design-system.md`](../design/gen-panel-design-system.md)（以 `videoGenPanel--chrome` 为基准；图片/文本/音频/合成底栏应对齐 `--gen-panel-*` token）
+
 ### 6.11 视频底栏生成面板（`videoGenPanel--chrome`）
 
 | 项 | 约定 |
 |----|------|
 | 容器 | `VideoMultimodalInputPanel` + `layout="portal"\|"expanded"`；类名 `videoGenPanel--chrome`（`NODE_CHROME_VIDEO_PANEL_CLASS`） |
 | 宽度 | Portal / 展开 Modal 均为 **500px**（`vgp-layout-expanded` 仅增高字号） |
-| 创作模式 Tab | **只读**：`mmTab--inactive` + `pointer-events: none`；由上游连线 `detectVideoWorkflow` 决定，不可手点切换 |
-| 参考图 | 无参考时不渲染 `mmThumbsWrapper`（禁止「暂无参考图」占位） |
-| 模型 | Chrome 底栏用 `VideoModelPicker`（Portal 上浮菜单，`VIDEO_MODEL_MENU_Z = 1200`）；非 Chrome 保留原生 `mmModelSelect` |
-| 输出参数 | `mmOutputCombo` pill，内容宽度（`--vgp-control-*` token） |
-| 生成钮 | 复用 `igp-generate-btn` 三态：可生成 / 禁用 / 生成中（`--vgp-cta-*`）；失败可点重试，成功显示勾选并禁用 |
-| 提示词 | `vgp-prompt-wrap` + 右下角 `vgp-prompt-counter`；无白描边，与面板一体 |
-| Token | `--vgp-control-*`、`--vgp-cta-*` 定义于 `.videoGenPanel--chrome`（`MinimalVideoNode.css`） |
+| 显隐 | `showGenPanel = expandedChrome && expandedGenPanelId !== id`；**单选即显示底栏**（有成片亦同） |
+| 创作模式 Tab | **可点击切换**；点击 Tab → `draft.workflowLocked = true`；再次点击已锁定 Tab → 解锁；未锁定时 `detectWorkflow` 随连线自动推断 |
+| 参考图 | 无参考时不渲染参考条；首尾帧模式显示「首帧/尾帧」badge +「交换首尾」 |
+| 模型 | Chrome 底栏用 `VideoModelPicker`（Portal 上浮菜单） |
+| 输出参数 | 底栏合并 **比例·清晰度·时长·音频** 单 pill + Popover |
+| 生成钮 | 复用 `igp-generate-btn` 三态；生成中胶囊 Portal 到**预览区正中** |
+| 提示词 | `vgp-prompt-wrap` + 右下角字数计数 |
+| Token / CSS | `--vgp-control-*` 等于 `VideoGenerationPanel.css`（`.videoGenPanel--chrome`） |
 
 ---
 
@@ -363,7 +361,7 @@ x = clamp(x, chromeW/2 + 8, window.innerWidth - chromeW/2 - 8)
 | `videoNode` ✅ | 播放器/封面 | 预览工具条（LibTV 2.3：剪辑/高清/解析/去字幕/音频分离；stub+菜单） | VideoMultimodal Portal | 外置标签 `视频 N`+右上分辨率/进度 | simple | 200% |
 | `audioNode` | 波形 | TTS/导出 | TTS 面板 | 标签+时长 | simple | 可选 |
 | `textNode` | 摘要/折叠 | 同步/复制 | Composer | 标签+字数 | magnetic→simple 可选 | 可选 |
-| `scriptNode` | 分镜预览 | 生成/导出 | Script 工作台 | 标签+镜头数 | magnetic | 可选 |
+| `scriptNode` ✅ | 迷你表预览 | 重新生成/分镜/导出 | `ScriptComposerPanel` | 标签+镜头数 | simple | 200% |
 | `llm` | 对话摘要 | 清空/导出 | Prompt | 标签 | magnetic | 可选 |
 
 ### 7.2 不宜硬套
@@ -406,17 +404,16 @@ x = clamp(x, chromeW/2 + 8, window.innerWidth - chromeW/2 - 8)
 ## 9. 手动验收（图片节点回归）
 
 1. 无图单选：见上方上传钮 + 底栏 empty；双击画布 zoom 200% 且节点居中。  
-2. 有图单选：见顶栏分组工具条，底栏默认隐藏；钉住后底栏出现。  
+2. 有图单选：见顶栏分组工具条 + **底栏生成面板**。  
 3. 拖动画布：顶/底栏跟随节点，不漂在视口中央。  
 4. 框选多选：顶/底栏均不出现。  
-5. 生成中：右上「生成中 N%」；取消后恢复分辨率。  
+5. 生成中：预览区正中胶囊 + 右上分阶段文案；取消后恢复分辨率。  
 6. 顶栏「放大预览」：打开居中 Modal，非双击触发。  
 7. **浏览器模式**：无 Tauri 时上传无操作，页面不报错。  
 8. **多选**：框选 2+ 图片节点时顶/底栏、空态上传均不出现。  
-9. **钉住**：钉住 A 后单选 B，A 失选时 `pinnedGenPanelId` 清除。  
-10. **展开 Modal**：打开时底栏 Portal 隐藏；Esc 只关 Modal。  
-11. **顶栏 stub**：点占位项有 toast，不静默。  
-12. **锚点**：拖线、磁吸、菜单弹出时不误拖节点。
+9. **展开 Modal**：打开时底栏 Portal 隐藏；Esc 只关 Modal。  
+10. **顶栏 stub**：点占位项有 toast，不静默。  
+11. **锚点**：拖线、磁吸、菜单弹出时不误拖节点。
 
 ---
 
@@ -438,7 +435,7 @@ x = clamp(x, chromeW/2 + 8, window.innerWidth - chromeW/2 - 8)
 | 字段 | 用途 |
 |------|------|
 | `imageGenPanelExpandedNodeId` | 居中展开 Modal 时隐藏底栏 Portal |
-| `imageGenPanelPinnedNodeId` | 有图时钉住底栏 |
+| `videoGenPanelExpandedNodeId` | 视频同上 |
 
 ## 附录 C：相关 Hooks 签名
 

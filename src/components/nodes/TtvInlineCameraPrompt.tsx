@@ -6,6 +6,7 @@ import {
   useMemo,
   useRef,
 } from "react";
+import "./TtvShared.css";
 import { MentionInput } from "@/components/nodes/MentionInput";
 import { useProjectStore } from "@/store/projectStore";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";

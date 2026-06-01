@@ -107,10 +107,14 @@
 
 ## 5. 相关仓库文档
 
+- **画布配色真源（交互像 LibTV，色不相仿）**：[canvas-color-system.md](../design/canvas-color-system.md)
+- **脚本节点功能真源**：[脚本节点功能说明.md](./脚本节点功能说明.md)
+- **脚本节点开发顺序**：[脚本节点开发顺序.md](./脚本节点开发顺序.md)
 - 迭代节奏与边界：[ROADMAP_V2.md](../iterations/ROADMAP_V2.md)
 - 贡献与四层约束：[CONTRIBUTING.md](../../CONTRIBUTING.md)
 - UI 粒度与执行单模板：[UI_ITERATION_GUIDE.md](../design/UI_ITERATION_GUIDE.md)
 - 技术栈与工程形态：[README.md](../../README.md)
+- **视频生成面板 LibTV 对齐分析与路线图**：[VIDEO_PANEL_LIBTV_OPTIMIZATION.md](./VIDEO_PANEL_LIBTV_OPTIMIZATION.md)（iter-98～100）
 
 ---
 

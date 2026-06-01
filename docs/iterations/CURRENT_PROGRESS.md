@@ -1,7 +1,7 @@
 # 当前进度与下一步规划（异地协作）
 
 > **固定入口**：本文档为「进度 + 规划 + 代码索引」的**主文档**，请在异地开发时优先阅读本文。  
-> 更新日期：**2026-05-21**  
+> 更新日期：**2026-05-26**  
 > 仓库：**vibevideo**（Tauri + React + React Flow）  
 > 历史同名快照：`REMOTE_DEV_HANDOFF_2026-04-28.md`（内容与本文同步后仅作锚点，见该文件说明）。
 
@@ -16,12 +16,17 @@
 更细的设计对照见：[`docs/design/architecture-spec-vs-implementation.md`](../design/architecture-spec-vs-implementation.md)  
 路线图版本见：[`docs/iterations/ROADMAP_V2.md`](ROADMAP_V2.md)  
 产品与 LibTV 对齐见：[`docs/product/LIBTV_GUIDE_ALIGNMENT.md`](../product/LIBTV_GUIDE_ALIGNMENT.md)  
-画布快捷键见：[`docs/product/SHORTCUTS.md`](../product/SHORTCUTS.md)
+画布快捷键见：[`docs/product/SHORTCUTS.md`](../product/SHORTCUTS.md)  
+**成熟度监控（已完成）**：[`GOLDEN_PATH.md`](../product/GOLDEN_PATH.md) · [`RELEASE_CHECKLIST.md`](../../RELEASE_CHECKLIST.md) A/B/C 档 · `npm run release:check` · [`iteration-19-maturity-monitoring.md`](iteration-19-maturity-monitoring.md)  
+**黄金路径 P0/P1（已完成）**：10 步对照 + E2E 4 条 · [`iteration-95-golden-path-p0-p1.md`](iteration-95-golden-path-p0-p1.md)  
+**设置「模型」IA（已完成）**：子 Tab 总览/文本/图/视/音 · 默认 1+2+2+1 · 即梦登录在总览 · [`iteration-20-settings-models-ia.md`](iteration-20-settings-models-ia.md)  
+**Hermes / 画布 Agent**：**[HERMES_CURSOR_AGENT_SPEC.md](../product/HERMES_CURSOR_AGENT_SPEC.md)** · iter-45～85 ✅  
+**产品状态矩阵**：**[PRODUCT_STATUS_MATRIX.md](../product/PRODUCT_STATUS_MATRIX.md)** · 阶段 5 → **[EPIC_STAGE5_BACKLOG.md](../product/EPIC_STAGE5_BACKLOG.md)**
 
 ### UX 决策（无限画布方案，2026-05-18）
 
 - **不采用** LibTV 式底部生成器 Dock。
-- 图片 / 视频 / 音频：**节点外浮层**（Portal）+ Inspector 元数据；节点卡保持预览与生成分离（见 [`docs/图片节点设计.md`](../图片节点设计.md)）。
+- 图片 / 视频 / 音频：**节点外浮层**（Portal）+ **节点/全屏/最大化** 承载元数据（`Inspector.tsx` 样式已备但**运行时未挂载**，见 [`iteration-15-canvas-chrome-libtv-parity.md`](iteration-15-canvas-chrome-libtv-parity.md) §0）；节点卡保持预览与生成分离（见 [`docs/图片节点设计.md`](../图片节点设计.md)）。
 - 规范参考：[`docs/无限画布.pdf`](../无限画布.pdf)、[`docs/节点UI设计规范.txt`](../节点UI设计规范.txt)（色板/状态作 token 参考，不强制节点内算力条）。
 
 ---
@@ -33,7 +38,7 @@
 | 桌面端 | `src-tauri` + `npm run tauri dev`（或项目既有脚本）；部分能力仅 Tauri 可用（文件对话框、密钥环、子图执行等）。 |
 | 前端检查 | 仓库根目录：`npx tsc --noEmit` |
 | 后端检查 | `src-tauri`：`cargo check` / `cargo test`（按需） |
-| 全局样式 | 大量 UI 在 `src/styles/global.css`；画布浮层 token 为 `--canvas-float-*`（与顶栏、小地图等一致）。 |
+| 全局样式 | 大量 UI 在 `src/styles/global.css`；配色真源 [`docs/design/canvas-color-system.md`](../design/canvas-color-system.md)（`--cf-*`）；遗留 `--bg`/`--text`/`--canvas-float-*` 已别名到炭黑+柔白。**配色 P1（2026-05-21）**：节点壳 L1、浮层菜单实底、类型左条、默认灰连线、选中白描边。**配色 P2（2026-05-21）**：右侧 Inspector L2、顶栏/设置/全局表单焦点环。**配色 P3（2026-05-21）**：脚本表/分镜网格/全屏 Lib 视图对齐 §9，选中行左条 + 淡蓝底。 |
 
 ---
 
@@ -47,8 +52,8 @@
 | R2 五类节点画布体验 | 持续迭代 | 小地图、`F`/`Z` 视口、整理画布确认、图片浮层生成；无底部 Dock。 |
 | R3 脚本工作台 | **主体可用** | Inspector 工作台 + 全屏表（`iteration-03/06`）；画布为 `MinimalScriptNode` Chrome（`iteration-08`）；体验对齐见 §4.2。 |
 | R4 分镜 | **产品化完成** | `storyboardShots`、`ScriptStoryboardSection` + Hermes 自动串联、失败重试。 |
-| R5 多模态输入 | **UI 已实现** | `VideoMultimodalInputPanel` 多模态输入面板，参数分组待完善。 |
-| R6 时间线合成 | **基础实现** | `FFmpegConcatPanel` FFmpeg 拼接面板，时间轴编辑能力待完善。 |
+| R5 多模态输入 | **UI 迭代中** | `VideoMultimodalInputPanel` + `VideoGenerationStatusRail`（`iteration-16-r5-video-generation-panel.md`）：状态轨固定于参数栏上方、Popover 分组标题。 |
+| R6 时间线合成 | **基础 + 剪辑台** | `ComposeEditorOverlay` 时间线编辑；`exportScriptCompose` / `render_timeline`；见 iteration-18。 |
 | C.1 节点状态机 | ✅ 已实现 | 节点执行状态可见（idle/pending/running/succeeded/failed/skipped）。 |
 | C.2 失败策略 | ✅ 已存在 | 后端自动标记下游 skipped，`abortWorkflowOnFailure` 配置。 |
 | C.3 子图重跑 | ✅ 已存在 | 后端 `run_subgraph_inner`，前端"重跑失败子图"按钮。 |
@@ -58,6 +63,20 @@
 ## 4. 近期已实现（与主线强相关）
 
 以下对应「脚本中枢 + 画布生产链路」近期交付，便于异地理解**行为契约**：
+
+### 4.0 画布打组（迭代 16-A～E，2026-05-21）
+
+方案：[`画布打组功能方案.md`](../product/画布打组功能方案.md)
+
+| 迭代 | 能力 |
+|------|------|
+| 16-A | 分组工具条、组标题、选中策略 A |
+| 16-B | 组框 resize、排列后自动扩组 |
+| 16-C | 整组执行、创建副本、批量导出 `assets/export/` |
+| 16-D | 转分镜组、工具箱模板、Hermes/建链组内范围 |
+| 16-E | 组色标、组级运行态角标、宫格/横向/纵向排列 |
+
+入口：`GroupToolbar.tsx`、`GroupNode.tsx`、`LeftAddDock` 工具箱区；store：`projectGroupRuns.ts`、`projectGroupProduction.ts`。
 
 ### 4.1 脚本节点解析与执行器（Rust）
 
@@ -129,7 +148,7 @@
 ### 4.3 侧栏 Inspector：镜头绑定
 
 - 图片 / 音频 / 视频节点：在存在上游 `scriptNode` 且其有 `scriptBeats` 时，**`scriptBeatId` 以下拉列出镜头**（镜号 + 描述摘要）；选择时写入 `shotNumber`；未在列表中的已保存 id 保留「孤儿」选项。  
-- 文件：`src/components/Inspector.tsx`。
+- 文件：`src/components/Inspector.tsx`（保留；**未挂到 App**）。分镜聚焦：`openInspectorStoryboardBeat` → 脚本全屏创意视图（`iteration-15` §0）。
 
 ### 4.4 脚本表格类型安全
 
@@ -239,6 +258,71 @@ npm run quality:gate:full # quality:gate + playwright e2e（CI 完整门禁）
 
 触发条件：`scriptNode` 执行完成（`agentName === "脚本调度 Agent"` 且 `phase === "end"`）
 
+### 4.8.3 Hermes Cursor Agent 运行时（iter-45～53，2026-05-26）
+
+真源：[HERMES_CURSOR_AGENT_SPEC.md](../product/HERMES_CURSOR_AGENT_SPEC.md)
+
+| 迭代 | 能力 | 关键文件 |
+|------|------|----------|
+| 45～46 | Agent 设置、`agentAutoExecute`、风险说明 | `hermesAgentSettings.ts`、`SettingsAgentSection.tsx` |
+| 47 | `director_plan` Job 队列 | `hermesJobStore.ts`、`HermesSidebar.tsx` |
+| 48 | 工作记忆 `workstate.json` | `hermesWorkstate.ts`、`hermesAgentContext.ts` |
+| 49 | 成功后自动写经验 / Skill | `hermesJobReflection.ts` |
+| 50 | 画布事件感知（手改/选中） | `hermesCanvasEvents.ts`、`initHermesCanvasAwareness.ts` |
+| 51 | 媒体并发上限 | `agentMaxConcurrentMedia` |
+| 52 | 外接 MCP stdio | `hermesExternalMcp.ts` |
+| **53** | **步内 Agent loop**：observe → preflight 补依赖 → 失败 recovery | `hermesAgentLoop.ts`、[`iteration-53-hermes-agent-loop.md`](iteration-53-hermes-agent-loop.md) |
+| **54** | **NL 增量编辑**：口语 → `patch_shot` 结构化参数 | `hermesNlPatch.ts`、[`iteration-54-hermes-nl-patch.md`](iteration-54-hermes-nl-patch.md) |
+| **55** | **全链路修复**：workflow_check ↔ loop 自动修断链 | `hermesWorkflowRepair.ts`、[`iteration-55-hermes-workflow-repair.md`](iteration-55-hermes-workflow-repair.md) |
+| **56** | **R4 长上下文**：工程/对话摘要进 workstate | `hermesLongContext.ts`、[`iteration-56-hermes-long-context.md`](iteration-56-hermes-long-context.md) |
+| **61** | **R4 LLM 摘要**：workstate 可选 LLM 压缩 | `hermesLongContextLlm.ts`、[`iteration-61-hermes-long-context-llm.md`](iteration-61-hermes-long-context-llm.md) |
+| **62** | **跨 Tab digest**：全 Tab 对话并入 workstate | `hermesCrossTabDigest.ts`、[`iteration-62-hermes-cross-tab-digest.md`](iteration-62-hermes-cross-tab-digest.md) |
+| **63** | **P2 E2 版本链**：脚本/分镜快照与回滚 | `hermesScriptVersion.ts`、[`iteration-63-hermes-script-version-chain.md`](iteration-63-hermes-script-version-chain.md) |
+| **64** | **P2 E4 优化建议**：镜数/提示词主动芯片 | `hermesProactiveSuggestions.ts`、[`iteration-64-hermes-optimize-suggestions.md`](iteration-64-hermes-optimize-suggestions.md) |
+| **65** | **P2 I4 语音输入**：Hermes 麦克风 STT | `hermesVoiceInput.ts`、`transcribe_speech_audio`、[`iteration-65-hermes-voice-input.md`](iteration-65-hermes-voice-input.md) |
+| **66** | **P2 T5 对外 MCP**：stdio Server + 本地桥 | `canvasflow-mcp-server.mjs`、`canvas_mcp_bridge.rs`、[`iteration-66-canvas-mcp-server.md`](iteration-66-canvas-mcp-server.md) |
+| **67** | **E2 可视化 diff**：版本对比浮层 | `hermesScriptVersionDiff.ts`、`HermesScriptVersionDiffOverlay.tsx`、[`iteration-67-hermes-script-version-visual-diff.md`](iteration-67-hermes-script-version-visual-diff.md) |
+| **68** | **R5 多任务并行**：对话与制片双通道 | `hermesParallelChannel.ts`、[`iteration-68-hermes-parallel-r5.md`](iteration-68-hermes-parallel-r5.md) |
+| **69** | **I3 主动补全打磨**：Situation/芯片去重、断点续跑、发送后忽略 | `filterSidebarProactiveChips`、[`iteration-69-hermes-proactive-polish.md`](iteration-69-hermes-proactive-polish.md) |
+| **70** | **M3 学习与适应**：消费成功经验、忽略偏好 | `hermesLearningAdaptation.ts`、[`iteration-70-hermes-learning-adaptation-m3.md`](iteration-70-hermes-learning-adaptation-m3.md) |
+| **71** | **M1 Job 中心**：制片任务展开、排队取消、后台任务 | `HermesJobCenter.tsx`、[`iteration-71-hermes-job-center-m1.md`](iteration-71-hermes-job-center-m1.md) |
+| **72** | **M1 取消执行中 Job + T1 工具 Registry** | `hermesJobStore` shouldAbort、`hermesToolRegistry.ts`、[`iteration-72-hermes-job-cancel-tool-registry.md`](iteration-72-hermes-job-cancel-tool-registry.md) |
+| **73** | **M5 LLM 任务复盘** | `hermesJobReflectionLlm.ts`、`agentPostJobLlmReflect`、[`iteration-73-hermes-m5-llm-reflect.md`](iteration-73-hermes-m5-llm-reflect.md) |
+| **74** | **M4 长期记忆增强** | 画像/分组/检索、`hermesPersistentMemory`、[`iteration-74-hermes-m4-memory.md`](iteration-74-hermes-m4-memory.md) |
+| **75** | **Job sessionStorage 持久化** | `hermesJobPersistence.ts`、[`iteration-75-hermes-job-session-persist.md`](iteration-75-hermes-job-session-persist.md) |
+| **76** | **E1 NL 梗概/圣经增量编辑** | `hermesNlEdit.ts`、[`iteration-76-hermes-nl-edit-e1.md`](iteration-76-hermes-nl-edit-e1.md) |
+| **77** | **M5×M3 复盘加权学习** | `[reflect-proc:]`、`hermesLearningAdaptation`、[`iteration-77-hermes-m5-m3-reflect-boost.md`](iteration-77-hermes-m5-m3-reflect-boost.md) |
+| **78** | **R1 全片理解块** | `hermesGlobalUnderstanding.ts`、[`iteration-78-hermes-r1-global-understanding.md`](iteration-78-hermes-r1-global-understanding.md) |
+| **79** | **E3 制片断链检测** | `hermesProductionIssues.ts`、[`iteration-79-hermes-e3-production-issues.md`](iteration-79-hermes-e3-production-issues.md) |
+| **80** | **R3 计划逻辑补全** | `completePlanWithLogicalSteps`、[`iteration-80-hermes-r3-plan-reasoning.md`](iteration-80-hermes-r3-plan-reasoning.md) |
+| **81** | **E4 顾问芯片扩展** | 稀疏描述/节奏/断链修复、[`iteration-81-hermes-e4-advisor-chips.md`](iteration-81-hermes-e4-advisor-chips.md) |
+| **82** | **T3 Skills 深化** | 评分匹配、模板联动、`hermesSkillPlan`、[`iteration-82-hermes-t3-skills-deep.md`](iteration-82-hermes-t3-skills-deep.md) |
+| **83** | **E2 版本链 Agent 联动** | 预快照、上下文 diff、主动「版本对比」、[`iteration-83-hermes-e2-version-agent.md`](iteration-83-hermes-e2-version-agent.md) |
+| **84** | **T1 Registry 深化** | 风险/gate/参数、`isPlanStepAllowed`、[`iteration-84-hermes-t1-registry-deep.md`](iteration-84-hermes-t1-registry-deep.md) |
+| **85** | **多 Job 编排（队列）** | 优先级/插队/取消排队、[`iteration-85-hermes-m2-multi-job-orchestration.md`](iteration-85-hermes-m2-multi-job-orchestration.md) |
+| **86** | **R5 LibTV 面板分组** | 工作流主/高级 Tab、三区段标签、[`iteration-86-r5-libtv-panel-grouping.md`](iteration-86-r5-libtv-panel-grouping.md) |
+| **87** | **R5 Seedance 轮询** | 多字段 URL 解析、[`iteration-87-r5-seedance-poll.md`](iteration-87-r5-seedance-poll.md) |
+| **88** | **参考视频 ffprobe** | 非真理解、[`iteration-88-reference-video-metadata.md`](iteration-88-reference-video-metadata.md) |
+| **89** | **产品状态矩阵** | [`PRODUCT_STATUS_MATRIX.md`](../product/PRODUCT_STATUS_MATRIX.md)、[`EPIC_STAGE5_BACKLOG.md`](../product/EPIC_STAGE5_BACKLOG.md) |
+| **90** | **R5 视频模型测试连接** | `test_video_model_connection`、[`iteration-90-r5-video-model-test.md`](iteration-90-r5-video-model-test.md) |
+| **91** | **E5 批量出关键帧** | `assessBatchImageReadiness`、[`iteration-91-e5-batch-keyframes.md`](iteration-91-e5-batch-keyframes.md) |
+| **92** | **E5 重试失败关键帧** | `listFailedKeyframeBeatIds`、[`iteration-92-e5-retry-failed-keyframes.md`](iteration-92-e5-retry-failed-keyframes.md) |
+| **94** | **连线内联删除** | 单线选中 + 沿路径删除钮、[`iteration-94-canvas-edge-inline-delete.md`](iteration-94-canvas-edge-inline-delete.md) |
+| **93** | **Hermes image.retry_failed** | 对齐 iter-92、[`iteration-93-hermes-image-retry-failed.md`](iteration-93-hermes-image-retry-failed.md) |
+| **95** | **黄金路径 P0/P1 巩固** | E2E 步骤 1 + P0/P1 文档 · [`iteration-95-golden-path-p0-p1.md`](iteration-95-golden-path-p0-p1.md) ✅ |
+| **57** | **I3 主动补全**：侧栏芯片 + Situation 可点执行 | `hermesProactiveSuggestions.ts`、[`iteration-57-hermes-proactive-completion.md`](iteration-57-hermes-proactive-completion.md) |
+| **58** | **G5 多格式导出**：MP4 / MOV / WebM + Hermes 格式话术 | `timelineExportFormat.ts`、`compose_concat.rs`、[`iteration-58-g5-multi-format-export.md`](iteration-58-g5-multi-format-export.md) |
+| **59** | **导出编码面板**：分辨率 + 码率预设 | `timelineExportEncode.ts`、[`iteration-59-compose-export-encode-panel.md`](iteration-59-compose-export-encode-panel.md) |
+| **60** | **ProRes / GIF 导出** | `exportFormat` 字段、[`iteration-60-prores-gif-export.md`](iteration-60-prores-gif-export.md) |
+
+**iter-53 行为契约**（`agentLoopEnabled` 默认开，设置 → Agent →「步内智能调整」）：
+
+- 执行 `video.generate_for_beats` 前若缺关键帧 → 自动插入 `image.generate_for_beats`
+- 执行出图/出视频前若缺分镜 → 插入 `script.generate_storyboard`
+- 可重试步骤失败 → 规则 `proposeFailureRecoveryPlan` 插入修复步（最多 3 轮 replan，单 Job 最多 12 步）
+- 关 loop → 回退 iter-47 固定计划顺序 + 侧栏二次 recovery
+- `workstate` 记录 `loopRound`、`lastToolSummary`；侧栏进度行 `↻ 重新规划：…`
+
 ### 4.9 C.1 节点状态机（2026-05-07 实现）
 
 #### 4.9.1 节点状态类型
@@ -308,13 +392,13 @@ CSS 样式新增：`.nodeStatus*` 系列类名，动画效果
 
 | 主题 | 说明 |
 |------|------|
-| 视频任务引擎（R4/R5） | ~~pending~~ ✅ 已实现（`video_cmd.rs` 三命令 + 两阶段 poll + ffmpeg mock fallback）。真实 API 轮询（`poll_video_job_http`）仍为 stub，待接入 Doubao Seedance API。 |
+| 视频任务引擎（R4/R5） | ✅ `video_cmd.rs` 三命令 + HTTP 轮询（iter-87 多字段解析）；**仅 `mock_` jobId** 降级 ffmpeg 黑屏片。需配置 Settings 视频模型 Key。 |
 | R4 分镜产品化 | ~~pending~~ ✅ 已实现（2026-05-07）。增强分镜网格状态、批量重试、Hermes 串联。 |
 | C.1 节点状态机 | ~~pending~~ ✅ 已实现（2026-05-07）。`node.data.status` 字段、全局事件监听、状态徽章 UI。 |
 | C.2 失败策略 | ~~pending~~ ✅ 已存在。后端自动标记下游 skipped，`abortWorkflowOnFailure` 配置。 |
 | C.3 子图重跑 | ~~pending~~ ✅ 已存在。后端 `run_subgraph_inner`，前端"重跑失败子图"按钮。 |
 | 设计 vs 实现差距 | `architecture-spec-vs-implementation.md`：端口类型系统、DAG 并行、执行器只认 asset ID 等仍为 ⚠️/❌。 |
-| 参考视频与多模态 | 当前为「路径 + 文本约束」；若产品要**真视频理解**，需单独方案（模型与成本）。 |
+| 参考视频与多模态 | iter-88：**路径 + ffprobe 元信息**（非画面理解）；真理解 → Epic E2（见 [`EPIC_STAGE5_BACKLOG.md`](../product/EPIC_STAGE5_BACKLOG.md)）。 |
 | `global.css` 体积 | 单文件过大，长期建议按模块拆分（非功能阻断）。 |
 | `ScriptNodeWorkbench.tsx` | 体量大，后续可拆子组件或抽 hooks（非功能阻断）。 |
 
@@ -367,14 +451,21 @@ CSS 样式新增：`.nodeStatus*` 系列类名，动画效果
 
 5. **~~视频异步任务引擎~~** ✅ 已实现（2026-05）
    - `video_gen_start` / `video_gen_get_job` / `video_gen_cancel` 三命令已完成
-   - 真实 API 轮询（`poll_video_job_http`）仍为 stub，待接入 Doubao Seedance API
+   - **`poll_video_job_http`**：iter-87 已接 HTTP 多字段解析；**仅 `mock_` jobId** 仍降级 ffmpeg 黑屏片（见 §5 表）
+
+### P0′ — 黄金路径巩固 ✅（iter-95，2026-05-26）
+
+- E2E 4 条（含浏览器「新建工程」桌面壳提示）；`GOLDEN_PATH` / `RELEASE_CHECKLIST` P0/P1 与双路径表。  
+- B 档步骤 2、9、10 仍手工（桌面）；发版前按 [`GOLDEN_PATH.md`](../product/GOLDEN_PATH.md) 勾选。
 
 ### P1 — 脚本工作台与体验
+
+**画布壳层 / LibTV 范式（已完成）** — [`iteration-15-canvas-chrome-libtv-parity.md`](iteration-15-canvas-chrome-libtv-parity.md)：15-0～D（IA、顶栏、Dock、空态、token 扫尾）。
 
 0. **脚本节点 Chrome + 体验一致（已完成）**  
    - Chrome：`iteration-08`（`MinimalScriptNode` + Portal）。  
    - 对齐：`script-09-0A/0B`、`script-10-1A/1B`（见本文 §4.2 表）。  
-   - **当前推荐开工**：阶段 5 Epic 或 R5/R6 深化，见 [`脚本节点开发顺序.md`](../product/脚本节点开发顺序.md) §10。
+   - **发版前优先**：iter-95 黄金路径 P0/P1；Epic / R5/R6 深化见 [`脚本节点开发顺序.md`](../product/脚本节点开发顺序.md) §10。
 
 1. **Workbench 可维护性**（非功能阻断）
    - 拆分 `ScriptNodeWorkbench.tsx` 或提取批量/模板逻辑到 `src/lib/`。
@@ -382,19 +473,31 @@ CSS 样式新增：`.nodeStatus*` 系列类名，动画效果
 2. **样式拆分**
    - 从 `global.css` 抽出脚本工作台 / 画布浮层等 scoped 片段，减少合并冲突。
 
-### P2 — 架构纵轴（与对照表一致，改动面大）
+### P2 — 架构纵轴（2026-05-21 收尾并冻结）
 
-3. **执行器与资产 ID**
-   - 按 `architecture-spec-vs-implementation.md` 结论，选一纵轴：**DAG 内更多只认 `assetId` + 元数据表**，再扩端口类型。
-   - 需单独里程碑文档与迁移策略（旧工程兼容）。
+3. **执行器与资产 ID** — ✅ **已冻结**（[`iteration-17-asset-id-dag-vertical.md`](iteration-17-asset-id-dag-vertical.md) §0）  
+   - 够用：打开工程 reconcile、`commitNodeMediaPatch`、解析优先 `assetId`  
+   - **不再做** M5（删 `path`）、新 reconcile 分支
 
-4. **视频节点参数分组 / 失败态固定区域**
-   - R5 视频生成参数面板完善
+4. **视频节点参数分组 / 失败态固定区域** — ✅（`iteration-16-r5-video-generation-panel.md`）
+   - `VideoGenerationStatusRail`、分区标签、`VideoOutputSettingsContent`「时长与水印」
 
-### P3 — 路线图后续 R5～R6
+### P3 — 时间线合成与导出（2026-05-21 收尾并冻结）
 
-5. 时间线合成与导出闭环
-   - 增强现有 `ffmpegConcat` 能力，添加时间轴编辑 UI
+5. **时间线合成与导出闭环** — ✅ 已冻结（[`iteration-18-p3-timeline-export.md`](iteration-18-p3-timeline-export.md)）  
+   - 已有全屏 `ComposeEditorOverlay`；本迭代补：从脚本填充、Inspector/底栏进剪辑台、导出 `assetId` 双写  
+   - **不再做**：多轨/转场、重做时间线 UI
+
+### P4 — 工作流库（画布复用，已合并）
+
+6. **工作流库 P0** — ✅ 已合并进 `feat/hermes-p2-agent-experience`（[`iteration-96-workflow-library.md`](iteration-96-workflow-library.md)；PR 栈 `feat/iter-96-workflow-a` → `b` → `c`）  
+   - 本机 `localStorage` + 工程 `.canvasflow/workflows`；多选/分组/右键「保存为工作流」；Dock 列表插入/删除  
+   - 依赖：`canvasGroupTemplate` / 粘贴 ID 映射；与分组工具箱并存  
+   - 后续：iter-97 导入导出；iter-98 标签/缩略图/Hermes 提示  
+
+### P5 — 其他（按需）
+
+7. 产品向迭代（脚本/分镜体验、真实 video API、性能）— 无固定排期
 
 ---
 
@@ -414,12 +517,18 @@ CSS 样式新增：`.nodeStatus*` 系列类名，动画效果
 | 旧卡内 UI（未注册） | `src/components/nodes/ScriptNode.tsx`（仅历史参考，勿按此实现） |
 | 节点状态 | `src/hooks/useNodeStatus.ts`（C.1）、`src/components/nodes/NodeStatusBadge.tsx` |
 | Hermes 自动串联 | `src/lib/hermes/index.ts`、`src/lib/hermes/autoChain.ts`、`src/lib/hermes/shotNodeFactory.ts` |
+| Hermes Director / Agent loop | `src/lib/hermes/hermesDirector.ts`、`src/lib/hermes/agent/hermesAgentLoop.ts`、`src/lib/hermes/agent/hermesJobStore.ts`、`src/components/hermes/HermesSidebar.tsx` |
+| 视频生成面板 R5 | `src/components/nodes/VideoMultimodalInputPanel.tsx`、`VideoGenerationStatusRail.tsx`、`VideoOutputSettingsContent.tsx` |
+| 资产 ID 纵轴 M2 | `src-tauri/src/canvas_asset_backfill.rs`、`executor/asset_resolve.rs`、`src/lib/nodeMediaRef.ts`、`projectWorkspaceLoad.ts` |
+| 剪辑 / 导出 P3 | `ComposeEditorOverlay.tsx`、`useComposeNodeEditor.ts`、`findScriptForCompose.ts`、`composeExportCommit.ts` |
 | 侧栏 | `src/components/Inspector.tsx` |
 | DAG 执行 | `src-tauri/src/executor.rs`、`src-tauri/src/executor/engine.rs` |
 | 运行事件 / DB | `src-tauri/src/db.rs`（及与 `run_events` 相关调用） |
 | **视频生成** | `src-tauri/src/commands/video_cmd.rs`（三命令）、`src/lib/videoGeneration/mode.ts`（模式开关）、`src/lib/videoGeneration/bridge.ts`（路由）、`src/lib/videoGeneration/apiPool.ts`（mock client）、`src/hooks/useVideoNodeGeneration.ts` |
 | **测试基础设施** | `vitest.config.ts`（jsdom 环境）、`vitest.setup.ts`（jest-dom 全局） |
 | **质量门禁** | `CONTRIBUTING.md` §6、`RELEASE_CHECKLIST.md`、`README.md` 质量门禁节 |
+| **黄金路径 P0/P1** | [`GOLDEN_PATH.md`](../product/GOLDEN_PATH.md)、[`iteration-95-golden-path-p0-p1.md`](iteration-95-golden-path-p0-p1.md)、`e2e/golden-path.spec.ts` |
+| **工作流库 iter-96** | [`iteration-96-workflow-library.md`](iteration-96-workflow-library.md)、`canvasWorkflowSnapshot.ts`、`CanvasWorkflowLibrarySection.tsx`、`projectWorkflowProduction.ts` |
 
 ---
 

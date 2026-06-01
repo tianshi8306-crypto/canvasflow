@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  defaultHermesAutoChainSettings,
   evaluateHermesAutoChainTrigger,
   listStoryboardReadyBeatIds,
   resolveHermesEnabled,
@@ -18,8 +19,10 @@ describe("hermesAutoChainPolicy", () => {
   ];
 
   it("resolveHermesEnabled respects node off", () => {
-    expect(resolveHermesEnabled({ enabled: true, scope: "all_ready" }, "off")).toBe(false);
-    expect(resolveHermesEnabled({ enabled: false, scope: "all_ready" }, "on")).toBe(true);
+    const on = { ...defaultHermesAutoChainSettings(), enabled: true, scope: "all_ready" as const };
+    const off = { ...defaultHermesAutoChainSettings(), enabled: false, scope: "all_ready" as const };
+    expect(resolveHermesEnabled(on, "off")).toBe(false);
+    expect(resolveHermesEnabled(off, "on")).toBe(true);
   });
 
   it("lists only generated shots with prompt", () => {
@@ -28,7 +31,7 @@ describe("hermesAutoChainPolicy", () => {
 
   it("does not run when global disabled", () => {
     const r = evaluateHermesAutoChainTrigger({
-      globalSettings: { enabled: false, scope: "selected_only" },
+      globalSettings: { ...defaultHermesAutoChainSettings(), enabled: false },
       nodeParams: {},
       beats,
       shots,
@@ -39,7 +42,7 @@ describe("hermesAutoChainPolicy", () => {
 
   it("selected_only requires selection", () => {
     const r = evaluateHermesAutoChainTrigger({
-      globalSettings: { enabled: true, scope: "selected_only" },
+      globalSettings: { ...defaultHermesAutoChainSettings(), enabled: true },
       nodeParams: {},
       beats,
       shots,
@@ -50,7 +53,7 @@ describe("hermesAutoChainPolicy", () => {
 
   it("runs for selected ready beats only", () => {
     const r = evaluateHermesAutoChainTrigger({
-      globalSettings: { enabled: true, scope: "selected_only" },
+      globalSettings: { ...defaultHermesAutoChainSettings(), enabled: true },
       nodeParams: {},
       beats,
       shots,

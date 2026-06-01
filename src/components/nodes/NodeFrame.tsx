@@ -95,7 +95,7 @@ export function NodeFrame({
 
   useEffect(() => {
     if (!editing) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setDraft(displayName);
     }
   }, [displayName, editing]);
@@ -119,7 +119,7 @@ export function NodeFrame({
   const nodeBusy = runState === "running" || agentBusyCount > 0;
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setAsyncProgress(2);
     if (!nodeBusy) return;
     const timer = window.setInterval(() => {
@@ -156,7 +156,7 @@ export function NodeFrame({
 
   useEffect(() => {
     if (!useSplit) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setOverlayGeom(null);
       return;
     }
@@ -227,7 +227,7 @@ export function NodeFrame({
     if (typeof rootRef === "function") {
       rootRef(el);
     } else if (typeof rootRef === "object" && rootRef !== null) {
-      // eslint-disable-next-line react-hooks/immutability
+       
       (rootRef as React.MutableRefObject<HTMLDivElement | null>).current = el;
     }
   };

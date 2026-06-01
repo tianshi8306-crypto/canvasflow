@@ -91,6 +91,8 @@ export type VideoGenOutputSpec = {
   generateAudio: boolean;
   /** 水印开关，默认 false（无水印） */
   watermark?: boolean;
+  /** 生成时提示去字幕（部分模型/工作流） */
+  noSubtitles?: boolean;
 };
 
 /** 单段裁剪入出点（秒）；导出后仍保留便于再调 */
@@ -110,6 +112,8 @@ export type VideoSubtitleRegion = {
 /** 与面板同步的生成草稿（持久化） */
 export type VideoGenerationDraft = {
   workflow: VideoGenerationWorkflow;
+  /** 用户手动点 Tab 锁定后，连线变化不再自动覆盖 workflow */
+  workflowLocked?: boolean;
   modelId: VideoModelId;
   /** 主提示词；图生/编辑等可复用 */
   prompt: string;
@@ -118,6 +122,8 @@ export type VideoGenerationDraft = {
   referenceVideoPaths?: string[];
   /** 参考音频（mp3/wav 等），与画布左侧音频节点连线同步 */
   referenceAudioPaths?: string[];
+  /** 参考条缩略图顺序（edgeId 列表）；未设置时按源节点 Y 坐标排序 */
+  referenceEdgeOrder?: string[];
   output: VideoGenOutputSpec;
   /** 运镜：预设 / 自定义列表 / 收藏 */
   cameraMovement?: CameraMovementDraft;

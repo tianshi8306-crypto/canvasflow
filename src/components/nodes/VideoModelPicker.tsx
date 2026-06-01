@@ -9,6 +9,8 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import type { VideoModelOption } from "@/hooks/useVideoModels";
+import { formatVideoModelCapabilitySubtitle } from "@/lib/videoGeneration/catalog";
+import type { VideoGenerationWorkflow } from "@/lib/videoNodeTypes";
 
 /** 高于生成面板 Portal，避免被节点裁切 */
 export const VIDEO_MODEL_MENU_Z = 1200;
@@ -21,6 +23,7 @@ type Props = {
   onChange: (modelId: string) => void;
   onOpenChange?: (open: boolean) => void;
   loading?: boolean;
+  workflow?: VideoGenerationWorkflow;
 };
 
 function ModelSparkleIcon() {
@@ -39,7 +42,14 @@ function iconLetter(label: string, id: string): string {
   return t ? t.toUpperCase() : "?";
 }
 
-export function VideoModelPicker({ models, value, onChange, onOpenChange, loading = false }: Props) {
+export function VideoModelPicker({
+  models,
+  value,
+  onChange,
+  onOpenChange,
+  loading = false,
+  workflow,
+}: Props) {
   const [open, setOpen] = useState(false);
   const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -146,6 +156,9 @@ export function VideoModelPicker({ models, value, onChange, onOpenChange, loadin
               {orderedModels.map((m) => {
                 const isSelected = m.id === value;
                 const disabled = !m.enabled;
+                const disabledHint =
+                  m.disabledReason ??
+                  (disabled ? "请在 设置 → 视频模型 中启用并配置 API Key" : undefined);
                 return (
                   <button
                     key={m.settingsId ?? m.id}
@@ -153,6 +166,7 @@ export function VideoModelPicker({ models, value, onChange, onOpenChange, loadin
                     role="option"
                     aria-selected={isSelected}
                     disabled={disabled}
+                    title={disabledHint}
                     className={`igp-model-item${isSelected ? " selected" : ""}${disabled ? " disabled" : ""}`}
                     onClick={() => {
                       if (disabled) return;
@@ -166,6 +180,9 @@ export function VideoModelPicker({ models, value, onChange, onOpenChange, loadin
                     <span className="igp-model-item-body">
                       <span className="igp-model-item-title-row">
                         <span className="igp-model-item-title">{m.label}</span>
+                      </span>
+                      <span className="igp-model-item-subtitle">
+                        {formatVideoModelCapabilitySubtitle(m.id, workflow)}
                       </span>
                     </span>
                   </button>

@@ -11,8 +11,8 @@ export function defaultVideoSubtitleRegion(): VideoSubtitleRegion {
 export function normalizeVideoSubtitleRegion(region: VideoSubtitleRegion): VideoSubtitleRegion {
   let w = Math.max(MIN_W, Math.min(1, region.w));
   let h = Math.max(MIN_H, Math.min(1, region.h));
-  let x = Math.max(0, Math.min(1 - w, region.x));
-  let y = Math.max(0, Math.min(1 - h, region.y));
+  const x = Math.max(0, Math.min(1 - w, region.x));
+  const y = Math.max(0, Math.min(1 - h, region.y));
   if (x + w > 1) w = 1 - x;
   if (y + h > 1) h = 1 - y;
   return { x, y, w, h };

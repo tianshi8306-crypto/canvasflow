@@ -7,6 +7,24 @@ import type {
   NodeDirection,
 } from "@/lib/settingsPanelTypes";
 import type { NodeSnapVisual } from "@/lib/nodeSnapAlignment";
+import {
+  loadHermesShellPrefs,
+  saveHermesShellPrefs,
+  type HermesFloatDock,
+  type HermesOrbDock,
+  type HermesShellMode,
+} from "@/lib/hermes/hermesShellPrefs";
+const initialHermesShell = loadHermesShellPrefs();
+
+function persistHermesShell(get: () => CanvasUiState): void {
+  const s = get();
+  saveHermesShellPrefs({
+    mode: "idle",
+    panelWidth: s.hermesPanelWidth,
+    orbDock: s.hermesOrbDock,
+    floatDock: s.hermesFloatDock,
+  });
+}
 
 /**
  * 画布级 UI：拖拽时收起展开态、音频右键 TTS、右键双击最大化等（与 projectStore 图数据分离）。
@@ -64,21 +82,29 @@ type CanvasUiState = {
   maximizedNodeId: string | null;
   setMaximizedNodeId: (id: string | null) => void;
 
+  /** 视频合成节点：全屏剪辑工作台 */
+  composeEditorNodeId: string | null;
+  setComposeEditorNodeId: (id: string | null) => void;
+
+  /** 由画布外浮层请求视口定位到节点（FlowCanvas 内消费） */
+  canvasFitRequestNodeId: string | null;
+  requestCanvasFitToNode: (nodeId: string | null) => void;
+
   /** 图片节点：生成参数面板放大态（图一居中浮层） */
   imageGenPanelExpandedNodeId: string | null;
   setImageGenPanelExpandedNodeId: (id: string | null) => void;
 
-  /** 图片节点：从放大态钉回节点下方底栏 */
-  imageGenPanelPinnedNodeId: string | null;
-  setImageGenPanelPinnedNodeId: (id: string | null) => void;
+  /** 图片节点：预览图放大态（LibTV 大图 lightbox） */
+  imagePreviewExpandedNodeId: string | null;
+  setImagePreviewExpandedNodeId: (id: string | null) => void;
 
   /** 视频节点：生成参数面板放大态 */
   videoGenPanelExpandedNodeId: string | null;
   setVideoGenPanelExpandedNodeId: (id: string | null) => void;
 
-  /** 视频节点：从放大态钉回节点下方底栏 */
-  videoGenPanelPinnedNodeId: string | null;
-  setVideoGenPanelPinnedNodeId: (id: string | null) => void;
+  /** 视频节点：预览成片放大态（LibTV lightbox） */
+  videoPreviewExpandedNodeId: string | null;
+  setVideoPreviewExpandedNodeId: (id: string | null) => void;
 
   /** 文本节点：钉住模型对话底栏 */
   textGenPanelPinnedNodeId: string | null;
@@ -124,7 +150,7 @@ type CanvasUiState = {
   markedNodeId: string | null;
   setMarkedNodeId: (id: string | null) => void;
 
-  /** Inspector 分镜区：创意视图等跳转后要展开的镜头 */
+  /** 脚本分镜聚焦：全屏创意视图 / 最大化 Overlay 分镜区滚动到指定镜头 */
   inspectorStoryboardFocus: { scriptNodeId: string; beatId: string } | null;
   setInspectorStoryboardFocus: (v: { scriptNodeId: string; beatId: string } | null) => void;
 
@@ -171,6 +197,10 @@ type CanvasUiState = {
   /** 对齐分布间距 */
   alignDistributeGap: number;
   setAlignDistributeGap: (v: number) => void;
+
+  /** 多选宫格默认列数（2/3/4） */
+  multiSelectGridCols: 2 | 3 | 4;
+  setMultiSelectGridCols: (v: 2 | 3 | 4) => void;
 
   /** 节点最小间距 */
   nodeSpacing: number;
@@ -220,6 +250,16 @@ type CanvasUiState = {
   shortcutsOverlayOpen: boolean;
   setShortcutsOverlayOpen: (v: boolean) => void;
 
+  /** Tab 等快捷键请求在视口坐标打开「添加」面板（由 FlowCanvas 消费） */
+  pendingAddPanelAt: { x: number; y: number } | null;
+  queueAddPanelAt: (x: number, y: number) => void;
+  clearPendingAddPanelAt: () => void;
+
+  /** 空画布引导已关闭（双击空白打开添加面板等，与是否已添加节点无关） */
+  emptyGuideDismissed: boolean;
+  dismissEmptyGuide: () => void;
+  resetEmptyGuide: () => void;
+
   /** @deprecated 保留兼容；新逻辑用 anchorConnectDrag + anchorMenuRequest */
   anchorDragConnect: AnchorDragConnectType;
   setAnchorDragConnect: (v: AnchorDragConnectType) => void;
@@ -228,6 +268,9 @@ type CanvasUiState = {
   setAnchorMenuRequest: (v: AnchorMenuRequest) => void;
   /** 避免 connectEnd 与 click 连续弹出两次菜单 */
   anchorMenuOpenedAt: number;
+  /** 递增后通知各节点收起本地锚点菜单 */
+  anchorMenuDismissEpoch: number;
+  bumpAnchorMenuDismiss: () => void;
 
   anchorConnectDrag: AnchorConnectDrag;
   setAnchorConnectDrag: (v: AnchorConnectDrag) => void;
@@ -248,6 +291,27 @@ type CanvasUiState = {
   updateTab: (id: string, patch: Partial<CanvasTab>) => void;
   updateTabUnsaved: (id: string, unsaved: boolean) => void;
 
+  /** 内置 Hermes Shell（Phase A：仅 UI） */
+  hermesMode: HermesShellMode;
+  hermesPanelWidth: number;
+  hermesOrbDock: HermesOrbDock;
+  hermesFloatDock: HermesFloatDock;
+  expandHermes: () => void;
+  collapseHermes: () => void;
+  toggleHermes: () => void;
+  setHermesOrbDock: (dock: HermesOrbDock) => void;
+  setHermesFloatDock: (dock: HermesFloatDock) => void;
+  /** 展开侧栏并预填输入框（Orb 主动建议） */
+  hermesComposerSeed: string | null;
+  setHermesComposerSeed: (text: string | null) => void;
+  expandHermesWithPrompt: (prompt: string) => void;
+
+  /** Ambient 制片任务抽屉（iter-110） */
+  hermesJobDrawerOpen: boolean;
+  openHermesJobDrawer: () => void;
+  closeHermesJobDrawer: () => void;
+  toggleHermesJobDrawer: () => void;
+
   /** 确认对话框 */
   confirmDialog: {
     open: boolean;
@@ -259,6 +323,23 @@ type CanvasUiState = {
   openConfirmDialog: (opts: { title: string; message: string; onConfirm: () => void; onCancel?: () => void }) => void;
   closeConfirmDialog: () => void;
 
+  /** 保存工作流对话框 */
+  saveWorkflowDialogOpen: boolean;
+  openSaveWorkflowDialog: () => void;
+  closeSaveWorkflowDialog: () => void;
+
+  /** E2：脚本/分镜版本可视化对比 */
+  scriptVersionDiffOpen: boolean;
+  scriptVersionDiffPreset: {
+    olderVersionId?: string;
+    newerVersionId?: string;
+  } | null;
+  openScriptVersionDiff: (opts?: {
+    olderVersionId?: string;
+    newerVersionId?: string;
+  }) => void;
+  closeScriptVersionDiff: () => void;
+
   clearTransientUi: () => void;
 };
 
@@ -269,17 +350,23 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   maximizedNodeId: null,
   setMaximizedNodeId: (id) => set({ maximizedNodeId: id }),
 
+  composeEditorNodeId: null,
+  setComposeEditorNodeId: (id) => set({ composeEditorNodeId: id }),
+
+  canvasFitRequestNodeId: null,
+  requestCanvasFitToNode: (nodeId) => set({ canvasFitRequestNodeId: nodeId }),
+
   imageGenPanelExpandedNodeId: null,
   setImageGenPanelExpandedNodeId: (id) => set({ imageGenPanelExpandedNodeId: id }),
 
-  imageGenPanelPinnedNodeId: null,
-  setImageGenPanelPinnedNodeId: (id) => set({ imageGenPanelPinnedNodeId: id }),
+  imagePreviewExpandedNodeId: null,
+  setImagePreviewExpandedNodeId: (id) => set({ imagePreviewExpandedNodeId: id }),
 
   videoGenPanelExpandedNodeId: null,
   setVideoGenPanelExpandedNodeId: (id) => set({ videoGenPanelExpandedNodeId: id }),
 
-  videoGenPanelPinnedNodeId: null,
-  setVideoGenPanelPinnedNodeId: (id) => set({ videoGenPanelPinnedNodeId: id }),
+  videoPreviewExpandedNodeId: null,
+  setVideoPreviewExpandedNodeId: (id) => set({ videoPreviewExpandedNodeId: id }),
 
   textGenPanelPinnedNodeId: null,
   setTextGenPanelPinnedNodeId: (id) => set({ textGenPanelPinnedNodeId: id }),
@@ -317,7 +404,7 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   inspectorStoryboardFocus: null,
   setInspectorStoryboardFocus: (v) => set({ inspectorStoryboardFocus: v }),
 
-  minimapVisible: true,
+  minimapVisible: false,
   setMinimapVisible: (v) => set({ minimapVisible: v }),
 
   subjectListVersion: 0,
@@ -342,7 +429,7 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   connectionLinesVisible: true,
   setConnectionLinesVisible: (v) => set({ connectionLinesVisible: v }),
 
-  snapGridEnabled: true,
+  snapGridEnabled: false,
   setSnapGridEnabled: (v) => set({ snapGridEnabled: v }),
 
   alignFeatureTriggerMode: "click",
@@ -350,6 +437,9 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
 
   alignDistributeGap: 40,
   setAlignDistributeGap: (v) => set({ alignDistributeGap: v }),
+
+  multiSelectGridCols: 3,
+  setMultiSelectGridCols: (v) => set({ multiSelectGridCols: v }),
 
   nodeSpacing: 120,
   setNodeSpacing: (v) => set({ nodeSpacing: v }),
@@ -387,13 +477,27 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   shortcutsOverlayOpen: false,
   setShortcutsOverlayOpen: (v) => set({ shortcutsOverlayOpen: v }),
 
+  pendingAddPanelAt: null,
+  queueAddPanelAt: (x, y) => set({ pendingAddPanelAt: { x, y } }),
+  clearPendingAddPanelAt: () => set({ pendingAddPanelAt: null }),
+
+  emptyGuideDismissed: false,
+  dismissEmptyGuide: () => set({ emptyGuideDismissed: true }),
+  resetEmptyGuide: () => set({ emptyGuideDismissed: false }),
+
   anchorDragConnect: null,
   setAnchorDragConnect: (v) => set({ anchorDragConnect: v }),
 
   anchorMenuRequest: null,
   anchorMenuOpenedAt: 0,
+  anchorMenuDismissEpoch: 0,
+  bumpAnchorMenuDismiss: () =>
+    set((s) => ({ anchorMenuDismissEpoch: s.anchorMenuDismissEpoch + 1 })),
   setAnchorMenuRequest: (v) =>
-    set({ anchorMenuRequest: v, anchorMenuOpenedAt: v ? Date.now() : get().anchorMenuOpenedAt }),
+    set({
+      anchorMenuRequest: v,
+      anchorMenuOpenedAt: v ? Date.now() : get().anchorMenuOpenedAt,
+    }),
 
   anchorConnectDrag: null,
   setAnchorConnectDrag: (v) => set({ anchorConnectDrag: v }),
@@ -431,12 +535,74 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
 
   updateTab: (id, patch) => {
     const { tabs } = get();
-    set({ tabs: tabs.map((t) => (t.id === id ? { ...t, ...patch } : t)) });
+    const tab = tabs.find((t) => t.id === id);
+    if (!tab) return;
+    const next = { ...tab, ...patch };
+    const same =
+      next.name === tab.name &&
+      next.projectPath === tab.projectPath &&
+      next.unsaved === tab.unsaved &&
+      next.nodes === tab.nodes &&
+      next.edges === tab.edges &&
+      next.viewport.x === tab.viewport.x &&
+      next.viewport.y === tab.viewport.y &&
+      next.viewport.zoom === tab.viewport.zoom;
+    if (same) return;
+    set({ tabs: tabs.map((t) => (t.id === id ? next : t)) });
   },
 
   updateTabUnsaved: (id, unsaved) => {
     const { tabs } = get();
+    const tab = tabs.find((t) => t.id === id);
+    if (!tab || tab.unsaved === unsaved) return;
     set({ tabs: tabs.map((t) => (t.id === id ? { ...t, unsaved } : t)) });
+  },
+
+  hermesMode: initialHermesShell.mode,
+  hermesPanelWidth: initialHermesShell.panelWidth,
+  hermesOrbDock: initialHermesShell.orbDock,
+  hermesFloatDock: initialHermesShell.floatDock,
+  hermesComposerSeed: null,
+  hermesJobDrawerOpen: false,
+
+  expandHermes: () => {
+    set({ hermesMode: "expanded" });
+    persistHermesShell(get);
+  },
+
+  setHermesComposerSeed: (text) => set({ hermesComposerSeed: text }),
+
+  expandHermesWithPrompt: (prompt) => {
+    set({ hermesMode: "expanded", hermesComposerSeed: prompt.trim() || null });
+    persistHermesShell(get);
+  },
+
+  collapseHermes: () => {
+    set({
+      hermesMode: "idle",
+      hermesComposerSeed: null,
+      hermesJobDrawerOpen: false,
+    });
+    persistHermesShell(get);
+  },
+
+  openHermesJobDrawer: () => set({ hermesJobDrawerOpen: true }),
+  closeHermesJobDrawer: () => set({ hermesJobDrawerOpen: false }),
+  toggleHermesJobDrawer: () =>
+    set((s) => ({ hermesJobDrawerOpen: !s.hermesJobDrawerOpen })),
+
+  toggleHermes: () => {
+    set((s) => ({ hermesMode: s.hermesMode === "expanded" ? "idle" : "expanded" }));
+    persistHermesShell(get);
+  },
+
+  setHermesOrbDock: (orbDock) => {
+    set({ hermesOrbDock: orbDock });
+  },
+
+  setHermesFloatDock: (floatDock) => {
+    set({ hermesFloatDock: floatDock });
+    persistHermesShell(get);
   },
 
   confirmDialog: null,
@@ -457,6 +623,20 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
     set({ confirmDialog: null });
   },
 
+  saveWorkflowDialogOpen: false,
+  openSaveWorkflowDialog: () => set({ saveWorkflowDialogOpen: true }),
+  closeSaveWorkflowDialog: () => set({ saveWorkflowDialogOpen: false }),
+
+  scriptVersionDiffOpen: false,
+  scriptVersionDiffPreset: null,
+  openScriptVersionDiff: (opts) =>
+    set({
+      scriptVersionDiffOpen: true,
+      scriptVersionDiffPreset: opts ?? null,
+    }),
+  closeScriptVersionDiff: () =>
+    set({ scriptVersionDiffOpen: false, scriptVersionDiffPreset: null }),
+
   clearTransientUi: () =>
     set({
       audioTtsPanelNodeId: null,
@@ -464,15 +644,17 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
       audioTtsPanelExpandedNodeId: null,
       imageI2iTargetNodeId: null,
       imageGenPanelExpandedNodeId: null,
-      imageGenPanelPinnedNodeId: null,
+      imagePreviewExpandedNodeId: null,
       videoGenPanelExpandedNodeId: null,
-      videoGenPanelPinnedNodeId: null,
+      videoPreviewExpandedNodeId: null,
       textGenPanelPinnedNodeId: null,
       textGenPanelExpandedNodeId: null,
       scriptGenPanelPinnedNodeId: null,
       scriptGenPanelExpandedNodeId: null,
       videoTrimEditingNodeId: null,
       videoSubtitleRegionEditingNodeId: null,
+      composeEditorNodeId: null,
+      canvasFitRequestNodeId: null,
       nodeSnapVisual: null,
     }),
 }));

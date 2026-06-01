@@ -1,0 +1,188 @@
+/**
+ * 脚本节点 Chrome：壳内迷你表预览 + Portal 底栏主题/生成
+ */
+import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { Node, NodeProps } from "@xyflow/react";
+import type { FlowNodeData } from "@/lib/types";
+import { computeScriptNodeFrameSize } from "@/lib/scriptNodeChrome";
+import { GEN_PANEL_CHROME_WIDTH } from "@/hooks/useNodeGenerationChrome";
+import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
+import { useProjectStore } from "@/store/projectStore";
+import {
+  NodeChromeProvider,
+  NodeChromeShell,
+  NodeMetaLabel,
+  NodeMetaStatus,
+  NodePanelPlaceholder,
+} from "@/components/nodes/nodeChrome";
+import { NodeAnchors } from "@/components/nodes/anchors";
+import { ScriptNodeMiniPreview } from "@/components/nodes/ScriptNodeMiniPreview";
+import { ScriptComposerPanelPortal } from "@/components/nodes/ScriptComposerPanelPortal";
+import { ScriptPreviewToolbarPortal } from "@/components/nodes/ScriptPreviewToolbarPortal";
+import { ScriptNodeUpstreamTextFloat } from "@/components/nodes/ScriptNodeUpstreamTextFloat";
+import { ScriptNodeReferenceVideoFloat } from "@/components/nodes/ScriptNodeReferenceVideoFloat";
+import { incomingTextUpstreamState } from "@/lib/incomingScriptBinding";
+import { incomingVideoUpstreamState } from "@/lib/scriptReferenceVideo";
+import { openScriptNodeFullscreen } from "@/lib/scriptNodeCanvasEntries";
+import "./MinimalScriptNode.css";
+
+export function MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
+  const nodes = useProjectStore((s) => s.nodes);
+  const edges = useProjectStore((s) => s.edges);
+  const updateNodeData = useProjectStore((s) => s.updateNodeData);
+  const deleteSelection = useProjectStore((s) => s.deleteSelection);
+  const setPinnedGenPanelId = useCanvasUiStore((s) => s.setScriptGenPanelPinnedNodeId);
+  const pinnedGenPanelId = useCanvasUiStore((s) => s.scriptGenPanelPinnedNodeId);
+  const expandedComposerNodeId = useCanvasUiStore((s) => s.scriptGenPanelExpandedNodeId);
+
+  const { expandedChrome } = useNodeExpandedChrome(selected);
+
+  const beats = data.scriptBeats ?? [];
+  const beatCount = beats.length;
+  const hasBeats = beatCount > 0;
+  const themePrompt = data.prompt ?? "";
+
+  const dockedBelow = pinnedGenPanelId === id;
+  const showComposerPortal =
+    expandedChrome && (!hasBeats || dockedBelow) && expandedComposerNodeId !== id;
+  const showPreviewToolbar = expandedChrome && hasBeats;
+  const textUpstream = useMemo(
+    () => incomingTextUpstreamState(nodes, edges, id),
+    [edges, id, nodes],
+  );
+  const showUpstreamTextFloat = expandedChrome && textUpstream !== "none";
+  const videoUpstream = useMemo(
+    () => incomingVideoUpstreamState(nodes, edges, id),
+    [edges, id, nodes],
+  );
+  const showUpstreamVideoFloat = expandedChrome && videoUpstream !== "none";
+  const showUpstreamFloatRow = showUpstreamTextFloat || showUpstreamVideoFloat;
+
+  const previewRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previewToolbarRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!selected && pinnedGenPanelId === id) {
+      setPinnedGenPanelId(null);
+    }
+  }, [id, pinnedGenPanelId, selected, setPinnedGenPanelId]);
+
+  const handleOpenFullscreen = useCallback(() => {
+    openScriptNodeFullscreen(id);
+  }, [id]);
+
+  const label = data.label ?? "";
+  const commitLabel = useCallback(
+    (next: string | undefined) => updateNodeData(id, { label: next }),
+    [id, updateNodeData],
+  );
+
+  const frameSize = useMemo(
+    () => computeScriptNodeFrameSize(hasBeats, beatCount),
+    [beatCount, hasBeats],
+  );
+
+  const nodeStatus = data.status;
+  const isGenerating =
+    nodeStatus?.status === "running" || nodeStatus?.status === "pending";
+  const genProgress =
+    isGenerating &&
+    typeof nodeStatus?.progress === "number" &&
+    Number.isFinite(nodeStatus.progress)
+      ? Math.round(nodeStatus.progress)
+      : null;
+
+  const dimsText = !isGenerating && hasBeats ? `${beatCount} 镜头` : null;
+
+  useEffect(() => {
+    if (!selected) return;
+    const handlePointerDown = (e: MouseEvent) => {
+      const target = e.target;
+      if (!(target instanceof globalThis.Node)) return;
+      const inPanel = panelRef.current?.contains(target);
+      const inToolbar = previewToolbarRef.current?.contains(target);
+      if (!inPanel && !inToolbar) {
+        document.getSelection()?.removeAllRanges();
+        (document.activeElement as HTMLElement)?.blur?.();
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Delete" || e.key === "Backspace") {
+        const t = e.target;
+        if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+        if ((t as HTMLElement).isContentEditable) return;
+        e.preventDefault();
+        deleteSelection();
+      }
+    };
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [deleteSelection, selected]);
+
+  return (
+    <NodeChromeProvider>
+      {!showPreviewToolbar ? (
+        <>
+          <NodeMetaLabel label={label} defaultLabel="分镜脚本" onCommit={commitLabel} />
+          <NodeMetaStatus dimsText={dimsText} generating={isGenerating} progress={genProgress} />
+        </>
+      ) : null}
+
+      {showUpstreamFloatRow ? (
+        <div className="scriptChrome-floatRow">
+          {showUpstreamTextFloat ? <ScriptNodeUpstreamTextFloat nodeId={id} /> : null}
+          {showUpstreamVideoFloat ? <ScriptNodeReferenceVideoFloat nodeId={id} /> : null}
+        </div>
+      ) : null}
+
+      <NodeChromeShell
+        selected={selected}
+        width={frameSize.width}
+        height={frameSize.height}
+        previewRef={previewRef}
+        shellClassName="scriptChrome-shell"
+        previewClassName="scriptChrome-preview"
+        afterPreview={<NodeAnchors nodeId={id} nodeType="scriptNode" variant="simple" />}
+      >
+        {hasBeats ? (
+          <ScriptNodeMiniPreview
+            beats={beats}
+            themePrompt={themePrompt}
+            onOpenFullscreen={handleOpenFullscreen}
+          />
+        ) : (
+          <div className="nodeChrome-placeholder scriptChrome-placeholder scriptChrome-emptyShell">
+            <NodePanelPlaceholder kind="scriptNode" />
+          </div>
+        )}
+      </NodeChromeShell>
+
+      <ScriptPreviewToolbarPortal
+        nodeId={id}
+        anchorRef={previewRef}
+        active={showPreviewToolbar}
+        toolbarRef={previewToolbarRef}
+        label={label}
+        onCommitLabel={commitLabel}
+        dimsText={dimsText}
+        generating={isGenerating}
+        progress={genProgress}
+      />
+
+      <ScriptComposerPanelPortal
+        nodeId={id}
+        anchorRef={previewRef}
+        active={showComposerPortal}
+        hideChromeHead={!hasBeats}
+        panelWidth={GEN_PANEL_CHROME_WIDTH}
+        panelRef={panelRef}
+      />
+    </NodeChromeProvider>
+  );
+}

@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import { NodeFrame } from "@/components/nodes/NodeFrame";
+import { NodePanelPlaceholder } from "@/components/nodes/nodeChrome";
 import { MagneticNodeAnchors } from "@/components/nodes/MagneticNodeAnchors";
 import { LLMPanel } from "@/components/nodes/LLMPanel";
 
@@ -30,10 +31,7 @@ function LLMTitleIcon() {
 function LLMDocGlyph() {
   return (
     <div className="llmNodeDocGlyph" aria-hidden>
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none">
-        <rect x="4" y="4" width="16" height="16" rx="3" stroke="currentColor" strokeWidth="1.3" />
-        <path d="M8 9.5h8M8 12.5h6M8 15.5h5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      </svg>
+      <NodePanelPlaceholder kind="llm" />
     </div>
   );
 }

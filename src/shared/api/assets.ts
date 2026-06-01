@@ -71,3 +71,62 @@ export async function importMediaFiles(
 export async function syncAssetsIndex(projectPath: string): Promise<number> {
   return invoke<number>("sync_assets_index", { projectPath });
 }
+
+export type AssetMigrationItem = {
+  oldRelPath: string;
+  newRelPath: string;
+  target: string;
+  skipped: boolean;
+  skipReason?: string;
+};
+
+export type AssetMigrationResult = {
+  dryRun: boolean;
+  migratedCount: number;
+  skippedCount: number;
+  canvasPathUpdates: number;
+  pathMappings: Record<string, string>;
+  items: AssetMigrationItem[];
+};
+
+/** 将 assets/ 根目录旧扁平文件迁移到 gen/import 分层目录 */
+export async function migrateLegacyAssets(
+  projectPath: string,
+  dryRun = false,
+): Promise<AssetMigrationResult> {
+  return invoke<AssetMigrationResult>("migrate_legacy_assets", { projectPath, dryRun });
+}
+
+/** 打开工程时为仅有 `path` 的媒体节点补 `assetId`（Tauri） */
+export type NodeAssetIdPatch = {
+  nodeId: string;
+  assetId: string;
+  relPath: string;
+};
+
+export type ScriptNodeAssetPatch = {
+  scriptNodeId: string;
+  storyboardShots?: StoryboardShotLike[];
+  scriptBeats?: Record<string, unknown>[];
+};
+
+/** 与 `StoryboardShot` 兼容的回填载荷（JSON 反序列化） */
+export type StoryboardShotLike = {
+  scriptBeatId: string;
+  visualPrompt?: string;
+  imagePath?: string;
+  imageAssetId?: string;
+  [key: string]: unknown;
+};
+
+export type CanvasAssetBackfillResult = {
+  nodePatches: NodeAssetIdPatch[];
+  scriptPatches: ScriptNodeAssetPatch[];
+};
+
+export async function backfillCanvasAssetIds(
+  projectPath: string,
+  nodes: Array<{ id: string; type: string; data: Record<string, unknown> }>,
+): Promise<CanvasAssetBackfillResult> {
+  return invoke<CanvasAssetBackfillResult>("backfill_canvas_asset_ids", { projectPath, nodes });
+}

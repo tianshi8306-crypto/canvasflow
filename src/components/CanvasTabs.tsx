@@ -1,7 +1,13 @@
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useShallow } from "zustand/react/shallow";
+import {
+  defaultTabViewport,
+  persistActiveTabSnapshot,
+  restoreProjectFromTab,
+  syncActiveTabUnsaved,
+} from "@/lib/canvasTabSync";
 
 function IconClose() {
   return (
@@ -51,49 +57,49 @@ export function CanvasTabs() {
   const tabs = useCanvasUiStore(useShallow((s) => s.tabs));
   const activeTabId = useCanvasUiStore((s) => s.activeTabId);
   const setActiveTab = useCanvasUiStore((s) => s.setActiveTab);
-  const updateTab = useCanvasUiStore((s) => s.updateTab);
+  const addTab = useCanvasUiStore((s) => s.addTab);
+  const removeTab = useCanvasUiStore((s) => s.removeTab);
   const openConfirmDialog = useCanvasUiStore.getState().openConfirmDialog;
 
-  const projectPath = useProjectStore((s) => s.projectPath);
-  const nodes = useProjectStore(useShallow((s) => s.nodes));
-  const edges = useProjectStore(useShallow((s) => s.edges));
-  const viewport = useProjectStore((s) => s.viewport);
-  const newProject = useProjectStore((s) => s.newProject);
-  const loadGraph = useProjectStore((s) => s.loadGraph);
+  const projectDirty = useProjectStore((s) => s.projectDirty);
+
+  useEffect(() => {
+    syncActiveTabUnsaved(projectDirty);
+  }, [projectDirty]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const handleSwitchTab = useCallback(
     (tabId: string) => {
       if (tabId === activeTabId) return;
-
-      if (activeTab && projectPath) {
-        updateTab(activeTab.id, {
-          nodes,
-          edges,
-          viewport,
-          unsaved: activeTab.unsaved,
-        });
-      }
+      persistActiveTabSnapshot();
 
       const targetTab = tabs.find((t) => t.id === tabId);
       if (!targetTab) return;
 
       setActiveTab(tabId);
-
-      if (targetTab.projectPath) {
-        loadGraph(targetTab.nodes, targetTab.edges, targetTab.viewport);
-      } else {
-        loadGraph([], [], { x: 0, y: 0, zoom: 1 });
-      }
+      restoreProjectFromTab(targetTab);
     },
-    [activeTabId, activeTab, projectPath, nodes, edges, viewport, tabs, updateTab, setActiveTab, loadGraph],
+    [activeTabId, tabs, setActiveTab],
   );
 
-  const handleNewTab = useCallback(async () => {
+  const handleNewTab = useCallback(() => {
     if (tabs.length >= 20) return;
-    await newProject();
-  }, [tabs.length, newProject]);
+    persistActiveTabSnapshot();
+    const ok = addTab({
+      name: `画布 ${tabs.length + 1}`,
+      projectPath: null,
+      unsaved: false,
+      nodes: [],
+      edges: [],
+      viewport: defaultTabViewport(),
+    });
+    if (!ok) return;
+    const next = useCanvasUiStore.getState().tabs.find(
+      (t) => t.id === useCanvasUiStore.getState().activeTabId,
+    );
+    if (next) restoreProjectFromTab(next);
+  }, [tabs.length, addTab]);
 
   const handleCloseTab = useCallback(
     (id: string, e: React.MouseEvent) => {
@@ -101,18 +107,41 @@ export function CanvasTabs() {
       const tab = tabs.find((t) => t.id === id);
       if (!tab) return;
 
-      openConfirmDialog({
-        title: `删除未保存画布？`,
-        message: "当前画布有未保存的改动，删除后这些改动将消失。",
-        onConfirm: () => {
-          const store = useCanvasUiStore.getState();
-          store.removeTab(id);
-        },
-        onCancel: () => {},
-      });
+      const doRemove = () => {
+        const wasActive = id === activeTabId;
+        removeTab(id);
+        if (!wasActive) return;
+        const nextId = useCanvasUiStore.getState().activeTabId;
+        const nextTab = useCanvasUiStore.getState().tabs.find((t) => t.id === nextId);
+        if (nextTab) restoreProjectFromTab(nextTab);
+        else {
+          restoreProjectFromTab({
+            id: "",
+            name: "未命名画布",
+            projectPath: null,
+            unsaved: false,
+            nodes: [],
+            edges: [],
+            viewport: defaultTabViewport(),
+          });
+        }
+      };
+
+      if (tab.unsaved) {
+        openConfirmDialog({
+          title: "关闭画布？",
+          message: "该标签页有未保存的改动，关闭后内存中的改动将丢失。",
+          onConfirm: doRemove,
+          onCancel: () => {},
+        });
+        return;
+      }
+      doRemove();
     },
-    [tabs, openConfirmDialog],
+    [tabs, activeTabId, removeTab, openConfirmDialog],
   );
+
+  if (tabs.length === 0) return null;
 
   return (
     <div className="canvasTabs">
@@ -136,7 +165,7 @@ export function CanvasTabs() {
           />
         ))}
       {tabs.length < 20 && (
-        <button type="button" className="canvasTabAdd" onClick={handleNewTab} title="新建画布">
+        <button type="button" className="canvasTabAdd" onClick={handleNewTab} title="新建画布标签">
           <IconAdd />
         </button>
       )}

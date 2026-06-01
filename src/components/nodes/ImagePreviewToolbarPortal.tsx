@@ -1,30 +1,34 @@
-import { createPortal } from "react-dom";
 import { useCallback, type MutableRefObject, type RefObject } from "react";
 import { ImagePreviewToolbar } from "@/components/nodes/ImagePreviewToolbar";
-import { NODE_CHROME_PANEL_CLASS, NODE_CHROME_TOP_CLASS } from "@/components/nodes/nodeChrome";
-import { GEN_PANEL_CHROME_Z, useNodeGenerationChrome } from "@/hooks/useNodeGenerationChrome";
+import { useNodeChromeMount } from "@/components/nodes/nodeChrome/NodeChromeContext";
+import { NodeChromePortalShell } from "@/components/nodes/nodeChrome/NodeChromePortalShell";
+import {
+  GEN_PANEL_CHROME_ABOVE_PREVIEW_GAP,
+  useNodeGenerationChrome,
+} from "@/hooks/useNodeGenerationChrome";
 
 type Props = {
   nodeId: string;
   anchorRef: RefObject<HTMLElement | null>;
   active: boolean;
   hasLocalImage: boolean;
-  onOpenGenPanel: () => void;
-  toolbarRef?: RefObject<HTMLDivElement | null>;
+  toolbarRef: RefObject<HTMLDivElement | null>;
 };
 
-/** 有图且选中：预览区上方外部 Portal 渲染功能栏 */
+/** 有图且选中：预览区上方外部 Portal（仅功能栏；名称/分辨率钉在预览壳外缘） */
 export function ImagePreviewToolbarPortal({
   nodeId,
   anchorRef,
   active,
   hasLocalImage,
-  onOpenGenPanel,
   toolbarRef: externalToolbarRef,
 }: Props) {
+  const chromeMount = useNodeChromeMount();
   const { pos, panelRef: innerToolbarRef } = useNodeGenerationChrome(anchorRef, {
     active,
+    mountRef: chromeMount?.mountRef,
     placement: "above",
+    aboveGap: GEN_PANEL_CHROME_ABOVE_PREVIEW_GAP,
   });
 
   const setToolbarRef = useCallback(
@@ -37,27 +41,15 @@ export function ImagePreviewToolbarPortal({
     [innerToolbarRef, externalToolbarRef],
   );
 
-  if (!active || !pos || typeof document === "undefined") return null;
-
-  return createPortal(
-    <div
-      ref={setToolbarRef}
-      className={`${NODE_CHROME_PANEL_CLASS} ${NODE_CHROME_TOP_CLASS} imagePreviewToolbarChrome`}
-      style={{
-        position: "fixed",
-        left: `${pos.x}px`,
-        top: `${pos.y}px`,
-        transform: "translate(-50%, -100%)",
-        zIndex: GEN_PANEL_CHROME_Z,
-      }}
+  return (
+    <NodeChromePortalShell
+      active={active}
+      pos={pos}
+      setPanelRef={setToolbarRef}
+      className="imagePreviewToolbarPortalRoot previewToolbarChrome--stack"
       onPointerDown={(e) => e.stopPropagation()}
     >
-      <ImagePreviewToolbar
-        nodeId={nodeId}
-        hasLocalImage={hasLocalImage}
-        onOpenGenPanel={onOpenGenPanel}
-      />
-    </div>,
-    document.body,
+      <ImagePreviewToolbar nodeId={nodeId} hasLocalImage={hasLocalImage} />
+    </NodeChromePortalShell>
   );
 }

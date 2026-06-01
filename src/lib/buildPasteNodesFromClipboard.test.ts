@@ -71,4 +71,29 @@ describe("buildPasteNodesFromClipboard", () => {
     expect(nextEdges[0]!.source).toBe(nextS!.id);
     expect(nextEdges[0]!.target).toBe(nextI!.id);
   });
+
+  it("applies offset only to paste subtree roots (nested group child keeps relative position)", () => {
+    const G = {
+      id: "g1",
+      type: "group",
+      position: { x: 100, y: 100 },
+      data: { label: "组" },
+      style: { width: 400, height: 300 },
+    } as Node<FlowNodeData>;
+    const A = {
+      id: "a1",
+      type: "imageNode",
+      parentId: "g1",
+      position: { x: 40, y: 50 },
+      data: {},
+    } as Node<FlowNodeData>;
+    const { nextNodes } = buildPasteNodesFromClipboard(
+      { copiedNodes: [G, A], copiedEdges: [] },
+      48,
+    );
+    const nextG = nextNodes.find((n) => n.type === "group");
+    const nextA = nextNodes.find((n) => n.type === "imageNode");
+    expect(nextG?.position).toEqual({ x: 148, y: 148 });
+    expect(nextA?.position).toEqual({ x: 40, y: 50 });
+  });
 });

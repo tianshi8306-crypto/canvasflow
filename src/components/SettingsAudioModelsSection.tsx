@@ -22,10 +22,10 @@ export function SettingsAudioModelsSection({
   const audioModels = settings.audioModels ?? [];
 
   return (
-    <div className="settingsSection settingsSection--sub">
+    <div className="settingsSection">
       <SettingsSectionHeader
-        title="语音模型"
-        description="需 OpenAI 兼容 TTS 接口（POST …/v1/audio/speech）；Base URL 请包含 /v1。保存后可在音频节点模型列表中选择。"
+        title="语音合成模型"
+        description="用于画布「音频」节点。需 OpenAI 兼容 TTS（POST …/v1/audio/speech）。若已在「文本与脚本」启用 OpenAI，也可共用其密钥。"
         action={
           <button
             type="button"
@@ -41,10 +41,12 @@ export function SettingsAudioModelsSection({
         }
       />
 
+      <div className="settingsModelsNodeBadges">
+        <span className="settingsModelsNodeBadge">音频节点</span>
+      </div>
+
       {audioModels.length === 0 ? (
-        <p className="settings-desc">
-          尚未配置语音模型；未配置时将使用默认 Provider 的密钥与内置 TTS 模型。
-        </p>
+        <p className="settings-desc">尚未配置语音模型；未配置时可尝试使用文本与脚本中的 OpenAI 服务商。</p>
       ) : null}
 
       {audioModels.map((m) => (

@@ -18,11 +18,19 @@ const MIME_MAP: Record<string, string> = {
   mp3: "audio/mpeg",
   wav: "audio/wav",
   aac: "audio/aac",
+  m4a: "audio/mp4",
+  flac: "audio/flac",
   ogg: "audio/ogg",
 };
 
-function getMime(ext: string): string {
-  return MIME_MAP[ext.toLowerCase()] ?? "application/octet-stream";
+export function getMime(ext: string): string {
+  const key = ext.toLowerCase().replace(/^\./, "");
+  return MIME_MAP[key] ?? "application/octet-stream";
+}
+
+function getMimeFromPath(path: string): string {
+  const ext = path.split(".").pop() ?? "";
+  return getMime(ext);
 }
 
 /**
@@ -31,8 +39,7 @@ function getMime(ext: string): string {
  * 超过限制时 Rust 会抛出明确错误，透传到前端。
  */
 export async function readFileAsDataUrl(absPath: string): Promise<string> {
-  const ext = absPath.split(".").pop() ?? "";
-  const mime = getMime(ext);
+  const mime = getMimeFromPath(absPath);
   const base64: string = await invoke("read_file_as_base64", { path: absPath });
   return `data:${mime};base64,${base64}`;
 }

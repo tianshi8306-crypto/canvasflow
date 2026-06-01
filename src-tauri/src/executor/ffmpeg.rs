@@ -41,7 +41,7 @@ pub(crate) fn run_ffmpeg_concat(
         &json!({ "ffmpeg": ffmpeg, "inputs": inputs, "output": output_rel }),
     )?;
 
-    let rel = compose_concat_clips(project_root, &ffmpeg, &inputs, output_rel)?;
+    let rel = compose_concat_clips(project_root, &ffmpeg, &inputs, output_rel, None, None)?;
 
     db::log_event(
         conn,

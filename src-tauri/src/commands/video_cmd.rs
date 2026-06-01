@@ -5,34 +5,87 @@
 //! 2. video_gen_get_job -> 轮询供应商接口，状态 succeeded 时下载视频落盘
 
 use crate::command_common::resolve_ffmpeg_bin;
-use crate::commands::types::{VideoGenStartResponse, VideoGenerationStartRequest, VideoJobSnapshot};
-use crate::db;
+use crate::commands::types::{DreaminaVideoRecoverRequest, VideoGenStartResponse, VideoGenerationStartRequest, VideoJobSnapshot};
+use crate::project_asset_store::{self, AssetWriteContext};
 use crate::dreamina_cli::DreaminaCliState;
 use crate::dreamina_gen;
-use crate::media;
 use crate::settings;
 use crate::vault::get_api_key;
 use crate::AppState;
 use crate::VideoMockJob;
 use serde_json::json;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 /// Doubao Seedance API 基址
 const DEFAULT_SEEDANCE_API_BASE: &str = "https://ark.cn-beijing.volces.com/api/v3";
 
+const DOUBAO_SEEDANCE_CANONICAL_ID: &str = "doubao_seedance_2_0";
+const DOUBAO_SEEDANCE_API_MODEL: &str = "doubao-seedance-2-0-260128";
+
+fn is_doubao_seedance_preset(cfg: &settings::ImageModelConfig) -> bool {
+    let model = cfg.model.trim();
+    cfg.id == "preset-video-doubao-seedance"
+        || model == DOUBAO_SEEDANCE_API_MODEL
+        || model == DOUBAO_SEEDANCE_CANONICAL_ID
+}
+
+fn canonical_video_model_id(cfg: &settings::ImageModelConfig) -> &str {
+    if is_doubao_seedance_preset(cfg) {
+        return DOUBAO_SEEDANCE_CANONICAL_ID;
+    }
+    let model = cfg.model.trim();
+    if model.is_empty() {
+        cfg.id.as_str()
+    } else {
+        model
+    }
+}
+
+fn video_model_config_matches(cfg: &settings::ImageModelConfig, model_id: &str) -> bool {
+    if !cfg.enabled {
+        return false;
+    }
+    let mid = model_id.trim();
+    if mid.is_empty() {
+        return false;
+    }
+    let model = cfg.model.trim();
+    model == mid || cfg.id == mid || canonical_video_model_id(cfg) == mid
+}
+
+fn seedance_api_model_id(cfg: &settings::ImageModelConfig) -> String {
+    let model = cfg.model.trim();
+    if model.is_empty() {
+        return String::new();
+    }
+    if model == DOUBAO_SEEDANCE_CANONICAL_ID {
+        return DOUBAO_SEEDANCE_API_MODEL.to_string();
+    }
+    model.to_string()
+}
+
 /// 从 settings 中解析视频模型配置
 fn resolve_video_model_config(
     app: &tauri::AppHandle,
     model_id: &str,
-) -> Result<(String, String), String> {
+) -> Result<(String, String, String), String> {
     let app_settings = settings::load_settings(app)?;
-    // 用 model 字段（真实 API 标识，如 "doubao-seedance-2-0-260128"）匹配
     let cfg = app_settings
         .video_models
         .iter()
-        .find(|m| m.model == model_id && m.enabled)
-        .ok_or_else(|| format!("视频模型不存在或已禁用：{}（请确认模型标识与 Settings 中填写的值一致）", model_id))?;
+        .find(|m| video_model_config_matches(m, model_id))
+        .ok_or_else(|| {
+            format!(
+                "视频模型不存在或已禁用：{}（请确认已在 设置→视频模型 启用，且模型标识为火山接入点 ID）",
+                model_id
+            )
+        })?;
+
+    let api_model = seedance_api_model_id(cfg);
+    if api_model.trim().is_empty() {
+        return Err(format!("视频模型「{}」未填写 API 接入点 model", cfg.label));
+    }
 
     let key_id = format!("video-model:{}", cfg.id);
     let api_key =
@@ -44,7 +97,7 @@ fn resolve_video_model_config(
         cfg.api_base_url.trim().to_string()
     };
 
-    Ok((base_url, api_key))
+    Ok((base_url, api_key, api_model))
 }
 
 /// 调用 Seedance 提交视频生成任务
@@ -54,7 +107,7 @@ async fn submit_video_job_http(
     http: &reqwest::Client,
     req: &VideoGenerationStartRequest,
 ) -> Result<String, String> {
-    let (base_url, api_key) = resolve_video_model_config(app, &req.payload.model_id)?;
+    let (base_url, api_key, api_model) = resolve_video_model_config(app, &req.payload.model_id)?;
 
     // 构建 content[] 数组
     let mut content: Vec<serde_json::Value> = vec![];
@@ -154,7 +207,7 @@ async fn submit_video_job_http(
 
     // 这些字段放到请求体顶层，不是 parameters 里
     let body = json!({
-        "model": req.payload.model_id,
+        "model": api_model,
         "content": content,
         "duration": duration,
         "resolution": resolution,
@@ -199,6 +252,40 @@ async fn submit_video_job_http(
     Ok(job_id)
 }
 
+/// 将火山方舟任务 status 映射为前端 Job 状态
+pub(crate) fn map_seedance_task_status(api_status: &str) -> &'static str {
+    match api_status {
+        "pending" | "queued" => "queued",
+        "processing" | "running" => "running",
+        "succeeded" | "success" | "completed" => "succeeded",
+        "failed" | "error" | "cancelled" => "failed",
+        _ => "running",
+    }
+}
+
+/// 从任务查询 JSON 解析视频下载 URL（兼容多版字段）
+pub(crate) fn parse_video_url_from_task_json(parsed: &serde_json::Value) -> Option<String> {
+    const PATHS: &[&str] = &[
+        "/content/video_url",
+        "/content/url",
+        "/output/video_url",
+        "/output/url",
+        "/data/content/video_url",
+        "/data/output/video_url",
+        "/result/video_url",
+        "/video_url",
+    ];
+    for path in PATHS {
+        if let Some(url) = parsed.pointer(path).and_then(|v| v.as_str()) {
+            let trimmed = url.trim();
+            if !trimmed.is_empty() {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
+}
+
 /// 轮询视频任务状态
 /// API: GET https://ark.cn-beijing.volces.com/api/v3/contents/generations/tasks/{id}
 async fn poll_video_job_http(
@@ -207,8 +294,10 @@ async fn poll_video_job_http(
     project_path: &str,
     model_id: &str,
     app: &tauri::AppHandle,
+    node_id: Option<&str>,
+    workflow: Option<&str>,
 ) -> Result<VideoJobSnapshot, String> {
-    let (base_url, api_key) = resolve_video_model_config(app, model_id)?;
+    let (base_url, api_key, _api_model) = resolve_video_model_config(app, model_id)?;
     let url = format!("{}/contents/generations/tasks/{}", base_url.trim_end_matches('/'), job_id);
 
     let resp = http
@@ -246,31 +335,38 @@ async fn poll_video_job_http(
         .and_then(|v| v.as_str())
         .map(String::from);
 
-    // Map API status to our status
-    let status = match api_status {
-        "pending" | "queued" => "queued",
-        "processing" | "running" => "running",
-        "succeeded" | "success" | "completed" => "succeeded",
-        "failed" | "error" => "failed",
-        _ => "running",
-    };
+    let status = map_seedance_task_status(api_status);
 
     // 如果成功，下载视频并落盘
     if status == "succeeded" {
-        // 视频 URL 在 content.video_url（火山方舟 API 返回格式）
-        let video_url = parsed
-            .pointer("/content/video_url")
-            .or_else(|| parsed.pointer("/content/url"))
-            .and_then(|v| v.as_str());
+        if let Some(existing) = project_asset_store::find_existing_gen_asset_by_job_id(
+            Path::new(project_path),
+            "video",
+            job_id,
+        )? {
+            return Ok(VideoJobSnapshot {
+                id: job_id.to_string(),
+                status: "succeeded".into(),
+                progress: Some(1.0),
+                error: None,
+                model_id: model_id.to_string(),
+                result_rel_path: Some(existing),
+            });
+        }
 
-        eprintln!(
-            "[poll_video_job_http] video_url 解析结果: {:?}",
-            video_url
-        );
+        let video_url = parse_video_url_from_task_json(&parsed);
 
-        if let Some(url) = video_url {
-            eprintln!("[poll_video_job_http] 找到视频URL: {}", url);
-            match download_video_to_assets(http.clone(), url, project_path).await {
+        if let Some(url) = video_url.as_deref() {
+            match download_video_to_assets(
+                http.clone(),
+                url,
+                project_path,
+                node_id,
+                workflow,
+                Some(job_id),
+            )
+            .await
+            {
                 Ok(rel_path) => {
                     return Ok(VideoJobSnapshot {
                         id: job_id.to_string(),
@@ -307,11 +403,14 @@ async fn poll_video_job_http(
     })
 }
 
-/// 下载视频到工程 assets/ 目录
+/// 下载视频到工程 `assets/gen/video/seedance/`
 async fn download_video_to_assets(
     http: reqwest::Client,
     url: &str,
     project_path: &str,
+    node_id: Option<&str>,
+    workflow: Option<&str>,
+    job_id: Option<&str>,
 ) -> Result<String, String> {
     let resp = http
         .get(url)
@@ -329,31 +428,14 @@ async fn download_video_to_assets(
         .map_err(|e| format!("读取视频内容失败：{}", e))?;
 
     let root = PathBuf::from(project_path);
-    let assets_dir = root.join("assets");
-    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-
-    let file_name = format!(
-        "seedance_{}_{}.mp4",
-        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
-        &uuid::Uuid::new_v4().to_string()[..8]
-    );
-    let out_path = assets_dir.join(&file_name);
-    std::fs::write(&out_path, &bytes).map_err(|e| format!("保存视频失败：{}", e))?;
-
-    let rel_path = format!("assets/{}", file_name);
-
-    // 登记到数据库
-    let conn = db::open_run_db(&root)?;
-    let meta_json = media::meta_json_for_av(&out_path, "video");
-    let _aid = db::upsert_asset(
-        &conn,
-        &rel_path,
-        "video",
-        Some("seedance"),
-        meta_json.as_deref(),
-    )?;
-
-    Ok(rel_path)
+    let ctx = AssetWriteContext {
+        kind: "video",
+        source: "seedance",
+        workflow,
+        node_id,
+        job_id,
+    };
+    project_asset_store::write_bytes_to_project_asset(&root, &bytes, "mp4", &ctx)
 }
 
 #[tauri::command]
@@ -422,11 +504,7 @@ pub async fn video_gen_start(
             result_rel_path: None,
             cancelled: false,
             is_dreamina,
-            dreamina_workflow: if is_dreamina {
-                Some(workflow)
-            } else {
-                None
-            },
+            dreamina_workflow: Some(workflow),
         },
     );
     Ok(VideoGenStartResponse { job_id })
@@ -489,32 +567,22 @@ pub async fn video_gen_get_job(
                 j.project_path.clone(),
                 j.model_id.clone(),
                 j.dreamina_workflow.clone().unwrap_or_else(|| "text_to_video".into()),
+                j.node_id.clone(),
             ))
         } else {
             j.polls += 1;
-            if j.polls < 4 {
-                let st = if j.polls == 1 { "queued" } else { "running" };
-                let p = (j.polls as f64) * 0.25;
-                return Ok(VideoJobSnapshot {
-                    id: id.to_string(),
-                    status: st.into(),
-                    progress: Some(p.min(0.95)),
-                    error: None,
-                    model_id: j.model_id.clone(),
-                    result_rel_path: None,
-                });
-            }
             None
         }
     };
 
-    if let Some((project_path, model_id, workflow)) = dreamina_poll_ctx {
+    if let Some((project_path, model_id, workflow, node_id)) = dreamina_poll_ctx {
         let snap = dreamina_gen::poll_video_via_cli(
             &state.http,
             id,
             &project_path,
             &model_id,
             &workflow,
+            Some(node_id.as_str()),
         )
         .await?;
         if snap.status == "succeeded" {
@@ -556,17 +624,29 @@ pub async fn video_gen_get_job(
                 result_rel_path: rel,
             });
         }
-        (j.project_path.clone(), j.model_id.clone())
+        (j.project_path.clone(), j.model_id.clone(), j.node_id.clone(), j.dreamina_workflow.clone())
     };
 
     // 锁已释放，可以安全做 async IO
     let project_path = job_data.0;
     let model_id = job_data.1;
+    let node_id = job_data.2;
+    let workflow = job_data.3;
     let http = state.http.clone();
     let id_owned = id.to_string();
 
     if !id_owned.starts_with("mock_") {
-        match poll_video_job_http(&http, &id_owned, &project_path, &model_id, &app).await {
+        match poll_video_job_http(
+            &http,
+            &id_owned,
+            &project_path,
+            &model_id,
+            &app,
+            Some(node_id.as_str()),
+            workflow.as_deref(),
+        )
+        .await
+        {
             Ok(snap) if snap.status == "succeeded" && snap.result_rel_path.is_some() => {
                 let rel = snap.result_rel_path.clone().unwrap();
                 let mut map = state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
@@ -619,14 +699,14 @@ pub async fn video_gen_get_job(
     let settings = settings::load_settings(&app_clone)?;
     let ffmpeg = resolve_ffmpeg_bin(&settings);
     let root = PathBuf::from(&project_path);
-    let assets_dir = root.join("assets");
-    std::fs::create_dir_all(&assets_dir).map_err(|e| e.to_string())?;
-    let file_name = format!(
-        "mock_video_{}_{}.mp4",
-        chrono::Utc::now().format("%Y%m%d_%H%M%S"),
-        &uuid::Uuid::new_v4().to_string()[..8]
-    );
-    let out_abs = assets_dir.join(&file_name);
+    let ctx = AssetWriteContext {
+        kind: "video",
+        source: "mock",
+        workflow: None,
+        node_id: None,
+        job_id: Some(id_owned.as_str()),
+    };
+    let (rel, out_abs) = project_asset_store::allocate_project_asset_paths(&root, "mp4", &ctx)?;
     let status = Command::new(&ffmpeg)
         .args([
             "-y",
@@ -652,10 +732,7 @@ pub async fn video_gen_get_job(
     if !status.success() {
         return Err(format!("ffmpeg 退出码: {:?}", status.code()));
     }
-    let rel = format!("assets/{}", file_name);
-    let conn = db::open_run_db(&root)?;
-    let meta_json = media::meta_json_for_av(&out_abs, "video");
-    let _aid = db::upsert_asset(&conn, &rel, "video", Some("mock-video"), meta_json.as_deref())?;
+    project_asset_store::register_asset_at_path(&root, &out_abs, &ctx)?;
     let mut map = state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
     if let Some(j) = map.get_mut(&id_owned) {
         j.result_rel_path = Some(rel.clone());
@@ -668,6 +745,55 @@ pub async fn video_gen_get_job(
         model_id,
         result_rel_path: Some(rel),
     })
+}
+
+/// 按 submit_id 从即梦取回已在网页端成功的视频成片
+#[tauri::command]
+pub async fn video_gen_recover_dreamina(
+    state: tauri::State<'_, AppState>,
+    req: DreaminaVideoRecoverRequest,
+) -> Result<VideoJobSnapshot, String> {
+    if req.project_path.trim().is_empty() {
+        return Err("projectPath 不能为空".into());
+    }
+    if req.submit_id.trim().is_empty() {
+        return Err("submitId 不能为空".into());
+    }
+    dreamina_gen::recover_dreamina_video_job(
+        &state.http,
+        req.submit_id.trim(),
+        req.project_path.trim(),
+        req.model_id.trim(),
+        req.workflow.as_deref(),
+        Some(req.node_id.trim()),
+    )
+    .await
+}
+
+#[cfg(test)]
+mod poll_parse_tests {
+    use super::{map_seedance_task_status, parse_video_url_from_task_json};
+    use serde_json::json;
+
+    #[test]
+    fn maps_seedance_status() {
+        assert_eq!(map_seedance_task_status("processing"), "running");
+        assert_eq!(map_seedance_task_status("succeeded"), "succeeded");
+    }
+
+    #[test]
+    fn parses_video_url_paths() {
+        let v = json!({ "content": { "video_url": "https://example.com/a.mp4" } });
+        assert_eq!(
+            parse_video_url_from_task_json(&v).as_deref(),
+            Some("https://example.com/a.mp4")
+        );
+        let alt = json!({ "output": { "url": "https://example.com/b.mp4" } });
+        assert_eq!(
+            parse_video_url_from_task_json(&alt).as_deref(),
+            Some("https://example.com/b.mp4")
+        );
+    }
 }
 
 #[tauri::command]
@@ -687,4 +813,102 @@ pub async fn video_gen_cancel(
         j.cancelled = true;
     }
     Ok(())
+}
+
+/// 设置页：探测视频模型 API（GET /models，与图片模型测试一致）
+#[tauri::command]
+pub async fn test_video_model_connection(
+    app: tauri::AppHandle,
+    state: tauri::State<'_, AppState>,
+    video_model_id: String,
+    api_key_override: Option<String>,
+) -> Result<String, String> {
+    let settings = settings::load_settings(&app)?;
+    let cfg = settings
+        .video_models
+        .iter()
+        .find(|m| m.id == video_model_id)
+        .ok_or_else(|| "未找到视频模型配置".to_string())?;
+
+    if cfg.model.trim().is_empty() {
+        return Err("请先填写模型标识".into());
+    }
+
+    let api_key = if let Some(v) = api_key_override {
+        if v.trim().is_empty() {
+            return Err("API Key 为空".into());
+        }
+        v.trim().to_string()
+    } else {
+        let key_id = format!("video-model:{}", cfg.id);
+        get_api_key(&key_id)?.ok_or_else(|| "请先填写并保存 API Key".to_string())?
+    };
+
+    let base_url = if cfg.api_base_url.trim().is_empty() {
+        DEFAULT_SEEDANCE_API_BASE.to_string()
+    } else {
+        cfg.api_base_url.trim().to_string()
+    };
+    let url = format!("{}/models", base_url.trim_end_matches('/'));
+
+    let resp = state
+        .http
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", api_key))
+        .send()
+        .await
+        .map_err(|e| format!("连接失败：{}", e))?;
+
+    let status = resp.status();
+    let text = resp.text().await.map_err(|e| e.to_string())?;
+    if !status.is_success() {
+        return Err(format!(
+            "连接失败({})：{}",
+            status.as_u16(),
+            text.chars().take(240).collect::<String>()
+        ));
+    }
+
+    Ok(format!(
+        "连接成功（{}）：模型「{}」API 可达",
+        status.as_u16(),
+        cfg.label.trim().is_empty()
+            .then(|| cfg.model.as_str())
+            .unwrap_or(cfg.label.as_str())
+    ))
+}
+
+#[cfg(test)]
+mod video_model_match_tests {
+    use super::*;
+    use crate::settings::ImageModelConfig;
+
+    fn doubao_preset(model: &str) -> ImageModelConfig {
+        ImageModelConfig {
+            id: "preset-video-doubao-seedance".into(),
+            vendor_name: String::new(),
+            model_name: String::new(),
+            model_variant: String::new(),
+            label: "Doubao Seedance 2.0".into(),
+            model: model.into(),
+            api_base_url: String::new(),
+            enabled: true,
+            priority: 0,
+            supports_multi_ref_fusion: true,
+            max_reference_images: 4,
+            supports_image_edit: true,
+        }
+    }
+
+    #[test]
+    fn matches_canvas_canonical_id_against_api_model_settings() {
+        let cfg = doubao_preset(DOUBAO_SEEDANCE_API_MODEL);
+        assert!(video_model_config_matches(&cfg, DOUBAO_SEEDANCE_CANONICAL_ID));
+    }
+
+    #[test]
+    fn maps_legacy_slug_to_api_model() {
+        let cfg = doubao_preset(DOUBAO_SEEDANCE_CANONICAL_ID);
+        assert_eq!(seedance_api_model_id(&cfg), DOUBAO_SEEDANCE_API_MODEL);
+    }
 }

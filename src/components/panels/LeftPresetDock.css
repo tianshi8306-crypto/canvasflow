@@ -33,7 +33,7 @@
 }
 
 .left-preset-tab.active {
-  background: var(--accent, #3b82f6);
+  background: var(--accent, var(--cf-accent-focus));
   color: white;
 }
 
@@ -128,7 +128,7 @@
 .left-preset-add {
   width: 100%;
   padding: 8px;
-  background: var(--accent, #3b82f6);
+  background: var(--accent, var(--cf-accent-focus));
   color: white;
   border: none;
   border-radius: 4px;
@@ -175,6 +175,6 @@
 }
 
 .left-preset-form-actions button.primary {
-  background: var(--accent, #3b82f6);
+  background: var(--accent, var(--cf-accent-focus));
   color: white;
 }

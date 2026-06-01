@@ -62,10 +62,10 @@ export const SettingsImageModelsSection = memo(function SettingsImageModelsSecti
   }, [settings.imageModels]);
 
   return (
-    <div className="settingsSection settingsSection--sub">
+    <div className="settingsSection">
       <SettingsSectionHeader
-        title="图片模型"
-        description="供图片节点选用；接入说明见 docs/image-model-api-tutorial.md"
+        title="图片生成模型"
+        description="仅用于画布「图片」节点底栏的模型下拉。与「文本与脚本」里的对话服务商分开配置。"
         action={
           <button
             type="button"
@@ -81,8 +81,12 @@ export const SettingsImageModelsSection = memo(function SettingsImageModelsSecti
         }
       />
 
+      <div className="settingsModelsNodeBadges">
+        <span className="settingsModelsNodeBadge">图片节点</span>
+      </div>
+
       {settings.imageModels.length === 0 ? (
-        <p className="settings-desc">尚未配置图片模型；添加后可在图片节点的模型下拉框中选择。</p>
+        <p className="settings-desc">尚未配置图片模型；添加后可在图片节点底栏选择。</p>
       ) : null}
 
       {settings.imageModels.map((m) => {

@@ -38,10 +38,13 @@ export function AudioModelPicker({ models, value, onChange, onOpenChange, loadin
   const [menuStyle, setMenuStyle] = useState<CSSProperties | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
-  const selectable = useMemo(() => models.filter((m) => m.enabled), [models]);
+  const orderedModels = useMemo(() => [...models], [models]);
+
+  const selectable = useMemo(() => orderedModels.filter((m) => m.enabled), [orderedModels]);
+
   const selected = useMemo(
-    () => models.find((m) => m.id === value) ?? selectable[0] ?? null,
-    [models, selectable, value],
+    () => orderedModels.find((m) => m.id === value) ?? selectable[0] ?? null,
+    [orderedModels, selectable, value],
   );
 
   const setOpenSafe = useCallback(
@@ -79,9 +82,17 @@ export function AudioModelPicker({ models, value, onChange, onOpenChange, loadin
     const onScrollOrResize = () => update();
     window.addEventListener("resize", onScrollOrResize);
     window.addEventListener("scroll", onScrollOrResize, true);
+    let raf = 0;
+    const tick = () => {
+      update();
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+
     return () => {
       window.removeEventListener("resize", onScrollOrResize);
       window.removeEventListener("scroll", onScrollOrResize, true);
+      cancelAnimationFrame(raf);
     };
   }, [open]);
 
@@ -111,7 +122,7 @@ export function AudioModelPicker({ models, value, onChange, onOpenChange, loadin
     open && selectable.length > 0 && menuStyle && typeof document !== "undefined"
       ? createPortal(
           <div
-            className="igp-model-menu igp-model-menu--portal amp-model-menu--portal audioGenPanel--chrome"
+            className="igp-model-menu igp-model-menu--portal amp-model-menu--portal"
             style={menuStyle}
             role="listbox"
             aria-label="语音模型"
@@ -119,9 +130,10 @@ export function AudioModelPicker({ models, value, onChange, onOpenChange, loadin
             onPointerDown={(e) => e.stopPropagation()}
           >
             <div className="igp-model-menu-scroll">
-              {models.map((m) => {
+              {orderedModels.map((m) => {
                 const isSelected = m.id === value;
                 const disabled = !m.enabled;
+                const iconLetter = (m.label.trim() || m.ttsModel).charAt(0).toUpperCase();
                 return (
                   <button
                     key={m.id}
@@ -137,10 +149,12 @@ export function AudioModelPicker({ models, value, onChange, onOpenChange, loadin
                     }}
                   >
                     <span className="igp-model-item-icon" aria-hidden>
-                      {(m.label.trim() || m.ttsModel).charAt(0).toUpperCase()}
+                      {iconLetter}
                     </span>
                     <span className="igp-model-item-body">
-                      <span className="igp-model-item-title">{m.label}</span>
+                      <span className="igp-model-item-title-row">
+                        <span className="igp-model-item-title">{m.label}</span>
+                      </span>
                       <span className="igp-model-item-subtitle">{m.ttsModel}</span>
                     </span>
                   </button>
@@ -153,11 +167,11 @@ export function AudioModelPicker({ models, value, onChange, onOpenChange, loadin
       : null;
 
   return (
-    <div className="igp-model-picker tgp-model-picker tgp-model-picker--pill">
+    <div className="igp-model-picker">
       <button
         ref={triggerRef}
         type="button"
-        className={`igp-model-trigger tgp-model-trigger tgp-model-trigger--pill${open ? " open" : ""}`}
+        className={`igp-model-trigger${open ? " open" : ""}`}
         title="语音模型"
         disabled={loading || selectable.length === 0}
         aria-expanded={open}

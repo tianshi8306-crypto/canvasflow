@@ -4,6 +4,7 @@ import { formatUserError } from "@/lib/errors";
 import {
   loadSettingsPanelData,
   mergeImportedSettings,
+  normalizeLoadedSettings,
   saveSettingsAndKeys,
   toUserMessage,
 } from "@/lib/settingsPanelState";
@@ -14,28 +15,34 @@ import type {
 import { SettingsNav, type SettingsCategory } from "@/components/SettingsNav";
 import { SettingsCategoryPane } from "@/components/settings/SettingsCategoryPane";
 import { SettingsPageHead } from "@/components/settings/SettingsPageHead";
-import { SettingsModelsSection } from "@/components/SettingsModelsSection";
-import { SettingsTextProvidersSection } from "@/components/SettingsTextProvidersSection";
-import { SettingsImageModelsSection } from "@/components/SettingsImageModelsSection";
-import { SettingsVideoModelsSection } from "@/components/SettingsVideoModelsSection";
-import { SettingsAudioModelsSection } from "@/components/SettingsAudioModelsSection";
-import {
-  SETTINGS_IMAGE_CUSTOM_MODEL_NAME,
-  SETTINGS_IMAGE_CUSTOM_MODEL_VARIANT,
-} from "@/lib/settingsModelConstants";
+import { SettingsModelsPane } from "@/components/settings/SettingsModelsPane";
+import { SettingsAgentPane } from "@/components/settings/SettingsAgentPane";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import {
   loadHermesAutoChainSettings,
   saveHermesAutoChainSettings,
-  clampHermesPackImageCount,
-  HERMES_PACK_IMAGE_COUNT_MAX,
-  HERMES_PACK_IMAGE_COUNT_MIN,
   type HermesAutoChainSettings,
-  type HermesBatchSplitStrategy,
-  type HermesGlobalScope,
 } from "@/lib/hermes/hermesAutoChainPolicy";
+import {
+  fetchHermesMemoryPaths,
+  formatHermesMemoryMigrationNotice,
+  hermesMemoryRootsEqual,
+  migrateHermesUserMemory,
+  normalizeHermesMemoryRoot,
+} from "@/lib/hermes/knowledge/hermesMemoryPaths";
+import { useProjectStore } from "@/store/projectStore";
+import { SettingsProjectAssetsSection } from "@/components/settings/SettingsProjectAssetsSection";
+import { SettingsMaterialLibrarySection } from "@/components/settings/SettingsMaterialLibrarySection";
+import { PROJECT_AUTO_SAVE_OPTIONS, normalizeProjectAutoSaveIdleSec } from "@/lib/projectAutoSaveSettings";
+import { applyProjectAutoSaveIdleSec } from "@/store/projectSaveDebounce";
 
-export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
+export function SettingsPanel(props: {
+  open: boolean;
+  onClose: () => void;
+  initialCategory?: SettingsCategory | null;
+  focusSectionId?: string | null;
+  openRequestNonce?: number;
+}) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [keys, setKeys] = useState<Record<string, string>>({});
   const [imageModelKeys, setImageModelKeys] = useState<Record<string, string>>({});
@@ -54,6 +61,7 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
     () => new Set(["general"]),
   );
   const importFileRef = useRef<HTMLInputElement>(null);
+  const loadedHermesMemoryRootRef = useRef<string | null | undefined>(undefined);
 
   const selectCategory = useCallback((cat: SettingsCategory) => {
     startTransition(() => {
@@ -75,6 +83,8 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
   const [hermesAutoChain, setHermesAutoChain] = useState<HermesAutoChainSettings>(() =>
     loadHermesAutoChainSettings(),
   );
+  const projectPath = useProjectStore((s) => s.projectPath);
+  const [hermesMemoryPreview, setHermesMemoryPreview] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeCategory === "canvas") {
@@ -85,10 +95,36 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
       setSnapGridEnabled(ui.snapGridEnabled);
       setAlignDistributeGap(ui.alignDistributeGap);
     }
-    if (activeCategory === "general") {
+    if (activeCategory === "agent") {
       setHermesAutoChain(loadHermesAutoChainSettings());
     }
   }, [activeCategory]);
+
+  useEffect(() => {
+    if (!props.open || activeCategory !== "agent") return;
+    void (async () => {
+      const paths = await fetchHermesMemoryPaths(projectPath);
+      setHermesMemoryPreview(paths?.userDir ?? null);
+    })();
+  }, [props.open, activeCategory, projectPath, settings?.hermesMemoryRoot]);
+
+  useEffect(() => {
+    if (!props.open) return;
+    if (props.initialCategory) {
+      selectCategory(props.initialCategory);
+    }
+  }, [props.open, props.initialCategory, props.openRequestNonce, selectCategory]);
+
+  useEffect(() => {
+    if (!props.open) return;
+    if (!settings) return;
+    if (!props.focusSectionId) return;
+    const sectionId = props.focusSectionId;
+    const timer = window.setTimeout(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 40);
+    return () => window.clearTimeout(timer);
+  }, [props.open, settings, props.focusSectionId, props.openRequestNonce]);
 
   const patchHermesAutoChain = (patch: Partial<HermesAutoChainSettings>) => {
     const next = { ...hermesAutoChain, ...patch };
@@ -110,6 +146,9 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
         const loaded = await loadSettingsPanelData();
         setKeyPreviews(loaded.keyPreviews);
         setSettings(loaded.settings);
+        loadedHermesMemoryRootRef.current = normalizeHermesMemoryRoot(
+          loaded.settings.hermesMemoryRoot,
+        );
         setHasKey(loaded.hasKey);
         setHasImageModelKey(loaded.hasImageModelKey);
         setHasVideoModelKey(loaded.hasVideoModelKey);
@@ -158,11 +197,17 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
 
   const handleSave = async () => {
     if (!settings) return;
+    const normalized = normalizeLoadedSettings(settings);
+    const previousMemoryRoot =
+      loadedHermesMemoryRootRef.current === undefined
+        ? normalizeHermesMemoryRoot(settings.hermesMemoryRoot)
+        : loadedHermesMemoryRootRef.current;
+    const nextMemoryRoot = normalizeHermesMemoryRoot(normalized.hermesMemoryRoot);
     try {
       setError(null);
       setNotice(null);
       const saved = await saveSettingsAndKeys({
-        settings,
+        settings: normalized,
         keys,
         imageModelKeys,
         videoModelKeys,
@@ -178,7 +223,28 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
       setImageModelKeys({});
       setVideoModelKeys({});
       setAudioModelKeys({});
-      setNotice(saved.notice);
+      setSettings(saved.settings);
+      loadedHermesMemoryRootRef.current = nextMemoryRoot;
+
+      let noticeText = saved.notice;
+      if (
+        projectPath?.trim() &&
+        !hermesMemoryRootsEqual(previousMemoryRoot, nextMemoryRoot)
+      ) {
+        const migration = await migrateHermesUserMemory(
+          projectPath,
+          previousMemoryRoot,
+          nextMemoryRoot,
+        );
+        const migrationNotice = formatHermesMemoryMigrationNotice(migration);
+        if (migrationNotice) {
+          noticeText = `${noticeText} ${migrationNotice}`;
+        }
+        const paths = await fetchHermesMemoryPaths(projectPath);
+        setHermesMemoryPreview(paths?.userDir ?? null);
+      }
+
+      setNotice(noticeText);
       window.dispatchEvent(new Event("canvasflow-settings-saved"));
     } catch (e) {
       setError(formatUserError(e));
@@ -249,7 +315,7 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
               >
                 <SettingsPageHead
                   title="常规"
-                  description="系统路径、工作流行为与分镜自动化偏好。"
+                  description="系统路径、工程保存与工作流行为。"
                 />
                 <div className="settingsSection">
                   <div className="settingsSectionTitle">媒体引擎</div>
@@ -270,6 +336,48 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
                 </div>
 
                 <div className="settingsSection">
+                  <div className="settingsSectionTitle">工程保存</div>
+                  <div className="settingsField">
+                    <label className="settingsFieldLabel" htmlFor="projectAutoSaveIdleSec">
+                      画布自动保存
+                    </label>
+                    <span className="settingsFieldHint">
+                      在已有工程路径下，画布有改动且你<strong>停止编辑</strong>达到所选时长后，在<strong>后台</strong>写入
+                      canvasflow.json（不阻塞拖拽与输入）。关闭后请用 Ctrl+S 或菜单保存。
+                    </span>
+                    <select
+                      id="projectAutoSaveIdleSec"
+                      className="settingsInput"
+                      value={settings.projectAutoSaveIdleSec ?? 2}
+                      onChange={(e) => {
+                        const idleSec = normalizeProjectAutoSaveIdleSec(Number(e.target.value));
+                        applyProjectAutoSaveIdleSec(idleSec);
+                        setSettings({
+                          ...settings,
+                          projectAutoSaveIdleSec: idleSec,
+                        });
+                      }}
+                    >
+                      {PROJECT_AUTO_SAVE_OPTIONS.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="settingsFieldHint">
+                      {
+                        PROJECT_AUTO_SAVE_OPTIONS.find(
+                          (o) => o.value === (settings.projectAutoSaveIdleSec ?? 2),
+                        )?.hint
+                      }
+                    </span>
+                  </div>
+                </div>
+
+                <SettingsProjectAssetsSection />
+                <SettingsMaterialLibrarySection />
+
+                <div className="settingsSection">
                   <div className="settingsSectionTitle">工作流</div>
                   <div className="settingsField">
                     <div className="settingsToggle">
@@ -287,85 +395,6 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
                     <span className="settingsFieldHint">关闭时：失败节点标记为跳过，下游继续执行</span>
                   </div>
                 </div>
-
-                <div className="settingsSection">
-                  <div className="settingsSectionTitle">分镜自动建链</div>
-                  <div className="settingsField">
-                    <span className="settingsFieldHint">
-                      分镜文案就绪后，按策略自动创建图片与视频节点（不含脚本解析阶段）。
-                    </span>
-                    <div className="settingsToggle">
-                      <input
-                        type="checkbox"
-                        id="hermesAutoChainEnabled"
-                        checked={hermesAutoChain.enabled}
-                        onChange={(e) => patchHermesAutoChain({ enabled: e.target.checked })}
-                      />
-                      <label htmlFor="hermesAutoChainEnabled" className="settingsToggleLabel">
-                        <span className="settingsToggleSwitch" />
-                        <span className="settingsToggleText">启用自动建链</span>
-                      </label>
-                    </div>
-                    {hermesAutoChain.enabled ? (
-                      <>
-                        <div className="settingsField">
-                          <label className="settingsFieldLabel">自动建链范围</label>
-                          <select
-                            className="settingsInput"
-                            value={hermesAutoChain.scope}
-                            onChange={(e) =>
-                              patchHermesAutoChain({ scope: e.target.value as HermesGlobalScope })
-                            }
-                          >
-                            <option value="selected_only">仅已勾选且就绪的镜头</option>
-                            <option value="all_ready">全部就绪的镜头</option>
-                          </select>
-                        </div>
-                        <div className="settingsField">
-                          <label className="settingsFieldLabel">批量出图 · 拆镜策略</label>
-                          <select
-                            className="settingsInput"
-                            value={hermesAutoChain.batchSplitStrategy}
-                            onChange={(e) =>
-                              patchHermesAutoChain({
-                                batchSplitStrategy: e.target.value as HermesBatchSplitStrategy,
-                              })
-                            }
-                          >
-                            <option value="pack_forward">打包拆镜（首镜多图，向后填充空缺镜）</option>
-                            <option value="per_beat">逐镜出图（每镜独立生成）</option>
-                          </select>
-                        </div>
-                        {hermesAutoChain.batchSplitStrategy === "pack_forward" ? (
-                          <div className="settingsField">
-                            <label className="settingsFieldLabel">打包张数</label>
-                            <select
-                              className="settingsInput"
-                              value={hermesAutoChain.packImageCount}
-                              onChange={(e) =>
-                                patchHermesAutoChain({
-                                  packImageCount: clampHermesPackImageCount(Number(e.target.value)),
-                                })
-                              }
-                            >
-                              {Array.from(
-                                {
-                                  length:
-                                    HERMES_PACK_IMAGE_COUNT_MAX - HERMES_PACK_IMAGE_COUNT_MIN + 1,
-                                },
-                                (_, i) => HERMES_PACK_IMAGE_COUNT_MIN + i,
-                              ).map((n) => (
-                                <option key={n} value={n}>
-                                  {n} 张
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </div>
-                </div>
               </SettingsCategoryPane>
 
               <SettingsCategoryPane
@@ -373,60 +402,43 @@ export function SettingsPanel(props: { open: boolean; onClose: () => void }) {
                 activeCategory={activeCategory}
                 visited={visitedCategories}
               >
-                <SettingsPageHead
-                  title="模型与服务"
-                  description="配置各厂商 API 与生成模型，供画布节点在运行时选用。"
+                <SettingsModelsPane
+                  settings={settings}
+                  setSettings={setSettings}
+                  keys={keys}
+                  setKeys={setKeys}
+                  hasKey={hasKey}
+                  imageModelKeys={imageModelKeys}
+                  setImageModelKeys={setImageModelKeys}
+                  hasImageModelKey={hasImageModelKey}
+                  videoModelKeys={videoModelKeys}
+                  setVideoModelKeys={setVideoModelKeys}
+                  hasVideoModelKey={hasVideoModelKey}
+                  audioModelKeys={audioModelKeys}
+                  setAudioModelKeys={setAudioModelKeys}
+                  hasAudioModelKey={hasAudioModelKey}
+                  testingModelId={testingModelId}
+                  setTestingModelId={setTestingModelId}
+                  onProviderSettingsChange={handleProviderSettingsChange}
+                  onKeysChange={handleKeysChange}
+                  setError={setError}
+                  setNotice={setNotice}
                 />
-                <>
-                  <SettingsModelsSection
-                    settings={settings}
-                    keys={keys}
-                    hasKeyMap={hasKey}
-                    onSettingsChange={handleProviderSettingsChange}
-                    onKeysChange={handleKeysChange}
-                    onError={setError}
-                    onNotice={setNotice}
-                  />
-                  <div className="settingsSection settingsSection--sub">
-                    <div className="settingsSectionTitle">文本模型</div>
-                    <p className="settings-desc">
-                      用于文本、脚本与 LLM 节点；请在对应服务商卡片中填写模型 ID（如 gpt-4o-mini）。
-                    </p>
-                    <SettingsTextProvidersSection
-                      settings={settings}
-                      setSettings={setSettings}
-                      keys={keys}
-                      setKeys={setKeys}
-                      hasKey={hasKey}
-                    />
-                  </div>
-                  <SettingsImageModelsSection
-                    settings={settings}
-                    setSettings={setSettings}
-                    imageModelKeys={imageModelKeys}
-                    setImageModelKeys={setImageModelKeys}
-                    hasImageModelKey={hasImageModelKey}
-                    testingModelId={testingModelId}
-                    setTestingModelId={setTestingModelId}
-                    setError={setError}
-                    customModelNameValue={SETTINGS_IMAGE_CUSTOM_MODEL_NAME}
-                    customModelVariantValue={SETTINGS_IMAGE_CUSTOM_MODEL_VARIANT}
-                  />
-                  <SettingsVideoModelsSection
-                    settings={settings}
-                    setSettings={setSettings}
-                    videoModelKeys={videoModelKeys}
-                    setVideoModelKeys={setVideoModelKeys}
-                    hasVideoModelKey={hasVideoModelKey}
-                  />
-                  <SettingsAudioModelsSection
-                    settings={settings}
-                    setSettings={setSettings}
-                    audioModelKeys={audioModelKeys}
-                    setAudioModelKeys={setAudioModelKeys}
-                    hasAudioModelKey={hasAudioModelKey}
-                  />
-                </>
+              </SettingsCategoryPane>
+
+              <SettingsCategoryPane
+                category="agent"
+                activeCategory={activeCategory}
+                visited={visitedCategories}
+              >
+                <SettingsAgentPane
+                  settings={settings}
+                  setSettings={setSettings}
+                  projectPath={projectPath}
+                  hermesAutoChain={hermesAutoChain}
+                  onPatchHermesAutoChain={patchHermesAutoChain}
+                  hermesMemoryPreview={hermesMemoryPreview}
+                />
               </SettingsCategoryPane>
 
               <SettingsCategoryPane

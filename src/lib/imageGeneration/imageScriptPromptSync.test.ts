@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Edge, Node } from "@xyflow/react";
+import { emptyScriptBeat } from "@/lib/scriptBeatHelpers";
 import type { FlowNodeData, ScriptBeat, StoryboardShot } from "@/lib/types";
 import {
   applyImagePromptFromScript,
@@ -8,7 +9,7 @@ import {
 
 function scriptNode(
   id: string,
-  beats: Partial<ScriptBeat> & { id: string }[],
+  beats: ScriptBeat[],
   shots?: StoryboardShot[],
 ): Node<FlowNodeData> {
   return {
@@ -17,7 +18,7 @@ function scriptNode(
     position: { x: 0, y: 0 },
     data: {
       label: "脚本",
-      scriptBeats: beats as ScriptBeat[],
+      scriptBeats: beats,
       storyboardShots: shots,
     },
   };
@@ -36,7 +37,7 @@ describe("imageScriptPromptSync", () => {
   it("returns bound visual from script beat", () => {
     const beatId = "b1";
     const nodes = [
-      scriptNode("s1", [{ id: beatId, description: "beat desc" }], [
+      scriptNode("s1", [{ ...emptyScriptBeat(), id: beatId, description: "beat desc" }], [
         { scriptBeatId: beatId, visualPrompt: "夕阳下的城市天际线" } as StoryboardShot,
       ]),
       imageNode("i1", { scriptBeatId: beatId }),
@@ -47,7 +48,7 @@ describe("imageScriptPromptSync", () => {
 
   it("applyImagePromptFromScript fails without binding", () => {
     const nodes = [
-      scriptNode("s1", [{ id: "b1", description: "场景" }]),
+      scriptNode("s1", [{ ...emptyScriptBeat(), id: "b1", description: "场景" }]),
       imageNode("i1"),
     ];
     const edges: Edge[] = [{ id: "e1", source: "s1", target: "i1" }];
@@ -59,7 +60,7 @@ describe("imageScriptPromptSync", () => {
   it("applyImagePromptFromScript succeeds with binding", () => {
     const beatId = "b1";
     const nodes = [
-      scriptNode("s1", [{ id: beatId, description: "森林小径" }]),
+      scriptNode("s1", [{ ...emptyScriptBeat(), id: beatId, description: "森林小径" }]),
       imageNode("i1", { scriptBeatId: beatId }),
     ];
     const edges: Edge[] = [{ id: "e1", source: "s1", target: "i1" }];

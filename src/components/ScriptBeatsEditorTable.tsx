@@ -33,6 +33,8 @@ type Props = {
   onPersistRows: (next: ScriptBeat[]) => void;
   projectPath?: string | null;
   onStatusText?: (msg: string) => void;
+  highlightBeatId?: string | null;
+  onHighlightDone?: () => void;
 };
 
 /** 脚本镜头表格（侧栏内嵌精简列；全屏为完整 Lib 列 + 字段可见性 + 筛选） */
@@ -44,6 +46,8 @@ export function ScriptBeatsEditorTable({
   onPersistRows,
   projectPath,
   onStatusText,
+  highlightBeatId,
+  onHighlightDone,
 }: Props) {
   const normRows = rows.map((b) => normalizeScriptBeat(b));
   const descRows = variant === "fullscreen" ? 3 : 2;
@@ -134,6 +138,19 @@ export function ScriptBeatsEditorTable({
     if (variant !== "fullscreen") return normRows;
     return normRows.filter((b) => rowMatchesFilter(b, filterQuery));
   }, [variant, normRows, filterQuery]);
+
+  const tableWrapRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!highlightBeatId || variant !== "fullscreen") return;
+    const row = tableWrapRef.current?.querySelector<HTMLElement>(
+      `tr[data-beat-id="${highlightBeatId}"]`,
+    );
+    if (!row) return;
+    row.scrollIntoView({ block: "center", behavior: "smooth" });
+    const t = window.setTimeout(() => onHighlightDone?.(), 2400);
+    return () => window.clearTimeout(t);
+  }, [highlightBeatId, variant, displayRows, onHighlightDone]);
 
   const fieldOptions = useMemo(() => {
     const q = fieldsQuery.trim().toLowerCase();
@@ -247,6 +264,39 @@ export function ScriptBeatsEditorTable({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [variant, fieldsOpen, filterOpen, roleEditorRowId]);
 
+  const moveRows = useCallback(
+    (direction: "up" | "down" | "top" | "bottom") => {
+      if (selectedIds.length === 0) return;
+      const sorted = [...selectedIds].map(id => normRows.findIndex(r => r.id === id)).filter(i => i >= 0).sort((a, b) => a - b);
+      if (sorted.length === 0) return;
+      let reordered = [...normRows];
+
+      if (direction === "up") {
+        if (sorted[0] === 0) return;
+        for (const idx of sorted) {
+          [reordered[idx - 1], reordered[idx]] = [reordered[idx], reordered[idx - 1]];
+        }
+      } else if (direction === "down") {
+        if (sorted[sorted.length - 1] === normRows.length - 1) return;
+        for (let i = sorted.length - 1; i >= 0; i--) {
+          const idx = sorted[i];
+          [reordered[idx], reordered[idx + 1]] = [reordered[idx + 1], reordered[idx]];
+        }
+      } else if (direction === "top") {
+        const moving = sorted.map(i => reordered[i]);
+        reordered = reordered.filter((_, i) => !sorted.includes(i));
+        reordered.unshift(...moving);
+      } else {
+        const moving = sorted.map(i => reordered[i]);
+        reordered = reordered.filter((_, i) => !sorted.includes(i));
+        reordered.push(...moving);
+      }
+
+      onPersistRows(reordered);
+    },
+    [normRows, selectedIds, onPersistRows]
+  );
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       // Escape — cancel editing/selection (table-level)
@@ -299,7 +349,7 @@ export function ScriptBeatsEditorTable({
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, [normRows, onPersistRows, selectedIds, editingCell, isAllSelected]);
+  }, [normRows, onPersistRows, selectedIds, editingCell, isAllSelected, moveRows]);
 
   const cols = visibleCols;
   const colCount = cols.length + 2;
@@ -361,39 +411,6 @@ export function ScriptBeatsEditorTable({
       });
     }
   }, [displayRows, selectedIds, onToggleSelect, allSelected]);
-
-  const moveRows = useCallback(
-    (direction: "up" | "down" | "top" | "bottom") => {
-      if (selectedIds.length === 0) return;
-      const sorted = [...selectedIds].map(id => normRows.findIndex(r => r.id === id)).filter(i => i >= 0).sort((a, b) => a - b);
-      if (sorted.length === 0) return;
-      let reordered = [...normRows];
-
-      if (direction === "up") {
-        if (sorted[0] === 0) return;
-        for (const idx of sorted) {
-          [reordered[idx - 1], reordered[idx]] = [reordered[idx], reordered[idx - 1]];
-        }
-      } else if (direction === "down") {
-        if (sorted[sorted.length - 1] === normRows.length - 1) return;
-        for (let i = sorted.length - 1; i >= 0; i--) {
-          const idx = sorted[i];
-          [reordered[idx], reordered[idx + 1]] = [reordered[idx + 1], reordered[idx]];
-        }
-      } else if (direction === "top") {
-        const moving = sorted.map(i => reordered[i]);
-        reordered = reordered.filter((_, i) => !sorted.includes(i));
-        reordered.unshift(...moving);
-      } else {
-        const moving = sorted.map(i => reordered[i]);
-        reordered = reordered.filter((_, i) => !sorted.includes(i));
-        reordered.push(...moving);
-      }
-
-      onPersistRows(reordered);
-    },
-    [normRows, selectedIds, onPersistRows]
-  );
 
   const tableEl = (
     <table
@@ -463,7 +480,16 @@ export function ScriptBeatsEditorTable({
             const origIdx = normRows.findIndex((r) => r.id === b.id);
             const idx = origIdx >= 0 ? origIdx : 0;
             return (
-              <tr key={b.id} className={isAllSelected ? "all-selected" : ""}>
+              <tr
+                key={b.id}
+                data-beat-id={b.id}
+                className={[
+                  isAllSelected ? "all-selected" : "",
+                  highlightBeatId === b.id ? "scriptTableRow--highlight" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 <td
                   tabIndex={0}
                   onFocus={() => { focusedRowIndexRef.current = idx; }}
@@ -648,7 +674,9 @@ export function ScriptBeatsEditorTable({
         onMove={moveRows}
       />
 
-      <div className="scriptTableFullscreenScroll">{tableEl}</div>
+      <div ref={tableWrapRef} className="scriptTableFullscreenScroll">
+        {tableEl}
+      </div>
     </div>
   );
 }

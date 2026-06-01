@@ -63,3 +63,31 @@ export async function cancelVideoJobViaBridge(jobId: string) {
   }
   await getVideoGenerationClient().cancelJob(jobId);
 }
+
+export type DreaminaVideoRecoverRequest = {
+  projectPath: string;
+  nodeId: string;
+  submitId: string;
+  modelId: string;
+  workflow?: string;
+};
+
+export async function recoverDreaminaVideoViaBridge(
+  req: DreaminaVideoRecoverRequest,
+): Promise<VideoJobSnapshot> {
+  const mode = resolveVideoGenerationMode();
+  if (mode === "mock") {
+    throw new Error("mock 模式不支持即梦成片取回");
+  }
+  const r = await tryInvoke<VideoJobSnapshot>("video_gen_recover_dreamina", {
+    req: {
+      projectPath: req.projectPath,
+      nodeId: req.nodeId,
+      submitId: req.submitId,
+      modelId: req.modelId,
+      workflow: req.workflow,
+    },
+  });
+  if (r.value) return { ...r.value, source: "bridge" };
+  throw new Error(`即梦成片取回失败：${String(r.error)}`);
+}

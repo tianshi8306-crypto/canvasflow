@@ -1,36 +1,32 @@
 import type { ReactNode } from "react";
+import {
+  buildCanvasShortcutColumns,
+  type ShortcutBinding,
+  type ShortcutEntry,
+} from "@/lib/canvasShortcutCatalog";
+import { formatShortcutParts } from "@/lib/canvasModKeys";
 
-function canvasModHints(): {
-  copy: string;
-  paste: string;
-  del: string;
-  undo: string;
-  redo: string;
-  group: string;
-} {
-  const mac =
-    typeof navigator !== "undefined" && /Mac|iPhone|iPod|iPad/.test(navigator.platform ?? "");
-  return {
-    copy: mac ? "⌘C" : "Ctrl+C",
-    paste: mac ? "⌘V" : "Ctrl+V",
-    del: mac ? "⌫" : "Delete",
-    undo: mac ? "⌘Z" : "Ctrl+Z",
-    redo: mac ? "⇧⌘Z" : "Ctrl+Shift+Z",
-    group: mac ? "⌘G" : "Ctrl+G",
-  };
+function isKbdPart(part: string): boolean {
+  if (/[\u4e00-\u9fff]/.test(part)) return false;
+  if (part.includes("拖") || part.includes("滚") || part === "·") return false;
+  return part.length <= 8;
 }
 
 function Kbd({ children }: { children: ReactNode }) {
   return <kbd className="canvasShortcutKbd">{children}</kbd>;
 }
 
-function KbdCombo({ parts }: { parts: ReactNode[] }) {
+function BindingView({ binding }: { binding: ShortcutBinding }) {
+  if (binding.kind === "hint") {
+    return <span className="canvasShortcutHint">{binding.text}</span>;
+  }
+  const parts = formatShortcutParts(binding.tokens);
   return (
     <span className="canvasShortcutCombo">
       {parts.map((p, i) => (
-        <span key={i} className="canvasShortcutCombo__part">
+        <span key={`${p}-${i}`} className="canvasShortcutCombo__part">
           {i > 0 ? <span className="canvasShortcutPlus">+</span> : null}
-          {p}
+          {isKbdPart(p) ? <Kbd>{p}</Kbd> : <span className="canvasShortcutToken">{p}</span>}
         </span>
       ))}
     </span>
@@ -39,18 +35,20 @@ function KbdCombo({ parts }: { parts: ReactNode[] }) {
 
 function Col({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <div className="canvasShortcutCol">
-      <div className="canvasShortcutCol__title">{title}</div>
+    <section className="canvasShortcutCol">
+      <h3 className="canvasShortcutCol__title">{title}</h3>
       <div className="canvasShortcutCol__rows">{children}</div>
-    </div>
+    </section>
   );
 }
 
-function Row({ label, right }: { label: string; right: ReactNode }) {
+function Row({ entry }: { entry: ShortcutEntry }) {
   return (
     <div className="canvasShortcutRow">
-      <span className="canvasShortcutRow__label">{label}</span>
-      <div className="canvasShortcutRow__right">{right}</div>
+      <span className="canvasShortcutRow__label">{entry.label}</span>
+      <div className="canvasShortcutRow__binding">
+        <BindingView binding={entry.binding} />
+      </div>
     </div>
   );
 }
@@ -60,7 +58,7 @@ type Props = {
 };
 
 export function CanvasShortcutsOverlay({ onClose }: Props) {
-  const m = canvasModHints();
+  const columns = buildCanvasShortcutColumns();
 
   return (
     <div
@@ -71,101 +69,30 @@ export function CanvasShortcutsOverlay({ onClose }: Props) {
     >
       <button type="button" className="canvasShortcutsOverlayBackdrop" aria-label="关闭" onClick={onClose} />
       <div className="canvasShortcutsOverlayCard">
-        <button type="button" className="canvasShortcutsOverlayClose" onClick={onClose} aria-label="关闭">
-          ×
-        </button>
+        <header className="canvasShortcutsOverlayHeader">
+          <div className="canvasShortcutsOverlayHeaderText">
+            <h2 className="canvasShortcutsOverlayTitle">快捷键</h2>
+            <p className="canvasShortcutsOverlaySubtitle">画布常用操作速查</p>
+          </div>
+          <button
+            type="button"
+            className="canvasShortcutsOverlayClose"
+            onClick={onClose}
+            aria-label="关闭"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </header>
         <div className="canvasShortcutsOverlayGrid">
-          <Col title="画布">
-            <Row
-              label="双击空白添加节点"
-              right={<span className="canvasShortcutHint">打开添加面板</span>}
-            />
-            <Row
-              label="双击节点"
-              right={<span className="canvasShortcutHint">适配视野居中</span>}
-            />
-            <Row
-              label="框选多节点"
-              right={
-                <span className="canvasShortcutHint">
-                  空白处拖拽 / Shift 点选
-                </span>
-              }
-            />
-            <Row
-              label="平移画布"
-              right={
-                <KbdCombo
-                  parts={[<Kbd key="s">Space</Kbd>, <span key="m">左键拖拽</span>]}
-                />
-              }
-            />
-            <Row
-              label="右键框选"
-              right={<span className="canvasShortcutHint">画布空白处按住右键拖选</span>}
-            />
-          </Col>
-
-          <Col title="缩放">
-            <Row label="聚焦选中节点" right={<Kbd>F</Kbd>} />
-            <Row label="适配全部节点" right={<Kbd>Z</Kbd>} />
-            <Row
-              label="滚轮"
-              right={<span className="canvasShortcutHint">在画布上滚动</span>}
-            />
-            <Row
-              label="左下角滑块"
-              right={<span className="canvasShortcutHint">调节缩放</span>}
-            />
-          </Col>
-
-          <Col title="整理与工具">
-            <Row
-              label="整理画布"
-              right={
-                <KbdCombo
-                  parts={[
-                    <Kbd key="a">Alt</Kbd>,
-                    <Kbd key="s">Shift</Kbd>,
-                    <Kbd key="f">F</Kbd>,
-                  ]}
-                />
-              }
-            />
-            <Row
-              label="小地图开关"
-              right={
-                <KbdCombo
-                  parts={[
-                    <Kbd key="a">Alt</Kbd>,
-                    <Kbd key="s">Shift</Kbd>,
-                    <Kbd key="m">M</Kbd>,
-                  ]}
-                />
-              }
-            />
-            <Row
-              label="对齐吸附开关"
-              right={
-                <KbdCombo
-                  parts={[
-                    <Kbd key="a">Alt</Kbd>,
-                    <Kbd key="s">Shift</Kbd>,
-                    <Kbd key="x">S</Kbd>,
-                  ]}
-                />
-              }
-            />
-          </Col>
-
-          <Col title="编辑">
-            <Row label="撤销" right={<Kbd>{m.undo}</Kbd>} />
-            <Row label="重做" right={<Kbd>{m.redo}</Kbd>} />
-            <Row label="删除选中" right={<Kbd>{m.del}</Kbd>} />
-            <Row label="复制" right={<Kbd>{m.copy}</Kbd>} />
-            <Row label="粘贴" right={<Kbd>{m.paste}</Kbd>} />
-            <Row label="打组" right={<Kbd>{m.group}</Kbd>} />
-          </Col>
+          {columns.map((col) => (
+            <Col key={col.id} title={col.title}>
+              {col.entries.map((entry) => (
+                <Row key={entry.id} entry={entry} />
+              ))}
+            </Col>
+          ))}
         </div>
       </div>
     </div>

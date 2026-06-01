@@ -3,58 +3,86 @@ import { useMemo } from "react";
 import { DESKTOP_SHELL_HINT } from "@/lib/tauriEnv";
 import { useProjectStore } from "@/store/projectStore";
 import { CanvasTabs } from "./CanvasTabs";
+import { WorkspaceMenu } from "./WorkspaceMenu";
 
 export function AppTopBar() {
   const statusText = useProjectStore((s) => s.statusText);
   const lastSavedAt = useProjectStore((s) => s.lastSavedAt);
   const lastRunId = useProjectStore((s) => s.lastRunId);
   const projectPath = useProjectStore((s) => s.projectPath);
+  const projectDirty = useProjectStore((s) => s.projectDirty);
   const nodeCount = useProjectStore((s) => s.nodes.length);
 
   const savedShort = useMemo(() => {
     if (!lastSavedAt) return "";
     const d = new Date(lastSavedAt);
-    return `已保存 ${d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }, [lastSavedAt]);
 
-  const statusLine = useMemo(() => {
-    const parts = [statusText];
-    if (savedShort) parts.push(savedShort);
-    if (lastRunId) parts.push(`Run ${lastRunId}`);
-    return parts.join(" · ");
-  }, [lastRunId, savedShort, statusText]);
+  const saveBadge = useMemo(() => {
+    if (!projectPath) return projectDirty ? "未保存" : "";
+    if (projectDirty) return "未保存";
+    if (savedShort) return `已保存 ${savedShort}`;
+    return "";
+  }, [projectDirty, projectPath, savedShort]);
+
+  const statusShort = useMemo(() => {
+    const t = statusText.trim();
+    if (!t) return "";
+    if (t.length <= 32) return t;
+    return `${t.slice(0, 30)}…`;
+  }, [statusText]);
+
+  const statusDetailTitle = useMemo(() => {
+    const lines: string[] = [];
+    if (projectPath?.trim()) lines.push(projectPath);
+    if (statusText.trim()) lines.push(statusText);
+    if (savedShort && saveBadge.startsWith("已保存")) lines.push(saveBadge);
+    if (lastRunId) lines.push(`Run ${lastRunId}`);
+    return lines.join("\n");
+  }, [lastRunId, projectPath, saveBadge, savedShort, statusText]);
 
   return (
     <header className="appTopChrome">
-      <div className="appTopChromeInner">
-        <div className="appTopBrand" title="CanvasFlow AI Studio">
-          CanvasFlow AI Studio
+      <div className="appTopChromeRow">
+        <div className="appTopLead">
+          <WorkspaceMenu />
+          {!isTauri() ? (
+            <span className="appTopWarn" title={DESKTOP_SHELL_HINT}>
+              浏览器预览
+            </span>
+          ) : null}
         </div>
 
-        {!isTauri() ? (
-          <div className="appTopWarn" title={DESKTOP_SHELL_HINT}>
-            浏览器预览
-          </div>
-        ) : null}
+        <div className="appTopTabs">
+          <CanvasTabs />
+        </div>
 
-        <span className="appTopChromeDivider" aria-hidden />
+        <div className="appTopChromeSpacer" aria-hidden />
 
-        <CanvasTabs />
-
-        <div className="appTopChromeSpacer" />
-
-        <div className="appTopStatusCol">
+        <div className="appTopTrail">
           {!projectPath && nodeCount > 0 ? (
-            <div
-              className="appTopTempWarn"
-              title="左侧添加的内容仅保存在内存中，整页刷新会丢失；请先新建或打开工程以关联保存目录。"
+            <span
+              className="appTopBadge appTopBadge--warn"
+              title="内容仅保存在内存中；请从顶栏打开或新建工程以写入本地目录。"
             >
               临时画布
-            </div>
+            </span>
           ) : null}
-          <div className="appTopStatusLine" title={[projectPath ?? "", statusLine].filter(Boolean).join("\n")}>
-            {statusLine}
-          </div>
+          {saveBadge ? (
+            <span
+              className={`appTopBadge${
+                projectDirty ? " appTopBadge--unsaved" : " appTopBadge--saved"
+              }`}
+            >
+              {saveBadge}
+            </span>
+          ) : null}
+          {statusShort ? (
+            <span className="appTopBadge appTopBadge--status" title={statusDetailTitle || statusShort}>
+              {statusShort}
+            </span>
+          ) : null}
         </div>
       </div>
     </header>
