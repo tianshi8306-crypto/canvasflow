@@ -5,7 +5,7 @@
   "identifier": "com.canvasflow.studio",
   "copyright": "© 2026 CanvasFlow AI Studio. Licensed under Apache-2.0.",
   "publisher": "CanvasFlow",
-  "homepage": "https://github.com/tianshi8306-crypto/vibevideo",
+  "homepage": "https://github.com/tianshi8306-crypto/canvasflow",
   "longDescription": "CanvasFlow AI Studio is a desktop application for AI-powered video creation. It provides an infinite canvas workflow where you design storylines, generate scripts, create storyboards, and produce videos — all driven by AI agents and local tools.",
   "build": {
     "beforeDevCommand": "npm run dev",
@@ -58,7 +58,7 @@
     "updater": {
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDRDRTgxMDZDNkZCMjg0QTMKUldTamhMSnZiQkRvVEpIUWdtUE1GTzBpaktPejloREErMGU2c05Lekg1RHIza2U3SGE3NnAxOFgK",
       "endpoints": [
-        "https://github.com/tianshi8306-crypto/vibevideo/releases/latest/download/latest.json"
+        "https://github.com/tianshi8306-crypto/canvasflow/releases/latest/download/latest.json"
       ],
       "windows": {
         "installMode": "passive"

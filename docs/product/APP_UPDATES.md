@@ -10,7 +10,7 @@ CanvasFlow 使用 Tauri `tauri-plugin-updater` + GitHub Release 静态 `latest.j
 - **稍后提醒**：跳过当前版本（写入 `localStorage`），下次启动不再提示该版本
 - **安装**：下载签名增量包 → 退出当前进程 → 安装 → **自动重启**
 
-更新源：`https://github.com/tianshi8306-crypto/vibevideo/releases/latest/download/latest.json`
+更新源：`https://github.com/tianshi8306-crypto/canvasflow/releases/latest/download/latest.json`
 
 ## 发版前准备（一次性）
 

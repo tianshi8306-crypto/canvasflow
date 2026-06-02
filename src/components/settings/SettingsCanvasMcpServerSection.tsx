@@ -22,7 +22,7 @@ export function SettingsCanvasMcpServerSection({ projectPath }: Props) {
   const [copied, setCopied] = useState(false);
 
   const configSnippet = useMemo(() => {
-    const examplePath = "D:/vibevideo/scripts/canvasflow-mcp-server.mjs";
+    const examplePath = "./scripts/canvasflow-mcp-server.mjs";
     return buildCursorMcpServerConfigSnippet(examplePath);
   }, []);
 

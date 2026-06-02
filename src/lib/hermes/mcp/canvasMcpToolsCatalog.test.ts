@@ -15,7 +15,7 @@ describe("canvasMcpToolsCatalog", () => {
   });
 
   it("buildCursorMcpServerConfigSnippet uses node command", () => {
-    const json = buildCursorMcpServerConfigSnippet("D:/vibevideo/scripts/canvasflow-mcp-server.mjs");
+    const json = buildCursorMcpServerConfigSnippet("./scripts/canvasflow-mcp-server.mjs");
     expect(json).toContain("canvasflow");
     expect(json).toContain("canvasflow-mcp-server.mjs");
   });

@@ -26,3 +26,4 @@ nul
 .gitcommitmsg*.txt
 .revert-actions.ts
 src/styles/global.css.before-*
+src-tauri/bin/ffmpeg.exe

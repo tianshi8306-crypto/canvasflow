@@ -2,7 +2,7 @@
 
 > **固定入口**：本文档为「进度 + 规划 + 代码索引」的**主文档**，请在异地开发时优先阅读本文。  
 > 更新日期：**2026-05-26**  
-> 仓库：**vibevideo**（Tauri + React + React Flow）  
+> 仓库：**canvasflow**（Tauri + React + React Flow）  
 > 历史同名快照：`REMOTE_DEV_HANDOFF_2026-04-28.md`（内容与本文同步后仅作锚点，见该文件说明）。
 
 ---
@@ -408,7 +408,7 @@ CSS 样式新增：`.nodeStatus*` 系列类名，动画效果
 
 参考文档（本地）：`liblib-tv-analysis.md`（2026-04-28）
 
-### 关键启发（对 vibevideo 有直接价值的部分）
+### 关键启发（对 canvasflow 有直接价值的部分）
 
 - **双入口架构**：人类入口（无限画布）+ Agent 入口（Skill API / OpenClaw）。  
   - 对应到本项目：我们已有画布入口；可以补一个“Agent/Skill 调度层”作为 **R7 能力编排层**的落地点（不是替代现有 DAG，而是包装成可观测的任务）。

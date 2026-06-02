@@ -4,7 +4,7 @@
 
 **无限画布 × AI 创作灵体 × 节点工作流 —— 从灵感到成片，一气呵成**
 
-[![Release](https://img.shields.io/github/v/release/tianshi8306-crypto/vibevideo?style=flat-square)](https://github.com/tianshi8306-crypto/vibevideo/releases)
+[![Release](https://img.shields.io/github/v/release/tianshi8306-crypto/canvasflow?style=flat-square)](https://github.com/tianshi8306-crypto/canvasflow/releases)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-lightgrey?style=flat-square)](#安装)
 
@@ -98,7 +98,7 @@ my-project/
 
 ## 安装
 
-在 [Releases 页面](https://github.com/tianshi8306-crypto/vibevideo/releases/latest) 下载对应平台安装包：
+在 [Releases 页面](https://github.com/tianshi8306-crypto/canvasflow/releases/latest) 下载对应平台安装包：
 
 | 平台 | 文件 |
 |------|------|
@@ -213,7 +213,7 @@ npm run desktop:build:with-ffmpeg
 ### 项目结构
 
 ```
-vibevideo/
+canvasflow/
 ├── src/                        # React 前端
 │   ├── App.tsx                 # 根组件，键盘快捷键，灵体初始化
 │   ├── components/
