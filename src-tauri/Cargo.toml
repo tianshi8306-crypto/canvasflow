@@ -1,8 +1,13 @@
 [package]
 name = "canvasflow"
 version = "0.2.0"
-description = "CanvasFlow AI Studio"
+description = "CanvasFlow AI Studio - AI-powered video creation with infinite canvas workflow"
 authors = ["CanvasFlow"]
+license = "Apache-2.0"
+repository = "https://github.com/tianshi8306-crypto/vibevideo"
+readme = "../README.md"
+keywords = ["ai", "video", "canvas", "tauri", "workflow"]
+categories = ["multimedia", "graphics", "video"]
 edition = "2021"
 
 [lib]

@@ -3,6 +3,26 @@
   "private": true,
   "version": "0.2.0",
   "license": "Apache-2.0",
+  "description": "AI-powered video creation studio with infinite canvas workflow",
+  "author": "CanvasFlow",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tianshi8306-crypto/vibevideo.git"
+  },
+  "homepage": "https://github.com/tianshi8306-crypto/vibevideo",
+  "bugs": {
+    "url": "https://github.com/tianshi8306-crypto/vibevideo/issues"
+  },
+  "keywords": [
+    "ai",
+    "video",
+    "canvas",
+    "tauri",
+    "react",
+    "workflow",
+    "storyboard",
+    "seedance"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
