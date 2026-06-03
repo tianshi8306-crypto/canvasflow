@@ -4,6 +4,8 @@ import { nodeLayoutDimensions } from "@/lib/nodeLayout";
 
 /** 边/中心对齐吸附阈值（与 Figma 智能参考线接近） */
 export const SNAP_ALIGN_THRESHOLD_PX = 12;
+/** 中心对齐略宽阈值，拖拽时优先显示中心参考线 */
+export const SNAP_CENTER_ALIGN_THRESHOLD_PX = 16;
 
 export type SnapGuideLine =
   | { axis: "x"; flowPos: number; flowMin: number; flowMax: number }
@@ -23,6 +25,7 @@ type Rect = { left: number; right: number; top: number; bottom: number; cx: numb
 type SnapCandidate = {
   delta: number;
   guide: SnapGuideLine;
+  kind: "edge" | "center";
 };
 
 function toRect(n: Node<FlowNodeData>): Rect {
@@ -39,10 +42,15 @@ function toRect(n: Node<FlowNodeData>): Rect {
   };
 }
 
-function pickBestCandidate(candidates: SnapCandidate[], threshold: number): SnapCandidate | null {
+function pickBestCandidate(
+  candidates: SnapCandidate[],
+  threshold: number,
+  kind?: SnapCandidate["kind"],
+): SnapCandidate | null {
   let best: SnapCandidate | null = null;
   let bestAbs = threshold + 1;
   for (const c of candidates) {
+    if (kind && c.kind !== kind) continue;
     const a = Math.abs(c.delta);
     if (a <= threshold && a < bestAbs) {
       bestAbs = a;
@@ -50,6 +58,13 @@ function pickBestCandidate(candidates: SnapCandidate[], threshold: number): Snap
     }
   }
   return best;
+}
+
+function pickAxisSnap(candidates: SnapCandidate[]): SnapCandidate | null {
+  return (
+    pickBestCandidate(candidates, SNAP_CENTER_ALIGN_THRESHOLD_PX, "center") ??
+    pickBestCandidate(candidates, SNAP_ALIGN_THRESHOLD_PX, "edge")
+  );
 }
 
 function verticalGuide(x: number, yMin: number, yMax: number, extra: Rect): SnapGuideLine {
@@ -158,50 +173,60 @@ export function snapNodePositionChanges(
       {
         delta: t.left - minX,
         guide: verticalGuide(t.left, minY, maxY, t),
+        kind: "edge",
       },
       {
         delta: t.right - minX,
         guide: verticalGuide(t.right, minY, maxY, t),
+        kind: "edge",
       },
       {
         delta: t.left - maxX,
         guide: verticalGuide(t.left, minY, maxY, t),
+        kind: "edge",
       },
       {
         delta: t.right - maxX,
         guide: verticalGuide(t.right, minY, maxY, t),
+        kind: "edge",
       },
       {
         delta: t.cx - movingCx,
         guide: verticalGuide(t.cx, minY, maxY, t),
+        kind: "center",
       },
     );
     dyCandidates.push(
       {
         delta: t.top - minY,
         guide: horizontalGuide(t.top, minX, maxX, t),
+        kind: "edge",
       },
       {
         delta: t.bottom - minY,
         guide: horizontalGuide(t.bottom, minX, maxX, t),
+        kind: "edge",
       },
       {
         delta: t.top - maxY,
         guide: horizontalGuide(t.top, minX, maxX, t),
+        kind: "edge",
       },
       {
         delta: t.bottom - maxY,
         guide: horizontalGuide(t.bottom, minX, maxX, t),
+        kind: "edge",
       },
       {
         delta: t.cy - movingCy,
         guide: horizontalGuide(t.cy, minX, maxX, t),
+        kind: "center",
       },
     );
   }
 
-  const dxPick = pickBestCandidate(dxCandidates, SNAP_ALIGN_THRESHOLD_PX);
-  const dyPick = pickBestCandidate(dyCandidates, SNAP_ALIGN_THRESHOLD_PX);
+  const dxPick = pickAxisSnap(dxCandidates);
+  const dyPick = pickAxisSnap(dyCandidates);
   const dx = dxPick?.delta ?? 0;
   const dy = dyPick?.delta ?? 0;
 

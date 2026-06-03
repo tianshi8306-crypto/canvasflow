@@ -37,6 +37,14 @@ describe("computeBatchImportDropPositions", () => {
 });
 
 describe("computeImageOutputGridPositions", () => {
+  it("lays out two cells in a single row from anchor", () => {
+    const pts = computeImageOutputGridPositions(2, { x: 50, y: 80 });
+    expect(pts).toHaveLength(2);
+    const stepX = IMAGE_OUTPUT_GRID_CELL_W + CANVAS_NODE_LAYOUT_GAP;
+    expect(pts[0]).toEqual({ x: 50, y: 80 });
+    expect(pts[1]).toEqual({ x: 50 + stepX, y: 80 });
+  });
+
   it("lays out four cells in row-major grid from anchor", () => {
     const pts = computeImageOutputGridPositions(4, { x: 100, y: 200 });
     expect(pts).toHaveLength(4);

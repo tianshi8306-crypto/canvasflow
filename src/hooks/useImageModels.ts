@@ -45,6 +45,7 @@ export function useImageModels() {
       ...builtins.filter((b) => !customModelIds.has(b.model)),
       ...custom,
     ];
+    merged.sort((a, b) => a.priority - b.priority || a.sortIndex - b.sortIndex);
     setModels(merged);
   }, []);
 

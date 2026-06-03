@@ -31,9 +31,8 @@ import {
 import { RF_NODE_ANCHOR_CLASS } from "@/lib/canvasInteraction";
 import {
   clientToKnobPos,
-  distanceToRestingKnob,
   dispatchHandleConnectPointerDown,
-  SIMPLE_ANCHOR_MAGNET_RADIUS,
+  isPointerInAnchorZone,
   type KnobPos,
 } from "@/lib/anchorKnobInteraction";
 import { useProjectStore } from "@/store/projectStore";
@@ -103,21 +102,26 @@ function CanvasAnchorSide({
     };
   }, [nodeId, updateNodeInternals]);
 
+  const syncKnobToPointer = useCallback(
+    (r: DOMRect, clientX: number, clientY: number) => {
+      if (!isPointerInAnchorZone(r, clientX, clientY)) {
+        setMagnetized(false);
+        setKnobPos(null);
+        return;
+      }
+      setMagnetized(true);
+      setKnobPos(clientToKnobPos(r, clientX, clientY));
+    },
+    [],
+  );
+
   const onZonePointerMove = useCallback(
     (e: React.PointerEvent) => {
       const el = zoneRef.current;
       if (!el) return;
-      const r = el.getBoundingClientRect();
-      if (magnetized) {
-        setKnobPos(clientToKnobPos(r, e.clientX, e.clientY));
-        return;
-      }
-      if (distanceToRestingKnob(r, side, e.clientX, e.clientY) <= SIMPLE_ANCHOR_MAGNET_RADIUS) {
-        setMagnetized(true);
-        setKnobPos(clientToKnobPos(r, e.clientX, e.clientY));
-      }
+      syncKnobToPointer(el.getBoundingClientRect(), e.clientX, e.clientY);
     },
-    [magnetized, side, zoneRef],
+    [syncKnobToPointer, zoneRef],
   );
 
   const onZonePointerEnter = useCallback(
@@ -125,13 +129,9 @@ function CanvasAnchorSide({
       setZoneHover(true);
       const el = zoneRef.current;
       if (!el) return;
-      const r = el.getBoundingClientRect();
-      if (distanceToRestingKnob(r, side, e.clientX, e.clientY) <= SIMPLE_ANCHOR_MAGNET_RADIUS) {
-        setMagnetized(true);
-        setKnobPos(clientToKnobPos(r, e.clientX, e.clientY));
-      }
+      syncKnobToPointer(el.getBoundingClientRect(), e.clientX, e.clientY);
     },
-    [side, zoneRef],
+    [syncKnobToPointer, zoneRef],
   );
 
   const onZonePointerLeave = useCallback(() => {

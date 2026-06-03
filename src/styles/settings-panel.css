@@ -536,6 +536,45 @@
   margin-top: 2px;
 }
 
+.settingsAboutActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settingsAdvancedBlock {
+  margin-top: 8px;
+  padding: 0 0 8px;
+  border-top: 1px solid var(--cf-border);
+}
+
+.settingsAdvancedBlockSummary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--cf-soft-white-secondary);
+  padding: 14px 0 10px;
+  list-style: none;
+  user-select: none;
+}
+
+.settingsAdvancedBlockSummary::-webkit-details-marker {
+  display: none;
+}
+
+.settingsAdvancedBlockSummary::before {
+  content: "▸ ";
+  opacity: 0.7;
+}
+
+.settingsAdvancedBlock[open] .settingsAdvancedBlockSummary::before {
+  content: "▾ ";
+}
+
+.settingsAdvancedBlock .settingsSection {
+  padding-top: 0;
+}
+
 .settingsDivider {
   height: 1px;
   margin: 18px 0;

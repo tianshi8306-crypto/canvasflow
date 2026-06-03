@@ -48,15 +48,23 @@
   --mention-pill-track: 22px;
 }
 
-.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell) .mention-input-wrapper.imageGenPanelTextarea,
-.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell)
-  .mention-input-wrapper.imageGenPanelTextarea--minimal,
-.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell)
-  .mention-input-wrapper.imageGenPanelTextarea--expanded {
+/* 与视频展开态同构：grid 叠层，避免 overlay/textarea 纵向分离导致无法聚焦、滚动条错位 */
+.igp-expanded-card.igp-layout-expanded .igp-prompt-wrap {
   flex: 1;
-  min-height: 160px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell)
+  .igp-prompt-wrap
+  .image-prompt-mention--compact.mention-input-wrapper {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: 1fr;
+  grid-template-columns: 1fr;
+  align-content: stretch;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
@@ -64,14 +72,30 @@
   padding: 0 !important;
 }
 
-.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell) .mention-textarea {
-  flex: 1;
-  min-height: 140px;
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell)
+  .igp-prompt-wrap
+  .image-prompt-mention--compact
+  .mention-overlay,
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell)
+  .igp-prompt-wrap
+  .image-prompt-mention--compact
+  .mention-textarea {
+  grid-area: 1 / 1;
+  min-height: 160px;
   max-height: min(360px, calc(100vh - 220px));
+  height: 100%;
+  box-sizing: border-box;
   border: none !important;
   outline: none !important;
   box-shadow: none !important;
   background: transparent !important;
+}
+
+.igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell)
+  .igp-prompt-wrap
+  .image-prompt-mention--compact
+  .mention-overlay {
+  overflow: hidden;
 }
 
 .igp-expanded-card.igp-layout-expanded:not(.tgp-expanded-shell) .mention-textarea:focus,

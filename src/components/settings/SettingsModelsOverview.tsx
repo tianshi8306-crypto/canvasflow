@@ -92,7 +92,7 @@ export const SettingsModelsOverview = memo(function SettingsModelsOverview({
   return (
     <div className="settingsModelsOverview">
       <p className="settings-desc settings-desc-lead">
-        画布上每一类节点使用<strong>不同的模型列表</strong>。先在这里配好，再回到节点底栏选择具体模型。
+        按节点类型配置模型；配好后在节点底栏选择具体型号。
       </p>
       <div className="settingsModelsOverviewGrid">
         {LANES.map((lane) => {

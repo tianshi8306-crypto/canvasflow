@@ -26,8 +26,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "desktop": "tauri dev",
-    "tauri:dev": "tauri dev",
+    "desktop": "tauri dev --config src-tauri/tauri.dev.conf.json",
+    "tauri:dev": "tauri dev --config src-tauri/tauri.dev.conf.json",
     "desktop:build:with-ffmpeg": "node scripts/tauri-build-with-ffmpeg.mjs",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b --pretty false",
@@ -47,7 +47,8 @@
     "test:e2e": "playwright test",
     "test:e2e:golden": "playwright test e2e/golden-path.spec.ts",
     "test:e2e:install": "playwright install chromium",
-    "mcp:server": "node scripts/canvasflow-mcp-server.mjs"
+    "mcp:server": "node scripts/canvasflow-mcp-server.mjs",
+    "icon:render": "node scripts/render-app-icon.mjs && tauri icon brand/app-icon-1024.png"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.99.0",
@@ -80,6 +81,7 @@
     "jsdom": "^29.1.1",
     "pdfjs-dist": "^5.7.284",
     "prettier": "^3.8.3",
+    "sharp": "^0.34.5",
     "typescript": "~5.6.3",
     "typescript-eslint": "^8.58.2",
     "vite": "^5.4.14",

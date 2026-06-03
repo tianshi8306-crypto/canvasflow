@@ -8568,21 +8568,33 @@ body .zoomMenu {
 
 /* 对齐参考线：青蓝虚线（与 --cf-cyan 体系一致） */
 .node-snap-guide-line:not(.node-snap-guide-line--vertical) {
+  height: 2px;
   background: repeating-linear-gradient(
     90deg,
-    var(--cf-cyan-light) 0 4px,
-    transparent 4px 8px
+    var(--cf-cyan-light) 0 6px,
+    transparent 6px 10px
   );
-  box-shadow: none;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.12);
 }
 
 .node-snap-guide-line--vertical {
+  width: 2px;
   background: repeating-linear-gradient(
     180deg,
-    var(--cf-cyan-light) 0 4px,
-    transparent 4px 8px
+    var(--cf-cyan-light) 0 6px,
+    transparent 6px 10px
   );
-  box-shadow: none;
+  box-shadow: 0 0 0 1px rgba(34, 211, 238, 0.12);
+}
+
+.node-snap-guide-crosshair .anchor-crosshair-h {
+  width: 18px;
+  height: 2px;
+}
+
+.node-snap-guide-crosshair .anchor-crosshair-v {
+  width: 2px;
+  height: 18px;
 }
 
 .node-snap-guide-crosshair .anchor-crosshair-h,

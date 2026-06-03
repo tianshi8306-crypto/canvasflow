@@ -29,6 +29,8 @@ type Props = {
   testMessage?: string;
   /** 文本 / 脚本 / LLM 节点：展示模型 ID、优先级与启用开关 */
   chatMode?: boolean;
+  /** 设置页：移除该对话服务商 */
+  onRemove?: () => void;
   onConfigChange: (patch: Partial<Props["config"]>) => void;
   onApiKeyChange: (field: "apiKey" | "modelApiKey", value: string) => void;
   onDreaminaAuthChange?: (state: DreaminaAuthState) => void;
@@ -36,12 +38,24 @@ type Props = {
 
 function getProviderBadge(id: ProviderId): string {
   const badges: Partial<Record<ProviderId, string>> = {
+    deepseek: "DS",
+    doubao: "豆",
+    glm: "GL",
     openai: "OA",
     apimart: "AM",
     dreamina: "即",
     aicanvas: "本",
   };
   return badges[id] || id.slice(0, 2).toUpperCase();
+}
+
+function chatModelPlaceholder(id: ProviderId): string {
+  const placeholders: Partial<Record<ProviderId, string>> = {
+    deepseek: "deepseek-v4-flash",
+    doubao: "doubao-pro-32k",
+    glm: "glm-4-flash",
+  };
+  return placeholders[id] ?? "gpt-4o-mini";
 }
 
 function StatusIcon({ status }: { status: Props["testStatus"] }) {
@@ -78,6 +92,7 @@ export function ProviderCard({
   testStatus,
   testMessage,
   chatMode = false,
+  onRemove,
   onConfigChange,
   onApiKeyChange,
   onDreaminaAuthChange,
@@ -175,6 +190,11 @@ export function ProviderCard({
             {dreaminaAuth?.isLoggedIn ? "已登录" : "CLI 授权登录"}
           </span>
         )}
+        {chatMode && onRemove ? (
+          <button type="button" className="btn btn--ghost settingsProviderRemoveBtn" onClick={onRemove}>
+            删除
+          </button>
+        ) : null}
       </div>
 
       {isDreamina && (
@@ -190,17 +210,17 @@ export function ProviderCard({
         </>
       )}
 
-      {providerId === "openai" && (
+      {chatMode && !isDreamina ? (
         <div className="settingsField">
           <label className="settingsFieldLabel">接口地址</label>
           <input
             className="settingsInput mono"
             value={config.baseUrl}
-            placeholder={meta?.defaultUrl || "https://api.openai.com"}
+            placeholder={meta?.defaultUrl || "https://api.example.com/v1"}
             onChange={(e) => onConfigChange({ baseUrl: e.target.value })}
           />
         </div>
-      )}
+      ) : null}
 
       {!isDreamina && (
         <div className="settingsField">
@@ -230,11 +250,20 @@ export function ProviderCard({
         <>
           <div className="settingsField">
             <label className="settingsFieldLabel">模型 ID（必填）</label>
-            <span className="settingsFieldHint">出现在文本 / 脚本 / LLM 节点的模型下拉中，如 gpt-4o-mini</span>
+            <span className="settingsFieldHint">
+              出现在文本 / 脚本 / LLM 节点的模型下拉中
+              {providerId === "deepseek"
+                ? "，如 deepseek-v4-flash、deepseek-v4-pro"
+                : providerId === "doubao"
+                  ? "，如 doubao-pro-32k 或方舟 Endpoint ID"
+                  : providerId === "glm"
+                    ? "，如 glm-4-flash、glm-4-plus"
+                    : "，如 gpt-4o-mini"}
+            </span>
             <input
               className="settingsInput mono"
               value={config.model ?? ""}
-              placeholder="gpt-4o-mini"
+              placeholder={chatModelPlaceholder(providerId)}
               onChange={(e) => onConfigChange({ model: e.target.value })}
             />
           </div>

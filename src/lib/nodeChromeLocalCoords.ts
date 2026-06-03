@@ -38,15 +38,22 @@ export function computeInNodeChromePos({
   aboveExtra = DEFAULT_ABOVE_EXTRA,
   insideTopInset = DEFAULT_INSIDE_TOP_INSET,
 }: InNodeChromePosInput): { x: number; y: number; placement: GenPanelPlacement } {
-  let x = viewportDeltaToLocal(
+  const anchorLocalWidth = viewportDeltaToLocal(anchorRect.width, invZoom);
+  const anchorCenterX = viewportDeltaToLocal(
     anchorRect.left - mountRect.left + anchorRect.width / 2,
     invZoom,
   );
 
-  if (chromeLocalWidth > 0 && mountLocalWidth > 0) {
+  let x = anchorCenterX;
+
+  // 仅当顶/底栏比预览窄时做边界钳制；栏更宽时保持预览中心（translateX(-50%) 居中）
+  const clampSpan = anchorLocalWidth > 0 ? anchorLocalWidth : mountLocalWidth;
+  if (chromeLocalWidth > 0 && clampSpan > 0 && chromeLocalWidth <= clampSpan) {
     const minX = chromeLocalWidth / 2 + 8;
-    const maxX = mountLocalWidth - chromeLocalWidth / 2 - 8;
-    x = Math.max(minX, Math.min(x, maxX > minX ? maxX : minX));
+    const maxX = clampSpan - chromeLocalWidth / 2 - 8;
+    if (maxX >= minX) {
+      x = Math.max(minX, Math.min(anchorCenterX, maxX));
+    }
   }
 
   let y: number;

@@ -72,7 +72,7 @@ pub(crate) fn incoming_texts_ordered_with_prompt_fallback(
             continue;
         }
         if let Some(src) = node_by_id(graph, &e.source) {
-            if src.node_type == "textNode" {
+            if src.node_type == "textNode" || src.node_type == "llm" {
                 let p = src
                     .data
                     .get("prompt")

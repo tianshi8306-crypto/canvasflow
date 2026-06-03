@@ -463,16 +463,12 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
 
   return (
     <NodeChromeProvider>
-      {!showPreviewTopPortal ? (
-        <>
-          <NodeMetaLabel
-            label={data.label ?? ""}
-            defaultLabel="文本"
-            onCommit={commitLabel}
-          />
-          <NodeMetaStatus dimsText={dimsText} generating={isGenerating} progress={genProgress} />
-        </>
-      ) : null}
+      <NodeMetaLabel
+        label={data.label ?? ""}
+        defaultLabel="文本"
+        onCommit={commitLabel}
+      />
+      <NodeMetaStatus dimsText={dimsText} generating={isGenerating} progress={genProgress} />
 
       <NodeChromeShell
         selected={selected}
@@ -495,11 +491,6 @@ export function TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDa
         anchorRef={previewRef}
         active={showPreviewTopPortal}
         toolbarRef={previewToolbarRef}
-        label={data.label ?? ""}
-        onCommitLabel={commitLabel}
-        dimsText={dimsText}
-        generating={isGenerating}
-        progress={genProgress}
         onFormatExec={handleFormatExec}
         showFormat={showFormatInToolbar}
         onSyncFromScript={hasScriptUpstream ? handleSyncFromScript : undefined}

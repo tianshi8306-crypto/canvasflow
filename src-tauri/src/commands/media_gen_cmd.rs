@@ -60,6 +60,7 @@ pub async fn generate_image_asset(
             reference_image_paths,
             aspect,
             resolution,
+            count,
         )
         .await;
     }
@@ -110,7 +111,7 @@ pub async fn generate_image_asset(
         }
     }
 
-    let n = count.unwrap_or(1).max(1).min(4);
+    let n = dreamina_gen::normalize_image_generation_count(count);
     let mut rel_paths: Vec<String> = Vec::new();
     let root = PathBuf::from(&project_path);
 

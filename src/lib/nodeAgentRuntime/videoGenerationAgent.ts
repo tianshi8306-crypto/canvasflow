@@ -8,6 +8,10 @@ import {
   buildNamedAssetsForVideoGeneration,
   buildPanelOrderedRefs,
 } from "@/lib/seedance/videoPromptAtTokens";
+import {
+  buildVideoPanelTextRefs,
+  expandPromptTextAtReferences,
+} from "@/lib/promptUpstreamTextRefs";
 import { resolveOrderedVideoIncomingRefItems } from "@/hooks/useVideoIncomingReferenceItems";
 import { useProjectStore } from "@/store/projectStore";
 import { refreshDreaminaAuthOnGenerationFailure } from "@/lib/dreaminaAuthOnFailure";
@@ -54,6 +58,8 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
     const basePrompt = applyNoSubtitlePrompt(merged, draft.output.noSubtitles ?? false);
     const { nodes, edges } = useProjectStore.getState();
     const incoming = resolveOrderedVideoIncomingRefItems(ctx.nodeId, nodes, edges);
+    const textRefs = buildVideoPanelTextRefs(incoming);
+    const promptWithText = expandPromptTextAtReferences(basePrompt, textRefs);
     const panelOrder = buildPanelOrderedRefs(incoming);
     const namedAssets = buildNamedAssetsForVideoGeneration({
       videoNodeId: ctx.nodeId,
@@ -63,7 +69,7 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
     });
     const { expandedPrompt, imagePaths: atImagePaths, videoPaths: atVideoPaths, audioPaths: atAudioPaths } =
       buildSeedancePromptSimple(
-        basePrompt,
+        promptWithText,
         draft.referenceImagePaths,
         draft.referenceVideoPaths,
         draft.referenceAudioPaths,

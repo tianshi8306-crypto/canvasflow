@@ -76,6 +76,21 @@ export const SettingsChatProvidersSection = memo(function SettingsChatProvidersS
     [onSettingsChange, settings.providers],
   );
 
+  const handleRemoveProvider = useCallback(
+    (id: string) => {
+      const nextProviders = settings.providers.filter((p) => p.id !== id);
+      const patch: Partial<AppSettings> = { providers: nextProviders };
+      if (settings.defaultProviderId === id) {
+        const fallback = nextProviders.find(
+          (p) => p.enabled && providerSupportsCapability(p.id, "chat"),
+        );
+        patch.defaultProviderId = fallback?.id ?? null;
+      }
+      onSettingsChange(patch);
+    },
+    [onSettingsChange, settings.defaultProviderId, settings.providers],
+  );
+
   const providerConfigs = useMemo<Record<ProviderId, ProviderCardConfig>>(() => {
     const map: Record<string, ProviderCardConfig> = {};
     for (const id of displayProviderIds) {
@@ -231,7 +246,7 @@ export const SettingsChatProvidersSection = memo(function SettingsChatProvidersS
       ) : null}
 
       {displayProviderIds.length === 0 ? (
-        <p className="settings-desc">请从右上角添加对话服务商，或保存后使用默认 OpenAI 兼容项。</p>
+        <p className="settings-desc">请从右上角添加对话服务商，或保存后使用默认 DeepSeek 配置。</p>
       ) : (
         <div className="settingsProviderList">
           {displayProviderIds.map((id) => {
@@ -255,6 +270,7 @@ export const SettingsChatProvidersSection = memo(function SettingsChatProvidersS
                 testMessage={testMessages[id]}
                 onConfigChange={(patch) => handleProviderConfigChange(id, patch)}
                 onApiKeyChange={(field, value) => handleApiKeyChange(id, field, value)}
+                onRemove={() => handleRemoveProvider(id)}
               />
             );
           })}

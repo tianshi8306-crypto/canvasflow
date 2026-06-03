@@ -77,4 +77,32 @@ describe("computeInNodeChromePos", () => {
 
     expect(pos.x).toBe(200);
   });
+
+  it("keeps preview center when chrome is wider than narrow preview (9:16)", () => {
+    const previewLocalW = 281;
+    const pos = computeInNodeChromePos({
+      anchorRect: { left: 100, top: 200, bottom: 700, width: previewLocalW },
+      mountRect,
+      mountLocalWidth: previewLocalW,
+      chromeLocalWidth: 500,
+      placement: "below",
+      invZoom: 1,
+    });
+
+    expect(pos.x).toBe(previewLocalW / 2);
+  });
+
+  it("keeps preview center for wide top toolbar on tall preview", () => {
+    const previewLocalW = 281;
+    const pos = computeInNodeChromePos({
+      anchorRect: { left: 50, top: 100, bottom: 600, width: previewLocalW },
+      mountRect: { left: 50, top: 100 },
+      mountLocalWidth: previewLocalW,
+      chromeLocalWidth: 420,
+      placement: "above",
+      invZoom: 1,
+    });
+
+    expect(pos.x).toBe(previewLocalW / 2);
+  });
 });

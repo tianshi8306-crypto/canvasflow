@@ -1,6 +1,9 @@
 import type { Edge, Node } from "@xyflow/react";
 import { invoke } from "@tauri-apps/api/core";
-import type { ImageStyleId } from "@/lib/imageGeneration/catalog";
+import {
+  normalizeImageGenerationCount,
+  type ImageStyleId,
+} from "@/lib/imageGeneration/catalog";
 import {
   applyModelImageTaskCapabilities,
   imageModelCapabilitiesFromConfig,
@@ -12,6 +15,15 @@ import {
   stripImageStyleTokensFromPrompt,
 } from "@/lib/imageGeneration/imageStyleTokens";
 import { resolveImageGenerationContext } from "@/lib/imageGeneration/resolveImageGenerationContext";
+import { collectIncomingImagePanelItems } from "@/lib/imageGeneration/collectIncomingImagePanelItems";
+import {
+  orderIncomingImagePanelRefs,
+  readImageReferenceEdgeOrder,
+} from "@/lib/imageGeneration/imageReferenceEdgeOrder";
+import {
+  buildImagePanelTextRefs,
+  expandPromptTextAtReferences,
+} from "@/lib/promptUpstreamTextRefs";
 import type { ImageModelOption } from "@/hooks/useImageModels";
 import {
   buildBuiltinImageModels,
@@ -97,7 +109,18 @@ export async function prepareImageGenerationRun(
   if (ctx.blockReason) return { ok: false, reason: ctx.blockReason };
 
   const stripped = stripImageStyleTokensFromPrompt(promptRaw).trim();
-  const effective = ctx.aggregatedPrompt.trim() || stripped;
+  const { items: rawPanelItems } = collectIncomingImagePanelItems(nodes, edges, imageNodeId);
+  const orderedPanelItems = orderIncomingImagePanelRefs(
+    rawPanelItems,
+    readImageReferenceEdgeOrder(
+      node.data.params && typeof node.data.params === "object"
+        ? (node.data.params as Record<string, unknown>)
+        : undefined,
+    ),
+  );
+  const textRefs = buildImagePanelTextRefs(orderedPanelItems);
+  const effectiveRaw = ctx.aggregatedPrompt.trim() || stripped;
+  const effective = expandPromptTextAtReferences(effectiveRaw, textRefs);
   if (!effective) return { ok: false, reason: "请输入图片提示词" };
   if (!ctx.task) return { ok: false, reason: "无法推断图片生成任务" };
 
@@ -107,10 +130,7 @@ export async function prepareImageGenerationRun(
       : {};
   const outputParams = readImageOutputParams(params);
   const imageCountRaw = params.imageCount;
-  const count =
-    typeof imageCountRaw === "number" && imageCountRaw >= 1 && imageCountRaw <= 4
-      ? imageCountRaw
-      : 1;
+  const count = normalizeImageGenerationCount(imageCountRaw);
   const apiSize = resolveImageApiSize(
     outputParams.aspect,
     outputParams.resolution,

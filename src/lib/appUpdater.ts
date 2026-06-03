@@ -46,12 +46,24 @@ export async function checkForAppUpdateOnceAtStartup(): Promise<PendingAppUpdate
   if (!isTauri()) return null;
   if (sessionStorage.getItem(STARTUP_CHECK_KEY) === "1") return null;
   sessionStorage.setItem(STARTUP_CHECK_KEY, "1");
+  try {
+    return await checkForAppUpdateManual({ respectSkipped: true });
+  } catch (err) {
+    if (isLikelyOfflineError(err)) return null;
+    console.debug("[appUpdater] check failed", err);
+    return null;
+  }
+}
 
+/** 设置页手动检查更新；默认不跳过已忽略版本。 */
+export async function checkForAppUpdateManual(opts?: {
+  respectSkipped?: boolean;
+}): Promise<PendingAppUpdate | null> {
+  if (!isTauri()) return null;
   try {
     const update = await check();
     if (!update) return null;
-    if (isUpdateSkipped(update.version)) return null;
-
+    if (opts?.respectSkipped && isUpdateSkipped(update.version)) return null;
     const currentVersion = await getVersion();
     return {
       version: update.version,
@@ -61,8 +73,7 @@ export async function checkForAppUpdateOnceAtStartup(): Promise<PendingAppUpdate
     };
   } catch (err) {
     if (isLikelyOfflineError(err)) return null;
-    console.debug("[appUpdater] check failed", err);
-    return null;
+    throw err instanceof Error ? err : new Error(String(err));
   }
 }
 

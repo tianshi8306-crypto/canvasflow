@@ -13,8 +13,22 @@ function die(msg) {
   process.exit(1);
 }
 
+function resolveCmd(cmd) {
+  if (process.platform === "win32") {
+    if (cmd === "npm") return "npm.cmd";
+    if (cmd === "npx") return "npx.cmd";
+  }
+  return cmd;
+}
+
 function run(cmd, args, opts = {}) {
-  const r = spawnSync(cmd, args, { stdio: "inherit", shell: false, ...opts });
+  const resolved = resolveCmd(cmd);
+  const useShell = process.platform === "win32" && resolved.endsWith(".cmd");
+  const r = spawnSync(resolved, args, {
+    stdio: "inherit",
+    shell: useShell,
+    ...opts,
+  });
   if (r.error) throw r.error;
   if (typeof r.status === "number" && r.status !== 0) {
     throw new Error(`${cmd} ${args.join(" ")} failed with ${r.status}`);
@@ -300,10 +314,9 @@ function main() {
   }
 
   ensureBundledFfmpeg();
+  ensureCiTargetCopies(path.join(BIN_DIR, ffmpegExeName()));
 
   if (args.has("--ci-prep")) {
-    const bin = ensureBundledFfmpeg();
-    ensureCiTargetCopies(bin);
     patchTauriExternalBinPermanent();
     console.log("[tauri] CI release prep complete");
     return;

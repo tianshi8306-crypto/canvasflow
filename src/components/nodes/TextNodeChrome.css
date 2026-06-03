@@ -116,6 +116,45 @@
   flex-shrink: 0;
 }
 
+.textGenPanel--v2 .tgp-v2-zone-a-start {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.textGenPanel--v2 .tgp-upstream-text-tags {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  max-width: 55%;
+  overflow: hidden;
+}
+
+.textGenPanel--v2 .tgp-upstream-text-tag {
+  flex-shrink: 0;
+  max-width: 120px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(20, 184, 166, 0.28);
+  background: rgba(20, 184, 166, 0.12);
+  color: #7dd3c0;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.textGenPanel--v2 .tgp-upstream-text-tag:hover {
+  background: rgba(20, 184, 166, 0.2);
+  color: #99f6e4;
+}
+
 .textGenPanel--v2 .tgp-v2-hint {
   flex: 1;
   min-width: 0;

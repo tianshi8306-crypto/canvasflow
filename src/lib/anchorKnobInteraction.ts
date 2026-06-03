@@ -24,6 +24,16 @@ export function clientToKnobPos(zone: DOMRect, clientX: number, clientY: number)
   };
 }
 
+/** 指针是否落在锚点热区内（进入即磁吸跟随十字） */
+export function isPointerInAnchorZone(zone: DOMRect, clientX: number, clientY: number): boolean {
+  return (
+    clientX >= zone.left &&
+    clientX <= zone.right &&
+    clientY >= zone.top &&
+    clientY <= zone.bottom
+  );
+}
+
 /** 指针与默认圆心距离（用于进入磁吸） */
 export function distanceToRestingKnob(
   zone: DOMRect,

@@ -3,6 +3,7 @@ import { parseAtReferences, type NamedAsset } from "@/lib/seedance/promptBuilder
 import { IMAGE_STYLE_TOKEN_RE, isImageStyleId } from "@/lib/imageGeneration/imageStyleTokens";
 import { IMAGE_STYLE_OPTIONS, type ImageStyleId } from "@/lib/imageGeneration/catalog";
 import type { ResolvedIncomingImageRef } from "@/lib/imageGeneration/types";
+import type { IncomingImagePanelRef } from "@/lib/imageGeneration/types";
 
 const MENTION_NODE_RE = /@\[([^\]]+)\]/;
 
@@ -13,6 +14,11 @@ const styleLabelById = Object.fromEntries(
 /** 图片参考条序号 token：@图片N（与视频 VGP 同宽，保证 pill 占位足够） */
 export function imageRefAtToken(slot: number): string {
   return `@图片${slot}`;
+}
+
+/** 参考条全局序号 token（与视频 VGP 一致：含图片/文本混排） */
+export function imageTextRefAtToken(slot: number): string {
+  return `@文本${slot}`;
 }
 
 /** 面板序号 token（@图片N / 旧版 @图N） */
@@ -426,4 +432,32 @@ export function remapImagePromptRefOrder(
     next = next.slice(0, ref.startIndex) + newToken + next.slice(ref.endIndex);
   }
   return next;
+}
+
+export type ImageTextRefPickerItem = {
+  sourceNodeId: string;
+  insertToken: string;
+  menuTitle: string;
+  menuShortcut: string;
+  displayToken?: string;
+};
+
+/** @ 浮层：连线的文本 / LLM 上游（序号与参考条全局位置一致） */
+export function imageTextRefPickerItems(
+  panelItems: IncomingImagePanelRef[],
+): ImageTextRefPickerItem[] {
+  const out: ImageTextRefPickerItem[] = [];
+  panelItems.forEach((item, index) => {
+    if (item.kind !== "text") return;
+    const slot = index + 1;
+    const label = item.nodeLabel.trim() || "文本节点";
+    out.push({
+      sourceNodeId: item.sourceNodeId,
+      insertToken: imageTextRefAtToken(slot),
+      menuTitle: `文本 ${slot}`,
+      menuShortcut: `(@${slot})`,
+      displayToken: `@${label}`,
+    });
+  });
+  return out;
 }

@@ -1,22 +1,32 @@
 import { useState } from "react";
 import { useProjectAssetOrganize } from "@/hooks/useProjectAssetOrganize";
 
-export function SettingsProjectAssetsSection() {
+type Props = {
+  /** diagnostics：关于页高级区块，文案更短 */
+  variant?: "default" | "diagnostics";
+};
+
+export function SettingsProjectAssetsSection({ variant = "default" }: Props) {
   const { projectPath, syncIndex, previewOrganize, executeOrganize } = useProjectAssetOrganize();
   const [previewText, setPreviewText] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   return (
-    <div className="settingsSection">
-      <div className="settingsSectionTitle">工程素材目录</div>
-      <p className="settingsFieldHint" style={{ marginBottom: 12 }}>
-        素材按<strong>类型</strong>放在 <code className="mono">assets/</code> 下一级目录，再分{" "}
-        <code className="mono">import/</code>（导入）与 <code className="mono">gen/来源/</code>
-        （AI 生成）。例如：
-        <code className="mono"> assets/video/import/clip.mp4</code>、
-        <code className="mono"> assets/image/gen/generate/…</code>。导出仍用{" "}
-        <code className="mono">assets/exports/</code>。
-      </p>
+    <div className={variant === "default" ? "settingsSection" : undefined}>
+      {variant === "default" ? (
+        <div className="settingsSectionTitle">工程素材目录</div>
+      ) : null}
+      {variant === "default" ? (
+        <p className="settingsFieldHint" style={{ marginBottom: 12 }}>
+          素材按<strong>类型</strong>放在 <code className="mono">assets/</code> 下一级目录，再分{" "}
+          <code className="mono">import/</code>（导入）与 <code className="mono">gen/来源/</code>
+          （AI 生成）。导出仍用 <code className="mono">assets/exports/</code>。
+        </p>
+      ) : (
+        <p className="settingsFieldHint" style={{ marginBottom: 12 }}>
+          将工程内素材路径整理到标准 <code className="mono">assets/</code> 结构，并同步画布引用。
+        </p>
+      )}
 
       {!projectPath ? (
         <p className="settingsFieldHint">请先打开工程后再整理素材目录。</p>

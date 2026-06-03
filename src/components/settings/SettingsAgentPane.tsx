@@ -37,7 +37,7 @@ export function SettingsAgentPane({
     <>
       <SettingsPageHead
         title="Agent"
-        description="灵体 Hermes 的自动执行、分镜建链、记忆与 MCP 扩展。"
+        description="Hermes 自动执行、分镜建链与记忆。"
       />
 
       <SettingsAgentSection />
@@ -120,20 +120,17 @@ export function SettingsAgentPane({
         </div>
       </div>
 
-      <SettingsMcpServersSection
-        settings={settings}
-        onChange={(patch) => setSettings((prev) => (prev ? { ...prev, ...patch } : prev))}
-      />
-
-      <SettingsCanvasMcpServerSection projectPath={projectPath} />
+      <details className="settingsAdvancedBlock">
+        <summary className="settingsAdvancedBlockSummary">高级集成（MCP）</summary>
+        <SettingsMcpServersSection
+          settings={settings}
+          onChange={(patch) => setSettings((prev) => (prev ? { ...prev, ...patch } : prev))}
+        />
+        <SettingsCanvasMcpServerSection projectPath={projectPath} />
+      </details>
 
       <div className="settingsSection">
         <div className="settingsSectionTitle">对话模板</div>
-        <div className="settingsField">
-          <span className="settingsFieldHint">
-            Hermes 仅通过画布 <strong>H</strong> 浮窗对话驱动：识别到可执行意图后自动在画布落结果。请在画布审核；不满意时继续对话或改节点。
-          </span>
-        </div>
         <SettingsHermesPlanTemplates />
       </div>
 
@@ -141,7 +138,7 @@ export function SettingsAgentPane({
         <div className="settingsSectionTitle">记忆</div>
         <div className="settingsField">
           <span className="settingsFieldHint">
-            「教给 Hermes」写入的经验会保存为 Markdown，并在本工程检索时优先召回。默认保存在工程目录内；也可指定统一文件夹（按工程名分子目录）。
+            「教给 Hermes」的经验保存为 Markdown，本工程检索时优先召回。
           </span>
           <div className="settingsField">
             <label className="settingsFieldLabel">保存位置</label>

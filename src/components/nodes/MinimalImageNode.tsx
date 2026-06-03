@@ -106,12 +106,21 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
       if (!(target instanceof Element)) return;
       const inPanel = panelRef.current?.contains(target);
       const inToolbar = previewToolbarRef.current?.contains(target);
-      if (!inPanel && !inToolbar) {
+      const inExpandedGenPanel =
+        expandedGenPanelId === id && Boolean(target.closest(".igp-expanded-overlay"));
+      if (!inPanel && !inToolbar && !inExpandedGenPanel) {
         document.getSelection()?.removeAllRanges();
         (document.activeElement as HTMLElement)?.blur?.();
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target;
+      const inExpandedGenPanel =
+        expandedGenPanelId === id &&
+        (target instanceof Element
+          ? Boolean(target.closest(".igp-expanded-overlay"))
+          : false);
+      if (inExpandedGenPanel) return;
       if (e.key === "Escape") {
         document.getSelection()?.removeAllRanges();
         (document.activeElement as HTMLElement)?.blur?.();
@@ -129,7 +138,7 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [selected, deleteSelection]);
+  }, [selected, deleteSelection, expandedGenPanelId, id]);
 
   const nodeStatus = data.status;
   const genProgressInput = {

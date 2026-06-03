@@ -101,14 +101,14 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             providers: vec![ProviderConfig {
-                id: "openai-compatible-1".into(),
-                label: "OpenAI 兼容".into(),
-                base_url: "https://api.openai.com/v1".into(),
-                model: "gpt-4o-mini".into(),
+                id: "deepseek".into(),
+                label: "DeepSeek".into(),
+                base_url: "https://api.deepseek.com/v1".into(),
+                model: "deepseek-v4-flash".into(),
                 priority: 0,
                 enabled: true,
             }],
-            default_provider_id: Some("openai-compatible-1".into()),
+            default_provider_id: Some("deepseek".into()),
             ffmpeg_path: None,
             image_models: Vec::new(),
             video_models: Vec::new(),

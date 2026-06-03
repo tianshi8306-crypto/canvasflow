@@ -7,7 +7,7 @@ use serde_json::json;
 use std::collections::HashMap;
 use tauri::Emitter;
 
-use super::graph_flow::incoming_texts_ordered;
+use super::graph_flow::incoming_texts_ordered_with_prompt_fallback;
 
 pub(crate) fn build_llm_request_parts(
     settings: &AppSettings,
@@ -277,11 +277,27 @@ pub(crate) async fn run_llm_node(
         .unwrap_or("")
         .to_string();
 
-    let upstream = incoming_texts_ordered(graph, &node.id, outputs);
+    let model_input = node
+        .data
+        .get("params")
+        .and_then(|v| v.get("textModelInput"))
+        .and_then(|v| v.as_str())
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string());
+
+    let user_instruction = model_input.unwrap_or(prompt);
+
+    let upstream =
+        incoming_texts_ordered_with_prompt_fallback(graph, &node.id, outputs);
     let merged = if upstream.is_empty() {
-        prompt.clone()
+        user_instruction.clone()
     } else {
-        format!("{}\n\n—— 上游上下文 ——\n{}", prompt, upstream.join("\n\n"))
+        format!(
+            "{}\n\n—— 上游上下文 ——\n\n{}",
+            user_instruction,
+            upstream.join("\n\n")
+        )
     };
 
     let params = node.data.get("params").cloned().unwrap_or(json!({}));

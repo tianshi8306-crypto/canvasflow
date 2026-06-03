@@ -18,6 +18,14 @@ mod tests {
     use super::*;
 
     #[test]
+    fn normalizes_image_generation_count() {
+        assert_eq!(normalize_image_generation_count(None), 1);
+        assert_eq!(normalize_image_generation_count(Some(2)), 2);
+        assert_eq!(normalize_image_generation_count(Some(3)), 2);
+        assert_eq!(normalize_image_generation_count(Some(4)), 4);
+    }
+
+    #[test]
     fn maps_pixel_size_to_dreamina_resolution_tier() {
         assert_eq!(
             normalize_resolution_type(Some("2048x1152")).as_deref(),
@@ -44,11 +52,30 @@ mod tests {
         assert_eq!(normalize_dreamina_duration(Some(-1)), None);
         assert_eq!(normalize_dreamina_duration(Some(5)), Some(5));
     }
+
+    #[test]
+    fn normalizes_dreamina_model_version_aliases() {
+        assert_eq!(
+            normalize_dreamina_model_version("3.0_fast"),
+            "3.0fast"
+        );
+        assert_eq!(normalize_dreamina_model_version("3.5_pro"), "3.5pro");
+    }
 }
 
 pub fn is_dreamina_model(model: &str) -> bool {
     let m = model.trim().to_lowercase();
     m.starts_with("dreamina/") || m == "dreamina"
+}
+
+/// 画布多图：仅 1 / 2 / 4（旧值 3 回落为 2）
+pub fn normalize_image_generation_count(count: Option<usize>) -> usize {
+    match count.unwrap_or(1).max(1).min(4) {
+        1 => 1,
+        2 => 2,
+        3 => 2,
+        _ => 4,
+    }
 }
 
 fn dreamina_model_version(model: &str) -> Option<String> {
@@ -68,7 +95,16 @@ fn dreamina_model_version(model: &str) -> Option<String> {
     if rest.is_empty() {
         None
     } else {
-        Some(rest.to_string())
+        Some(normalize_dreamina_model_version(rest))
+    }
+}
+
+fn normalize_dreamina_model_version(raw: &str) -> String {
+    match raw.trim().to_lowercase().as_str() {
+        "3.0_fast" => "3.0fast".into(),
+        "3.0_pro" => "3.0pro".into(),
+        "3.5_pro" => "3.5pro".into(),
+        _ => raw.trim().to_string(),
     }
 }
 
@@ -787,6 +823,44 @@ pub async fn generate_image_via_cli(
     reference_image_paths: Option<Vec<String>>,
     aspect: Option<String>,
     resolution: Option<String>,
+    count: Option<usize>,
+) -> Result<String, String> {
+    let n = normalize_image_generation_count(count);
+    let mut rel_paths: Vec<String> = Vec::new();
+    for i in 0..n {
+        let rel = generate_one_image_via_cli(
+            dreamina,
+            http,
+            project_path,
+            prompt,
+            model,
+            task,
+            reference_image_paths.clone(),
+            aspect.clone(),
+            resolution.clone(),
+            i + 1,
+        )
+        .await?;
+        rel_paths.push(rel);
+    }
+    if rel_paths.len() == 1 {
+        Ok(rel_paths.into_iter().next().unwrap())
+    } else {
+        Ok(serde_json::to_string(&rel_paths).unwrap())
+    }
+}
+
+async fn generate_one_image_via_cli(
+    dreamina: &DreaminaCliState,
+    http: &reqwest::Client,
+    project_path: &str,
+    prompt: &str,
+    model: &str,
+    task: Option<&str>,
+    reference_image_paths: Option<Vec<String>>,
+    aspect: Option<String>,
+    resolution: Option<String>,
+    seq: usize,
 ) -> Result<String, String> {
     ensure_logged_in(dreamina)?;
     let command_path = ensure_command_path(http)?;
@@ -857,12 +931,13 @@ pub async fn generate_image_via_cli(
         }
         downloaded = true;
         if let Some(local) = pick_first_output(&q.outputs, false) {
+            let seq_tag = format!("seq{seq}");
             let ctx = AssetWriteContext {
                 kind: "image",
                 source: "dreamina",
                 workflow: None,
                 node_id: None,
-                job_id: Some(submit_id.as_str()),
+                job_id: Some(seq_tag.as_str()),
             };
             return project_asset_store::copy_file_to_project_asset(&project, &local, &ctx);
         }

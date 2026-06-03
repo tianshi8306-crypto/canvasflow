@@ -8,6 +8,9 @@
 
 /** Provider 唯一标识符 */
 export type ProviderId =
+  | "deepseek"
+  | "doubao"
+  | "glm"
   | "openai"
   | "grsai"
   | "ppio"
@@ -38,6 +41,33 @@ export interface ProviderMeta {
  * 注意：dreamina (即梦) 需要 OAuth 登录，aicanvas 为前端占位
  */
 export const PROVIDERS_META: Record<ProviderId, ProviderMeta> = {
+  deepseek: {
+    id: "deepseek",
+    label: "DeepSeek",
+    defaultUrl: "https://api.deepseek.com/v1",
+    logoPath: null,
+    supportsModelKey: false,
+    needsOAuth: false,
+    getKeyUrl: "https://platform.deepseek.com/api_keys",
+  },
+  doubao: {
+    id: "doubao",
+    label: "豆包 (Doubao)",
+    defaultUrl: "https://ark.cn-beijing.volces.com/api/v3",
+    logoPath: null,
+    supportsModelKey: false,
+    needsOAuth: false,
+    getKeyUrl: "https://console.volcengine.com/ark",
+  },
+  glm: {
+    id: "glm",
+    label: "智谱 GLM",
+    defaultUrl: "https://open.bigmodel.cn/api/paas/v4",
+    logoPath: null,
+    supportsModelKey: false,
+    needsOAuth: false,
+    getKeyUrl: "https://open.bigmodel.cn/usercenter/apikeys",
+  },
   openai: {
     id: "openai",
     label: "OpenAI",
@@ -126,7 +156,14 @@ export function getProviderMeta(id: string): ProviderMeta | undefined {
 const MODEL_DISPLAY_NAMES: Record<string, string> = {
   "minimax/minimax-m2.5-highspeed": "MiniMax M2.5-highspeed",
   "qwen/qwen3.5-397b-a17b": "Qwen3.5-397B-A17B",
+  "deepseek-v4-flash": "DeepSeek V4 Flash",
+  "deepseek-v4-pro": "DeepSeek V4 Pro",
+  "deepseek-chat": "DeepSeek Chat",
+  "deepseek-reasoner": "DeepSeek Reasoner",
   "deepseek/deepseek-v3.2": "DeepSeek-V3.2",
+  "doubao-pro-32k": "Doubao Pro 32K",
+  "glm-4-flash": "GLM-4 Flash",
+  "glm-4-plus": "GLM-4 Plus",
   "moonshotai/kimi-k2.5": "Kimi K2.5",
   "ppio/seedream-5.0-lite": "Seedream 图片生成 5.0 lite",
   "ppio/seedream-4.5": "即梦 4.5",
@@ -189,9 +226,11 @@ const MODEL_DISPLAY_NAMES: Record<string, string> = {
   "dreamina/text2image": "即梦 文生图",
   "dreamina/image2image": "即梦 图生图",
   "dreamina/4.0": "即梦 4.0",
-  "dreamina/4.1": "即梦4.1",
-  "dreamina/4.5": "即梦4.5",
-  "dreamina/5.0": "即梦5.0",
+  "dreamina/4.1": "即梦 4.1",
+  "dreamina/4.5": "即梦 4.5",
+  "dreamina/4.6": "即梦 4.6",
+  "dreamina/5.0": "即梦 5.0",
+  "dreamina/3.1": "即梦 3.1",
   "dreamina/text2video": "即梦 文生视频",
   "dreamina/image2video": "即梦 图生视频",
   "dreamina/seedance2.0fast": "即梦 Seedance 2.0 Fast",
@@ -215,6 +254,9 @@ export function getDisplayModelName(modelId: string): string {
 
 /** 需要连接测试的 Provider ID 列表（按优先级） */
 export const DEFAULT_PROVIDER_TEST_IDS: ProviderId[] = [
+  "deepseek",
+  "doubao",
+  "glm",
   "apimart",
   "openai",
   "ppio",

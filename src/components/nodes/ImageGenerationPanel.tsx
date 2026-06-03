@@ -24,6 +24,7 @@ import {
   type ImageResolutionTierId,
   type ImageStyleId,
   type ImageTaskMode,
+  normalizeImageGenerationCount,
 } from "@/lib/imageGeneration/catalog";
 import {
   imageTaskMetaChipLabel,
@@ -52,7 +53,10 @@ import {
   reorderImagePanelRefEdgeOrder,
   syncImagePanelReferenceEdgeOrder,
 } from "@/lib/imageGeneration/imageReferenceEdgeOrder";
-import { remapImagePromptRefOrder } from "@/lib/imageGeneration/imagePromptAtTokens";
+import {
+  remapImagePromptRefOrder,
+  imageTextRefPickerItems,
+} from "@/lib/imageGeneration/imagePromptAtTokens";
 import type { ResolvedIncomingImagePanelRef, ResolvedIncomingImageRef } from "@/lib/imageGeneration/types";
 import { imageGenerationAgentRuntime } from "@/lib/nodeAgentRuntime/imageGenerationAgent";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
@@ -248,10 +252,7 @@ export function ImageGenerationPanel({
   const outputParams = useMemo(() => readImageOutputParams(params), [params]);
   const modelId = typeof params?.[PARAM_IMAGE_MODEL] === "string" ? params[PARAM_IMAGE_MODEL] : "";
   const imageCountRaw = params?.[PARAM_IMAGE_COUNT];
-  const imageCount =
-    typeof imageCountRaw === "number" && imageCountRaw >= 1 && imageCountRaw <= 4
-      ? imageCountRaw
-      : 1;
+  const imageCount = normalizeImageGenerationCount(imageCountRaw);
   const ctx = useImageGenerationContext(nodeId, prompt);
 
   const incomingPanelRaw = useMemo(
@@ -312,6 +313,11 @@ export function ImageGenerationPanel({
   const displayImageRefs = useMemo(
     (): ResolvedIncomingImageRef[] =>
       displayPanelItems.filter((i): i is ResolvedIncomingImageRef => i.kind === "image"),
+    [displayPanelItems],
+  );
+
+  const textPickerItems = useMemo(
+    () => imageTextRefPickerItems(displayPanelItems),
     [displayPanelItems],
   );
 
@@ -798,11 +804,12 @@ export function ImageGenerationPanel({
           value={prompt}
           onChange={setPrompt}
           incomingRefs={displayImageRefs}
+          textPickerItems={textPickerItems}
           nodeLabels={nodeLabels}
           placeholder={
             displayPanelItems.length > 0
-              ? "描述你想要生成的内容，@ 可引用参考图（如 @图片1，序号与顶栏一致）或 Shift+单击文本参考插入 @，按 / 呼出指令"
-              : "描述你想要生成的内容，使用 @可快速引用上传的文件，按 / 呼出指令"
+              ? "描述你想要生成的内容；@ 可引用 @文本1 / @图片1（序号与顶栏参考条一致），Shift+单击文本条亦可插入"
+              : "描述你想要生成的内容，使用 @ 引用已连线的上游节点，按 / 呼出指令"
           }
           className={`image-prompt-mention--compact ${textareaClass}`}
           maxLength={IMAGE_GENERATION_PROMPT_MAX_CHARS}

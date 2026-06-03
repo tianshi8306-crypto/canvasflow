@@ -40,7 +40,7 @@ export function ImageModelPicker({ models, value, onChange, onOpenChange, loadin
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const orderedModels = useMemo(
-    () => [...models].sort((a, b) => a.sortIndex - b.sortIndex),
+    () => [...models].sort((a, b) => a.priority - b.priority || a.sortIndex - b.sortIndex),
     [models],
   );
 

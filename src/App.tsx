@@ -29,6 +29,7 @@ import {
 } from "@/lib/textNodeContainerMode";
 import { useNodeStatusListener } from "@/hooks/useNodeStatus";
 import { useProjectAutoSaveSettingsSync } from "@/hooks/useProjectAutoSaveSettingsSync";
+import { useCanvasSettingsSync } from "@/hooks/useCanvasSettingsSync";
 import type { SettingsCategory } from "@/components/SettingsNav";
 
 type OpenSettingsDetail = {
@@ -44,6 +45,7 @@ export default function App() {
     nonce: number;
   }>({ category: null, focusSectionId: null, nonce: 0 });
   useProjectAutoSaveSettingsSync();
+  useCanvasSettingsSync();
 
   const scriptFullscreenNodeId = useProjectStore((s) => s.scriptFullscreenNodeId);
   const composeEditorNodeId = useCanvasUiStore((s) => s.composeEditorNodeId);
@@ -361,6 +363,10 @@ export default function App() {
         initialCategory={settingsOpenRequest.category}
         focusSectionId={settingsOpenRequest.focusSectionId}
         openRequestNonce={settingsOpenRequest.nonce}
+        onOpenShortcuts={() => {
+          setSettingsOpen(false);
+          toggleShortcutsOverlay();
+        }}
       />
       {scriptFullscreenNodeId ? <ScriptNodeFullscreenOverlay /> : null}
       {composeEditorNodeId ? <ComposeEditorOverlay /> : null}

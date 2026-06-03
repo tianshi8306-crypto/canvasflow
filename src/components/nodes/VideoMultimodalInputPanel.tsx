@@ -682,7 +682,7 @@ export function VideoMultimodalInputPanel({
             onChange={(next) => patchDraft({ prompt: next })}
             placeholder={
               orderedIncomingRefItems.length > 0
-                ? "描述画面与动作… @ 可写 @图片1、文件名、节点名；序号与参考条一致"
+                ? "描述画面与动作… @ 可写 @文本1、@图片1（序号与参考条一致）或节点名"
                 : "描述你想要的画面、场景、动作…"
             }
           />

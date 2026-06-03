@@ -141,6 +141,8 @@ function FlowCanvasInner() {
   const setAudioTtsPanelExpandedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelExpandedNodeId);
   const setViewportInteracting = useCanvasUiStore((s) => s.setViewportInteracting);
   const minimapVisible = useCanvasUiStore((s) => s.minimapVisible);
+  const gridDotsVisible = useCanvasUiStore((s) => s.gridDotsVisible);
+  const connectionLinesVisible = useCanvasUiStore((s) => s.connectionLinesVisible);
   const nodeSnapVisual = useCanvasUiStore((s) => s.nodeSnapVisual);
   const pendingAddPanelAt = useCanvasUiStore((s) => s.pendingAddPanelAt);
   const clearPendingAddPanelAt = useCanvasUiStore((s) => s.clearPendingAddPanelAt);
@@ -296,7 +298,7 @@ function FlowCanvasInner() {
     [pulseNodeIds],
   );
 
-  const { edgeView, nodesView } = useEdgeViewModel({
+  const { edgeView: rawEdgeView, nodesView } = useEdgeViewModel({
     nodes,
     edges,
     selectedNodeIds,
@@ -304,6 +306,12 @@ function FlowCanvasInner() {
     nodeRunStateById,
     hermesPulseNodeIds,
   });
+
+  const edgeView = useMemo(
+    () =>
+      connectionLinesVisible ? rawEdgeView : rawEdgeView.map((e) => ({ ...e, hidden: true })),
+    [connectionLinesVisible, rawEdgeView],
+  );
 
   // ── Gallery query ──────────────────────────────────────────────────────
 
@@ -732,7 +740,7 @@ function FlowCanvasInner() {
         noWheelClassName="nowheel"
         noPanClassName="nopan"
       >
-        <Background gap={18} size={1} color={CANVAS_BACKGROUND_DOT} />
+        {gridDotsVisible ? <Background gap={18} size={1} color={CANVAS_BACKGROUND_DOT} /> : null}
         {minimapVisible ? (
           <MiniMap pannable zoomable position="bottom-right" />
         ) : null}

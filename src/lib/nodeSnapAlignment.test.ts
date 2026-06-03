@@ -13,6 +13,22 @@ function n(id: string, x: number, y: number, w = 200, h = 100): Node {
 }
 
 describe("snapNodePositionChanges", () => {
+  it("snaps moving node center to target center horizontally", () => {
+    const nodes = [n("a", 0, 0, 200, 100), n("b", 2, 40, 200, 100)];
+    const changes: NodeChange[] = [
+      {
+        type: "position",
+        id: "b",
+        position: { x: 2, y: 40 },
+        dragging: true,
+      },
+    ];
+    const { changes: out, visual } = snapNodePositionChanges(changes, nodes);
+    const pos = (out[0] as { position: { x: number; y: number } }).position;
+    expect(pos.x).toBe(0);
+    expect(visual?.guides.some((g) => g.axis === "x")).toBe(true);
+  });
+
   it("snaps moving node left edge to target right edge", () => {
     const nodes = [n("a", 0, 0), n("b", 192, 5)];
     const changes: NodeChange[] = [

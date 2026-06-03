@@ -70,7 +70,7 @@ describe("planHermesBatchImageJobs", () => {
       edges,
     });
     expect(jobs).toEqual([
-      { beatId: "b1", imageNodeId: "i1", imageCount: 3 },
+      { beatId: "b1", imageNodeId: "i1", imageCount: 2 },
       { beatId: "b2", imageNodeId: "i2", imageCount: 1 },
     ]);
   });

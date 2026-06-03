@@ -3,6 +3,9 @@ import type { ProviderId } from "@/lib/providers";
 
 /** 各厂商在画布节点中支持的模型能力（与设置「API 配置」卡片 id 对齐） */
 const PROVIDER_CAPABILITIES: Record<ProviderId, ProviderCapability[]> = {
+  deepseek: ["chat"],
+  doubao: ["chat"],
+  glm: ["chat"],
   openai: ["chat", "audio"],
   grsai: ["chat", "image"],
   ppio: ["chat", "image"],

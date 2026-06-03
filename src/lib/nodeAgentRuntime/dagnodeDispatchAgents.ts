@@ -1,5 +1,7 @@
 import type { FlowNodeData } from "@/lib/types";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
+import { resolveMentionNodeTokens } from "@/lib/promptUpstreamTextRefs";
+import { useProjectStore } from "@/store/projectStore";
 
 type DispatchFn = (fromNodeId: string, force?: boolean) => Promise<void>;
 
@@ -63,7 +65,9 @@ export const textNodeDispatchAgentRuntime: NodeTaskAgentRuntime<
 > = {
   agentName: "文本调度 Agent",
   sense: ({ prompt, modelInput, dispatch }) => {
-    const normalizedPrompt = (modelInput.trim() || prompt.trim()).trim();
+    const nodes = useProjectStore.getState().nodes;
+    const raw = (modelInput.trim() || prompt.trim()).trim();
+    const normalizedPrompt = resolveMentionNodeTokens(raw, nodes);
     if (!normalizedPrompt) {
       throw new Error("请先输入正文或模型输入，再触发执行");
     }

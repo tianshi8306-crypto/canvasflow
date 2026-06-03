@@ -61,6 +61,8 @@ npm run test:rust
 ### 安全与产物
 
 - [ ] **API Key** 未写入 `canvasflow.json` 或导出 zip（抽查工程目录）  
+- [ ] **干净机器 / 新用户**：安装 release 包后设置页 Key 为空；开发 Key 仅在 `%APPDATA%\canvasflow-dev\`（dev）与 `%APPDATA%\canvasflow\`（release）隔离  
+- [ ] **明文 vault**：release 启动后 `%APPDATA%\canvasflow\api-keys.json` 应不存在（Key 仅在系统凭据管理器；仅 keyring 不可用时才保留兜底文件）  
 - [ ] **时间线导出**（若本轮动 FFmpeg）：`assets/exports/` 下有成片或预期错误提示可读  
 - [ ] **工作流**（若本轮动执行器）：至少一个 LLM/脚本节点运行有状态反馈（非静默失败）
 

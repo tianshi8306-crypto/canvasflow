@@ -64,6 +64,7 @@ pub fn run() {
         .manage(dreamina_state)
         .manage(Arc::new(canvas_mcp_bridge::CanvasMcpBridge::new()))
         .setup(|app| {
+            vault::migrate_plaintext_vault_to_keyring();
             canvas_mcp_bridge::start_canvas_mcp_bridge(app.handle().clone());
             Ok(())
         })

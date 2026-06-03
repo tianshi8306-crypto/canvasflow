@@ -1,12 +1,14 @@
+import { dreaminaCliImageOptions } from "@/lib/dreamina/cliModels";
+
 export type ImageModelOption = {
   id: string;
   label: string;
 };
 
-/** 内置默认露出（与 settings 预设一致；更多型号请用设置里「添加图片模型」） */
+/** 内置默认露出（Seedream API + 即梦 CLI 5.0/4.6；与 settings 预设一致） */
 export const IMAGE_MODEL_OPTIONS: ImageModelOption[] = [
   { id: "Doubao-Seedream-5.0-lite", label: "Seedream 5.0 Lite" },
-  { id: "dreamina/4.5", label: "即梦 4.5（CLI）" },
+  ...dreaminaCliImageOptions(),
 ];
 
 export type ImageTaskMode = "text_to_image" | "image_to_image" | "multi_ref_fusion" | "image_edit";
@@ -49,12 +51,28 @@ export const IMAGE_RESOLUTION_OPTIONS = IMAGE_RESOLUTION_TIERS.map((t) => ({
   resLabel: t.label,
 }));
 
+/** 图片节点可选生成张数：1×1 / 1×2 / 2×2 宫格 */
 export const IMAGE_COUNT_OPTIONS = [
   { id: 1, label: "1张" },
   { id: 2, label: "2张" },
-  { id: 3, label: "3张" },
   { id: 4, label: "4张" },
 ] as const;
+
+export type ImageGenerationCount = (typeof IMAGE_COUNT_OPTIONS)[number]["id"];
+
+const ALLOWED_IMAGE_COUNTS = new Set<number>(IMAGE_COUNT_OPTIONS.map((o) => o.id));
+
+/** 规范化张数（旧工程 imageCount=3 回落为 2） */
+export function normalizeImageGenerationCount(raw: unknown): ImageGenerationCount {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (n === 2 || n === 4) return n;
+  if (n === 3) return 2;
+  return 1;
+}
+
+export function isAllowedImageGenerationCount(raw: unknown): raw is ImageGenerationCount {
+  return typeof raw === "number" && ALLOWED_IMAGE_COUNTS.has(raw);
+}
 
 export type ImageStyleId =
   | "photorealistic"

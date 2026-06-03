@@ -37,21 +37,31 @@ const base: AppSettings = {
 };
 
 describe("ensureModelListDefaults", () => {
-  it("seeds 1 chat + 2 image + 2 video + 1 audio when empty", () => {
+  it("seeds chat + seedream + full dreamina CLI catalogs when empty", () => {
     const next = ensureModelListDefaults(base);
-    expect(next.providers.some((p) => p.model === "gpt-4o-mini")).toBe(true);
-    expect(next.imageModels).toHaveLength(2);
-    expect(next.videoModels).toHaveLength(2);
+    expect(next.providers.some((p) => p.id === "deepseek" && p.model === "deepseek-v4-flash")).toBe(true);
+    expect(next.defaultProviderId).toBe("deepseek");
+    expect(next.imageModels.some((m) => m.model === "Doubao-Seedream-5.0-lite")).toBe(true);
+    expect(next.imageModels.some((m) => m.model === "dreamina/5.0")).toBe(true);
+    expect(next.videoModels.some((m) => m.model === "dreamina/seedance2.0fast")).toBe(true);
     expect(next.audioModels).toHaveLength(1);
   });
 
-  it("does not replace existing image models", () => {
+  it("does not replace existing image models but merges missing dreamina CLI", () => {
     const next = ensureModelListDefaults({
       ...base,
       imageModels: [{ ...defaultImageModelPresets()[0]!, id: "custom-only" }],
     });
-    expect(next.imageModels).toHaveLength(1);
     expect(next.imageModels[0]?.id).toBe("custom-only");
+    expect(next.imageModels.some((m) => m.model === "dreamina/5.0")).toBe(true);
+  });
+
+  it("merges missing dreamina image preset when only seedream exists", () => {
+    const next = ensureModelListDefaults({
+      ...base,
+      imageModels: [{ ...defaultImageModelPresets()[0]! }],
+    });
+    expect(next.imageModels.some((m) => m.model === "dreamina/5.0")).toBe(true);
   });
 
   it("merges missing dreamina video preset when only doubao exists", () => {
@@ -71,12 +81,20 @@ describe("ensureModelListDefaults", () => {
         },
       ],
     });
-    expect(next.videoModels).toHaveLength(2);
     expect(next.videoModels.some((m) => m.model === "dreamina/seedance2.0")).toBe(true);
+    expect(next.videoModels.some((m) => m.model === "dreamina/seedance2.0fast")).toBe(true);
+    expect(next.videoModels.length).toBeGreaterThan(2);
   });
 });
 
 describe("listAddableChatProviderIds", () => {
+  it("lists deepseek first among addable providers", () => {
+    const ids = listAddableChatProviderIds([]);
+    expect(ids[0]).toBe("deepseek");
+    expect(ids).toContain("doubao");
+    expect(ids).toContain("glm");
+  });
+
   it("excludes dreamina and already configured", () => {
     const ids = listAddableChatProviderIds([
       { id: "openai", label: "x", baseUrl: "", model: "m", priority: 0, enabled: true },

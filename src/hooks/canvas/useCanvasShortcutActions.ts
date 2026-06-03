@@ -18,6 +18,12 @@ export function isCanvasShortcutBlockedTarget(target: EventTarget | null): boole
       ].join(","),
     ),
   );
+  const inExpandedGenPanel = (node: HTMLElement | null) =>
+    Boolean(
+      node?.closest(
+        ".igp-expanded-overlay, .tgp-expanded-overlay, .sgp-expanded-overlay, .atp-expanded-overlay",
+      ),
+    );
   const isEditableEl = (node: HTMLElement | null) =>
     Boolean(
       node &&
@@ -29,7 +35,13 @@ export function isCanvasShortcutBlockedTarget(target: EventTarget | null): boole
             "input, textarea, select, [contenteditable='true'], [contenteditable='plaintext-only'], .canvasShortcutsOverlayCard",
           )),
     );
-  return isEditableEl(el) || isEditableEl(active) || textNodeEditingMode;
+  return (
+    isEditableEl(el) ||
+    isEditableEl(active) ||
+    textNodeEditingMode ||
+    inExpandedGenPanel(el) ||
+    inExpandedGenPanel(active)
+  );
 }
 
 export function useCanvasShortcutActions() {

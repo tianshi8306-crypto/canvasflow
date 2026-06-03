@@ -31,10 +31,10 @@ import {
   normalizeHermesMemoryRoot,
 } from "@/lib/hermes/knowledge/hermesMemoryPaths";
 import { useProjectStore } from "@/store/projectStore";
-import { SettingsProjectAssetsSection } from "@/components/settings/SettingsProjectAssetsSection";
-import { SettingsMaterialLibrarySection } from "@/components/settings/SettingsMaterialLibrarySection";
+import { SettingsAboutPane } from "@/components/settings/SettingsAboutPane";
 import { PROJECT_AUTO_SAVE_OPTIONS, normalizeProjectAutoSaveIdleSec } from "@/lib/projectAutoSaveSettings";
 import { applyProjectAutoSaveIdleSec } from "@/store/projectSaveDebounce";
+import { applyAppSettingsToCanvasUi } from "@/lib/canvasSettingsSync";
 
 export function SettingsPanel(props: {
   open: boolean;
@@ -42,6 +42,7 @@ export function SettingsPanel(props: {
   initialCategory?: SettingsCategory | null;
   focusSectionId?: string | null;
   openRequestNonce?: number;
+  onOpenShortcuts?: () => void;
 }) {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [keys, setKeys] = useState<Record<string, string>>({});
@@ -91,14 +92,20 @@ export function SettingsPanel(props: {
       const ui = useCanvasUiStore.getState();
       setMinimapVisible(ui.minimapVisible);
       setNodeSnapAlignmentEnabled(ui.nodeSnapAlignmentEnabled);
-      setSnapGuidesEnabled(ui.snapGuidesEnabled);
-      setSnapGridEnabled(ui.snapGridEnabled);
-      setAlignDistributeGap(ui.alignDistributeGap);
+      if (settings) {
+        setSnapGuidesEnabled(settings.snapGuidesEnabled !== false);
+        setSnapGridEnabled(settings.snapGridEnabled === true);
+        setAlignDistributeGap(settings.alignDistributeGap ?? 40);
+      } else {
+        setSnapGuidesEnabled(ui.snapGuidesEnabled);
+        setSnapGridEnabled(ui.snapGridEnabled);
+        setAlignDistributeGap(ui.alignDistributeGap);
+      }
     }
     if (activeCategory === "agent") {
       setHermesAutoChain(loadHermesAutoChainSettings());
     }
-  }, [activeCategory]);
+  }, [activeCategory, settings?.snapGuidesEnabled, settings?.snapGridEnabled, settings?.alignDistributeGap]);
 
   useEffect(() => {
     if (!props.open || activeCategory !== "agent") return;
@@ -146,6 +153,7 @@ export function SettingsPanel(props: {
         const loaded = await loadSettingsPanelData();
         setKeyPreviews(loaded.keyPreviews);
         setSettings(loaded.settings);
+        applyAppSettingsToCanvasUi(normalizeLoadedSettings(loaded.settings));
         loadedHermesMemoryRootRef.current = normalizeHermesMemoryRoot(
           loaded.settings.hermesMemoryRoot,
         );
@@ -245,6 +253,7 @@ export function SettingsPanel(props: {
       }
 
       setNotice(noticeText);
+      applyAppSettingsToCanvasUi(saved.settings);
       window.dispatchEvent(new Event("canvasflow-settings-saved"));
     } catch (e) {
       setError(formatUserError(e));
@@ -315,25 +324,8 @@ export function SettingsPanel(props: {
               >
                 <SettingsPageHead
                   title="常规"
-                  description="系统路径、工程保存与工作流行为。"
+                  description="工程保存与工作流行为。"
                 />
-                <div className="settingsSection">
-                  <div className="settingsSectionTitle">媒体引擎</div>
-
-                  <div className="settingsField">
-                    <label className="settingsFieldLabel" htmlFor="settingsFfmpegPath">
-                      FFmpeg 路径
-                    </label>
-                    <span className="settingsFieldHint">留空则使用系统 PATH 中的 ffmpeg</span>
-                    <input
-                      id="settingsFfmpegPath"
-                      className="settingsInput mono"
-                      value={settings.ffmpegPath ?? ""}
-                      onChange={(e) => setSettings({ ...settings, ffmpegPath: e.target.value || null })}
-                      placeholder="ffmpeg"
-                    />
-                  </div>
-                </div>
 
                 <div className="settingsSection">
                   <div className="settingsSectionTitle">工程保存</div>
@@ -342,8 +334,7 @@ export function SettingsPanel(props: {
                       画布自动保存
                     </label>
                     <span className="settingsFieldHint">
-                      在已有工程路径下，画布有改动且你<strong>停止编辑</strong>达到所选时长后，在<strong>后台</strong>写入
-                      canvasflow.json（不阻塞拖拽与输入）。关闭后请用 Ctrl+S 或菜单保存。
+                      停止编辑达到所选时长后，后台写入 canvasflow.json。关闭后请用 Ctrl+S 保存。
                     </span>
                     <select
                       id="projectAutoSaveIdleSec"
@@ -364,18 +355,8 @@ export function SettingsPanel(props: {
                         </option>
                       ))}
                     </select>
-                    <span className="settingsFieldHint">
-                      {
-                        PROJECT_AUTO_SAVE_OPTIONS.find(
-                          (o) => o.value === (settings.projectAutoSaveIdleSec ?? 2),
-                        )?.hint
-                      }
-                    </span>
                   </div>
                 </div>
-
-                <SettingsProjectAssetsSection />
-                <SettingsMaterialLibrarySection />
 
                 <div className="settingsSection">
                   <div className="settingsSectionTitle">工作流</div>
@@ -446,12 +427,47 @@ export function SettingsPanel(props: {
                 activeCategory={activeCategory}
                 visited={visitedCategories}
               >
-                <SettingsPageHead
-                  title="画布"
-                  description="控制无限画布的视图、吸附与排列间距。"
-                />
+                <SettingsPageHead title="画布" description="视图、吸附与排列。" />
                 <div className="settingsSection">
                   <div className="settingsSectionTitle">视图与吸附</div>
+
+                  <div className="settingsField">
+                    <div className="settingsToggle">
+                      <input
+                        type="checkbox"
+                        id="toggleGridDots"
+                        checked={settings.gridDotsVisible !== false}
+                        onChange={(e) => {
+                          const v = e.target.checked;
+                          setSettings({ ...settings, gridDotsVisible: v });
+                          useCanvasUiStore.getState().setGridDotsVisible(v);
+                        }}
+                      />
+                      <label htmlFor="toggleGridDots" className="settingsToggleLabel">
+                        <span className="settingsToggleSwitch" />
+                        <span className="settingsToggleText">显示背景网格点</span>
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="settingsField">
+                    <div className="settingsToggle">
+                      <input
+                        type="checkbox"
+                        id="toggleConnectionLines"
+                        checked={settings.connectionLinesVisible !== false}
+                        onChange={(e) => {
+                          const v = e.target.checked;
+                          setSettings({ ...settings, connectionLinesVisible: v });
+                          useCanvasUiStore.getState().setConnectionLinesVisible(v);
+                        }}
+                      />
+                      <label htmlFor="toggleConnectionLines" className="settingsToggleLabel">
+                        <span className="settingsToggleSwitch" />
+                        <span className="settingsToggleText">显示节点连线</span>
+                      </label>
+                    </div>
+                  </div>
 
                   <div className="settingsField">
                     <div className="settingsToggle">
@@ -496,8 +512,10 @@ export function SettingsPanel(props: {
                         id="toggleSnapGuides"
                         checked={snapGuidesEnabled}
                         onChange={(e) => {
-                          setSnapGuidesEnabled(e.target.checked);
-                          useCanvasUiStore.getState().setSnapGuidesEnabled(e.target.checked);
+                          const v = e.target.checked;
+                          setSnapGuidesEnabled(v);
+                          setSettings({ ...settings, snapGuidesEnabled: v });
+                          useCanvasUiStore.getState().setSnapGuidesEnabled(v);
                         }}
                       />
                       <label htmlFor="toggleSnapGuides" className="settingsToggleLabel">
@@ -514,8 +532,10 @@ export function SettingsPanel(props: {
                         id="toggleSnapGrid"
                         checked={snapGridEnabled}
                         onChange={(e) => {
-                          setSnapGridEnabled(e.target.checked);
-                          useCanvasUiStore.getState().setSnapGridEnabled(e.target.checked);
+                          const v = e.target.checked;
+                          setSnapGridEnabled(v);
+                          setSettings({ ...settings, snapGridEnabled: v });
+                          useCanvasUiStore.getState().setSnapGridEnabled(v);
                         }}
                       />
                       <label htmlFor="toggleSnapGrid" className="settingsToggleLabel">
@@ -536,6 +556,7 @@ export function SettingsPanel(props: {
                       onChange={(e) => {
                         const v = Number(e.target.value);
                         setAlignDistributeGap(v);
+                        setSettings({ ...settings, alignDistributeGap: v });
                         useCanvasUiStore.getState().setAlignDistributeGap(v);
                       }}
                     >
@@ -552,44 +573,13 @@ export function SettingsPanel(props: {
                 activeCategory={activeCategory}
                 visited={visitedCategories}
               >
-                <SettingsPageHead title="关于" description="应用信息与问题排查。" />
-                <div className="settingsSection">
-                  <div className="settingsAbout">
-                    <div className="settingsAboutLogo">CanvasFlow AI Studio</div>
-                    <div className="settingsAboutVersion">版本 1.0.0</div>
-                    <div className="settingsAboutDesc">面向视频创作流程的节点化 AI 工作台</div>
-                  </div>
-
-                  <div className="settingsDivider" role="separator" />
-
-                  <div className="settingsSectionTitle">诊断</div>
-                  <div className="settingsDiagnostics">
-                    <p className="settingsDiagnosticsHint">
-                      导出 JSON 诊断包，包含版本、运行环境与时间戳，便于反馈问题时附带。
-                    </p>
-                    <button
-                      type="button"
-                      className="btn btn--secondary"
-                      onClick={() => {
-                        const info = {
-                          version: "1.0.0",
-                          timestamp: new Date().toISOString(),
-                          userAgent: navigator.userAgent,
-                          platform: navigator.platform,
-                        };
-                        const blob = new Blob([JSON.stringify(info, null, 2)], { type: "application/json" });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `canvasflow-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                      }}
-                    >
-                      导出诊断信息
-                    </button>
-                  </div>
-                </div>
+                <SettingsAboutPane
+                  settings={settings}
+                  onSettingsChange={(patch) =>
+                    setSettings((prev) => (prev ? { ...prev, ...patch } : prev))
+                  }
+                  onOpenShortcuts={props.onOpenShortcuts}
+                />
               </SettingsCategoryPane>
             </div>
           </div>

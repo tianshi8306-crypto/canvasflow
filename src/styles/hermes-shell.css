@@ -2052,20 +2052,27 @@
 .hermes-mention-input {
   flex: 1;
   min-width: 0;
+  --mention-mirror-pad-block: 6px;
+  --mention-mirror-pad-inline: 2px;
 }
 
 .hermes-mention-overlay {
   pointer-events: none;
+  max-height: 120px;
+  overflow: hidden;
 }
 
 .hermes-mention-input .mention-textarea.hermesFloatInput {
   border: none;
   background: transparent;
   resize: none;
-  min-height: 2.5em;
-  max-height: 80px;
+  min-height: 1.5em;
+  max-height: 120px;
+  overflow-y: auto;
   width: 100%;
   box-sizing: border-box;
+  padding-block: 6px;
+  padding-inline: 2px 4px;
 }
 
 .hermes-mention-input .mention-pill--hermes-ref {
@@ -2103,7 +2110,8 @@
   align-items: flex-end;
   gap: 8px;
   padding: 8px 8px 8px 6px;
-  border-radius: 999px;
+  border-radius: var(--canvas-dock-radius-panel, 14px);
+  overflow: visible;
 }
 
 .hermesFloatInputPill--inline {
@@ -2117,6 +2125,7 @@
 .hermesFloatInputBody {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
 }
 
 .hermesFloatInputAttachBtn {
@@ -2151,7 +2160,7 @@
 
 .hermesFloatInputPill--unified .hermes-mention-input .mention-textarea.hermesFloatInput {
   min-height: 1.5em;
-  max-height: 96px;
+  max-height: 120px;
 }
 
 .hermesFloatInputPill--inline .hermesFloatInputActions {

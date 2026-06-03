@@ -9,6 +9,7 @@ import {
   findImageNodesForScript,
   shotHasGeneratedImage,
 } from "@/lib/storyboard/storyboardMediaNodes";
+import { normalizeImageGenerationCount } from "@/lib/imageGeneration/catalog";
 
 export type HermesBatchImageJob = {
   beatId: string;
@@ -23,8 +24,7 @@ function readImageCountFromNode(nodes: Node<FlowNodeData>[], imageNodeId: string
       ? (node.data.params as Record<string, unknown>)
       : {};
   const raw = params.imageCount;
-  if (typeof raw === "number" && raw >= 1 && raw <= 4) return raw;
-  return 1;
+  return normalizeImageGenerationCount(raw);
 }
 
 function beatHasGeneratedImage(

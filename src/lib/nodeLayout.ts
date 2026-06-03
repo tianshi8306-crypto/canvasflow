@@ -36,7 +36,7 @@ export const IMAGE_OUTPUT_GRID_CELL_H = 320;
 function imageOutputGridColumnCount(count: number): number {
   if (count <= 1) return 1;
   if (count === 4) return 2;
-  return Math.min(IMAGE_OUTPUT_GRID_MAX_COLS, count);
+  return 2;
 }
 
 export function computeImageOutputGridPositions(

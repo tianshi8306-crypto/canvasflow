@@ -1,4 +1,4 @@
-/* 首屏启动层：与 canvas-color-system 炭黑 + 青蓝强调一致 */
+/* 首屏启动层：与 canvas-color-system 炭黑 + 青蓝节点流一致 */
 
 #app-boot-splash {
   position: fixed;
@@ -30,39 +30,22 @@
 }
 
 .app-boot-splash__mark {
-  position: relative;
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
 }
 
-.app-boot-splash__ring {
-  position: absolute;
-  inset: 0;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.08);
-  border-top-color: #38bdf8;
-  animation: app-boot-spin 0.9s linear infinite;
-}
-
-.app-boot-splash__core {
-  position: absolute;
-  inset: 14px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, rgba(56, 189, 248, 0.35), rgba(18, 18, 18, 0.2) 68%);
-  box-shadow: 0 0 28px rgba(56, 189, 248, 0.22);
+.app-boot-splash__icon {
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 8px 24px rgba(34, 211, 238, 0.18));
   animation: app-boot-pulse 1.6s ease-in-out infinite;
-}
-
-@keyframes app-boot-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @keyframes app-boot-pulse {
   0%,
   100% {
-    opacity: 0.72;
+    opacity: 0.82;
     transform: scale(0.96);
   }
   50% {
@@ -72,8 +55,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .app-boot-splash__ring,
-  .app-boot-splash__core {
+  .app-boot-splash__icon {
     animation: none;
   }
 

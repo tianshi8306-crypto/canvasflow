@@ -1,4 +1,5 @@
 import type { VideoGenerationWorkflow, VideoModelId } from "@/lib/videoNodeTypes";
+import { dreaminaCliVideoOptions } from "@/lib/dreamina/cliModels";
 
 export type { VideoModelCapabilities } from "@/lib/videoGeneration/modelCapabilities";
 export {
@@ -19,10 +20,10 @@ export type VideoModelCatalogEntry = {
   supportedWorkflows?: VideoGenerationWorkflow[];
 };
 
-/** 视频节点模型下拉：内置默认 2 项（与 settings 预设一致） */
+/** 视频节点模型下拉：内置默认（Doubao API + 即梦 CLI 全量） */
 export const VIDEO_BUILTIN_MODEL_OPTIONS: { id: string; label: string }[] = [
   { id: "doubao_seedance_2_0", label: "Doubao Seedance 2.0" },
-  { id: "dreamina/seedance2.0", label: "即梦 Seedance 2.0（CLI）" },
+  ...dreaminaCliVideoOptions(),
 ];
 
 /** Mock / 文档用模型池 */

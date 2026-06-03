@@ -25,7 +25,7 @@ export function SettingsAgentSection() {
     <div className="settingsSection">
       <div className="settingsSectionTitle">执行行为</div>
       <p className="settingsFieldHint" style={{ marginBottom: 12 }}>
-        控制 H 是否自动改脚本/分镜并提交生成；关闭后仅展示计划，需回复「执行」。执行制片任务时仍可继续聊天咨询（R5 并行）。回复长短由 H 根据你的指令自动判断，无需手动设置。
+        控制 Hermes 是否自动改脚本/分镜并提交生成。关闭后仅展示计划，需回复「执行」再落画布。
       </p>
 
       <div className="settingsField">
@@ -59,9 +59,9 @@ export function SettingsAgentSection() {
             </span>
           </label>
         </div>
-        <p className="settingsFieldHint">
-          开启后，灵体在检测到失败或未完成 pipeline 时，约 1.5 秒后自动向 Director 提交建议指令（仍消耗 API）。需同时开启「自动执行制片操作」。
-        </p>
+        <span className="settingsFieldHint">
+          开启后，检测到失败或未完成的流程时，灵体约 1.5 秒后自动提交修复建议（消耗 API）。需同时开启「自动执行制片操作」。
+        </span>
       </div>
 
       <div className="settingsField">
@@ -130,8 +130,7 @@ export function SettingsAgentSection() {
           </label>
         </div>
         <span className="settingsFieldHint">
-          开启后工程/较早对话写入 workstate 时调用对话模型压缩；失败时回退规则摘要。消耗少量
-          API 额度。
+          开启后，较长对话写入工程摘要时会调用文本模型压缩；失败时回退为规则摘要。
         </span>
       </div>
 
@@ -151,7 +150,7 @@ export function SettingsAgentSection() {
           </label>
         </div>
         <span className="settingsFieldHint">
-          制片 Job 完成后用对话模型总结可复用经验并写入工程记忆；失败时也会记录应避免项。
+          制片任务完成后，用对话模型总结可复用经验并写入工程记忆。
         </span>
       </div>
 

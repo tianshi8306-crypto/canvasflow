@@ -43,17 +43,17 @@ describe("resolveMentionTokens", () => {
     expect(result).toBe("Missing @[nonexistent] node.");
   });
 
-  it("falls back to label if prompt/output empty", () => {
+  it("falls back to label if prompt empty", () => {
     const input = "Empty @[node-2] here.";
     const result = resolveMentionTokens(input, mockNodes);
-    expect(result).toBe("Empty [Empty Node: ] here.");
+    expect(result).toBe("Empty [Empty Node: （空）] here.");
   });
 
   it("handles multiple mention tokens in one string", () => {
     const input = "First @[node-1] and second @[node-3] and missing @[unknown].";
     const result = resolveMentionTokens(input, mockNodes);
     expect(result).toBe(
-      "First [My Text Node: Hello world] and second [Output Node: Some output content] and missing @[unknown].",
+      "First [My Text Node: Hello world] and second [Output Node: （空）] and missing @[unknown].",
     );
   });
 });

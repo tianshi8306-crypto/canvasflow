@@ -11,7 +11,7 @@ import { createPortal } from "react-dom";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
 import { isEdgeDisabled } from "@/lib/edgeState";
 import type { ResolvedIncomingImagePanelRef } from "@/lib/imageGeneration/types";
-import { imageRefAtToken } from "@/lib/imageGeneration/imagePromptAtTokens";
+import { imageRefAtToken, imageTextRefAtToken } from "@/lib/imageGeneration/imagePromptAtTokens";
 import { videoRefTextThumbExcerpt } from "@/lib/videoRefTextThumbExcerpt";
 import {
   fitHoverPreviewBox,
@@ -281,9 +281,9 @@ export function ImageRefThumbStrip({
             const imageAtToken = isText
               ? undefined
               : imageRefAtToken(imageSlotBeforeIndex(items, idx));
-            const insertToken = isText ? `@[${sourceId}]` : imageAtToken;
+            const insertToken = isText ? imageTextRefAtToken(idx + 1) : imageAtToken;
             const title = isText
-              ? `${item.nodeLabel} · 拖动换位 · Shift+单击插入 @ · 点击 × 移除连线`
+              ? `${item.nodeLabel} · 拖动换位 · Shift+单击插入 ${insertToken} · 点击 × 移除连线`
               : `参考图 ${badge} · 拖动换位 · 单击选中 · Shift+单击插入 ${imageAtToken} · 悬停预览 · 点击 × 移除连线`;
             const textExcerpt = isText ? videoRefTextThumbExcerpt(item.textContent) : "";
             return (

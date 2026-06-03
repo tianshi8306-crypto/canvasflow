@@ -24,6 +24,7 @@ import {
   resolveCanonicalImageRefInsertToken,
   type ImagePromptInlineSegmentWithMedia,
   type ImageRefPickerItem,
+  type ImageTextRefPickerItem,
 } from "@/lib/imageGeneration/imagePromptAtTokens";
 import {
   getAtomicImagePromptTokenDeletion,
@@ -44,6 +45,8 @@ export interface ImagePromptMentionInputProps {
   value: string;
   onChange: (value: string) => void;
   incomingRefs: ResolvedIncomingImageRef[];
+  /** 参考条上的文本上游（@文本N） */
+  textPickerItems?: ImageTextRefPickerItem[];
   nodeLabels?: Record<string, string>;
   placeholder?: string;
   className?: string;
@@ -178,6 +181,7 @@ export const ImagePromptMentionInput = forwardRef<
       value,
       onChange,
       incomingRefs,
+      textPickerItems = [],
       nodeLabels = {},
       placeholder,
       className = "",
@@ -220,10 +224,26 @@ export const ImagePromptMentionInput = forwardRef<
 
     useEffect(() => () => clearPickerHoverTimer(), [clearPickerHoverTimer]);
 
-    const pickerItems = useMemo(
-      () => imageRefPickerItems(incomingRefs, nodeLabels),
-      [incomingRefs, nodeLabels],
-    );
+    const pickerItems = useMemo((): ImageRefPickerItem[] => {
+      const imageItems = imageRefPickerItems(incomingRefs, nodeLabels);
+      const textItems: ImageRefPickerItem[] = textPickerItems.map((t) => ({
+        slot: parseInt(t.insertToken.replace("@文本", ""), 10) || 0,
+        token: t.insertToken,
+        sourceNodeId: t.sourceNodeId,
+        fileName: "",
+        stemName: "",
+        namedToken: t.displayToken,
+        displayToken: t.displayToken,
+        displayName: t.displayToken?.slice(1),
+        badge: t.menuShortcut.replace(/[()@]/g, ""),
+        label: t.menuTitle,
+        path: "",
+        insertToken: t.insertToken,
+        menuTitle: t.menuTitle,
+        menuShortcut: t.menuShortcut,
+      }));
+      return [...textItems, ...imageItems];
+    }, [incomingRefs, nodeLabels, textPickerItems]);
 
     const filteredItems = useMemo(() => {
       if (!dropdownQuery) return pickerItems;
@@ -271,8 +291,19 @@ export const ImagePromptMentionInput = forwardRef<
       setPickerPos(resolvePickerPosition(filteredItems.length));
     }, [filteredItems.length, resolvePickerPosition]);
 
+    const clearPickerHoverPreview = useCallback(() => {
+      clearPickerHoverTimer();
+      setPickerHoverIndex(null);
+      setPickerHoverRect(null);
+    }, [clearPickerHoverTimer]);
+
     const schedulePickerHoverPreview = useCallback(
       (index: number) => {
+        const item = pickerItems[index];
+        if (item?.insertToken.startsWith("@文本")) {
+          clearPickerHoverPreview();
+          return;
+        }
         clearPickerHoverTimer();
         pickerHoverTimerRef.current = setTimeout(() => {
           const row = pickerRowRefs.current.get(index);
@@ -283,14 +314,8 @@ export const ImagePromptMentionInput = forwardRef<
           }
         }, REF_HOVER_PREVIEW_DELAY_MS);
       },
-      [clearPickerHoverTimer],
+      [clearPickerHoverTimer, clearPickerHoverPreview, pickerItems],
     );
-
-    const clearPickerHoverPreview = useCallback(() => {
-      clearPickerHoverTimer();
-      setPickerHoverIndex(null);
-      setPickerHoverRect(null);
-    }, [clearPickerHoverTimer]);
 
     const insertTokenAtCursor = useCallback(
       (token: string, replaceAtQuery = false) => {
@@ -585,18 +610,19 @@ export const ImagePromptMentionInput = forwardRef<
               className="video-at-picker nodrag nopan nowheel"
               style={{ left: pickerPos.left, top: pickerPos.top }}
               role="listbox"
-              aria-label="引用参考图"
+              aria-label="引用参考素材"
               onPointerDown={(e) => e.stopPropagation()}
               onMouseLeave={clearPickerHoverPreview}
             >
               {filteredItems.length === 0 ? (
-                <div className="video-at-picker__empty">无匹配参考图</div>
+                <div className="video-at-picker__empty">无匹配参考</div>
               ) : (
                 filteredItems.map((item, i) => {
                   const cited = promptContainsImageRefToken(value, item);
+                  const isTextRef = item.insertToken.startsWith("@文本");
                   return (
                     <button
-                      key={item.sourceNodeId}
+                      key={`${item.sourceNodeId}:${item.insertToken}`}
                       ref={(el) => {
                         if (el) pickerRowRefs.current.set(i, el);
                         else pickerRowRefs.current.delete(i);
@@ -614,12 +640,20 @@ export const ImagePromptMentionInput = forwardRef<
                         schedulePickerHoverPreview(i);
                       }}
                     >
-                      <div className="video-at-picker__thumb">
-                        <NodeMediaPreview
-                          relPath={item.path}
-                          assetId={item.assetId}
-                          kind="image"
-                        />
+                      <div
+                        className={`video-at-picker__thumb${isTextRef ? " video-at-picker__thumb--text" : ""}`}
+                      >
+                        {isTextRef ? (
+                          <span className="video-at-picker__textGlyph" aria-hidden>
+                            文
+                          </span>
+                        ) : (
+                          <NodeMediaPreview
+                            relPath={item.path}
+                            assetId={item.assetId}
+                            kind="image"
+                          />
+                        )}
                       </div>
                       <span className="video-at-picker__title">{item.menuTitle}</span>
                       <span className="video-at-picker__meta">

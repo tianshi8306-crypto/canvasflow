@@ -20,7 +20,8 @@ import {
 } from "@/lib/textNodeProviders";
 import { useFocusLinkedPartnerNode } from "@/hooks/canvas/useFocusLinkedPartnerNode";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
-import { getUpstreamImageForTextNode } from "@/lib/textNodeUpstream";
+import { getUpstreamImageForTextNode, listTextNodeUpstreamTextSources } from "@/lib/textNodeUpstream";
+import { formatUpstreamTextCharCount } from "@/lib/scriptUpstreamText";
 import { useProjectStore } from "@/store/projectStore";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
 
@@ -113,6 +114,12 @@ export function TextComposerPanel({
     () => (isImageToPrompt ? getUpstreamImageForTextNode(nodeId, nodes, edges) : null),
     [edges, isImageToPrompt, nodeId, nodes],
   );
+
+  const upstreamTextSources = useMemo(
+    () => listTextNodeUpstreamTextSources(nodes, edges, nodeId),
+    [edges, nodeId, nodes],
+  );
+  const upstreamTextChars = upstreamTextSources.reduce((sum, s) => sum + s.charCount, 0);
 
   const nodeLabels = useMemo(
     () => Object.fromEntries(nodes.map((n) => [n.id, n.data.label ?? n.id])),
@@ -257,6 +264,16 @@ export function TextComposerPanel({
     void focusPartnerNode(upstreamImage.nodeId, { kind: "image" });
   }, [focusPartnerNode, upstreamImage?.nodeId]);
 
+  const handleFocusUpstreamText = useCallback(
+    (sourceNodeId: string) => {
+      const source = upstreamTextSources.find((s) => s.nodeId === sourceNodeId);
+      void focusPartnerNode(sourceNodeId, {
+        label: source?.label,
+      });
+    },
+    [focusPartnerNode, upstreamTextSources],
+  );
+
   const textareaClass = isExpandedLayout
     ? "mention-input-wrapper imageGenPanelTextarea imageGenPanelTextarea--expanded"
     : "mention-input-wrapper imageGenPanelTextarea imageGenPanelTextarea--minimal";
@@ -285,7 +302,9 @@ export function TextComposerPanel({
       ? ZONE_A_HINT_IMAGE
       : isTextToMusic
         ? ZONE_A_HINT_MUSIC
-        : ZONE_A_HINT_DEFAULT;
+        : upstreamTextSources.length > 0
+          ? `上游 ${formatUpstreamTextCharCount(upstreamTextChars)} 字`
+          : ZONE_A_HINT_DEFAULT;
 
   const showZoneA = isExpandedLayout || !hideChromeHead || isImageToPrompt || isTextToMusic;
   const zoneAActions = isExpandedLayout ? (
@@ -396,7 +415,28 @@ export function TextComposerPanel({
       <div className="tgp-v2-stack">
         {showZoneA ? (
           <div className="tgp-v2-zone-a">
-            <span className="tgp-v2-hint">{zoneAHint}</span>
+            <div className="tgp-v2-zone-a-start">
+              {upstreamTextSources.length > 0 && !isImageToPrompt && !isTextToMusic ? (
+                <div className="tgp-upstream-text-tags" aria-label="上游文本节点">
+                  {upstreamTextSources.map((source) => (
+                    <button
+                      key={source.nodeId}
+                      type="button"
+                      className="tgp-upstream-text-tag"
+                      title={`定位上游「${source.label}」· ${formatUpstreamTextCharCount(source.charCount)} 字`}
+                      onPointerDown={onPointerDown}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleFocusUpstreamText(source.nodeId);
+                      }}
+                    >
+                      {source.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <span className="tgp-v2-hint">{zoneAHint}</span>
+            </div>
             <div className="tgp-v2-zone-a-actions">{zoneAActions}</div>
           </div>
         ) : null}
