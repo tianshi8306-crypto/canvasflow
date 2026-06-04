@@ -156,7 +156,8 @@ export function VideoMultimodalInputPanel({
   }, [validModelId, modelsLoading, videoNodeId, patchDraft]);
 
   const setVideoGenPanelExpandedNodeId = useCanvasUiStore((s) => s.setVideoGenPanelExpandedNodeId);
-  const { startGeneration, cancelGeneration, busy, cancelling, activeJob } = useVideoNodeGeneration(videoNodeId);
+  const { startGeneration, cancelGeneration, busy, cancelling, submitting, activeJob } =
+    useVideoNodeGeneration(videoNodeId);
   const incomingRefItems = useVideoIncomingReferenceItems(videoNodeId);
 
   const syncedEdgeOrder = useMemo(
@@ -479,7 +480,11 @@ export function VideoMultimodalInputPanel({
   // 生成状态派生
   const jobStatus = activeJob?.status;
   const jobError = activeJob?.error ?? (draft as { error?: string }).error;
-  const isGenerating = jobStatus === "queued" || jobStatus === "running" || cancelling;
+  const isGenerating =
+    submitting ||
+    jobStatus === "queued" ||
+    jobStatus === "running" ||
+    cancelling;
   const isCancelled = jobStatus === "cancelled";
   const isFailed = jobStatus === "failed";
   const isSucceeded = (jobStatus === "succeeded" || nodeHasOutput) && !isCancelled;
@@ -487,6 +492,7 @@ export function VideoMultimodalInputPanel({
     status: jobStatus,
     progress: activeJob?.progress,
     cancelling,
+    submitting,
   });
   const dreaminaSubmitId = resolveDreaminaSubmitId({
     jobId: activeJob?.id,
@@ -530,11 +536,12 @@ export function VideoMultimodalInputPanel({
 
   const handleGenerateClick = useCallback(() => {
     if (isGenerating) {
+      if (submitting || !activeJob?.id) return;
       void cancelGeneration();
       return;
     }
     handleGenerate();
-  }, [cancelGeneration, handleGenerate, isGenerating]);
+  }, [cancelGeneration, handleGenerate, isGenerating, submitting, activeJob?.id]);
 
   const aspectLabel = aspect === "auto" ? "自动" : aspect;
   const durationLabel = isSmartDuration ? "智能" : `${durationSec}s`;
@@ -591,6 +598,7 @@ export function VideoMultimodalInputPanel({
       label={generationCapsuleLabel}
       onCancel={() => void cancelGeneration()}
       cancelling={cancelling}
+      showCancel={!submitting && Boolean(activeJob?.id)}
     />
   ) : null;
 
@@ -640,6 +648,32 @@ export function VideoMultimodalInputPanel({
             ) : null}
         </div>
       </div>
+
+      {/* ★ 人脸审核通关开关：仅在 Seedance 2.0 且火山方舟模式时显示 */}
+      {draft.modelId === "doubao_seedance_2_0" && (
+        <div className="mmBypassRow">
+          <label className="mmBypassToggle">
+            <input
+              type="checkbox"
+              checked={draft.faceBypassEnabled !== false}
+              onChange={(e) => {
+                recordBeforeDiscreteMutation(useProjectStore.getState);
+                patchDraft({ faceBypassEnabled: e.target.checked });
+              }}
+            />
+            <span className="mmBypassSwitch" />
+            <span className="mmBypassText">
+              <span className="mmBypassTitle">一键过审</span>
+              <span className="mmBypassStatus">
+                {draft.faceBypassEnabled !== false ? "已开启" : "已关闭"}
+              </span>
+            </span>
+          </label>
+          <span className="mmBypassHint">
+            自动优化参考图，大幅提升 Seedance 2.0 人脸审核通过率
+          </span>
+        </div>
+      )}
 
       {/* ══ 模块 2：参考图（底栏缩略图条 + 悬停浮层预览，无顶部固定预览条） ══ */}
       {displayThumbnails.length > 0 ? (
@@ -692,6 +726,8 @@ export function VideoMultimodalInputPanel({
       <VideoGenerationStatusRail
         isGenerating={isGenerating}
         isCancelled={isCancelled}
+        isFailed={isFailed}
+        failureError={jobError}
         errors={validationErrors}
         showValidation={!isGenerating && !isFailed && !isCancelled && !validationResult.valid}
       />

@@ -127,6 +127,8 @@ export type VideoGenerationDraft = {
   output: VideoGenOutputSpec;
   /** 运镜：预设 / 自定义列表 / 收藏 */
   cameraMovement?: CameraMovementDraft;
+  /** Seedance 2.0 人脸审核通关开关（默认开启，仅火山方舟模式生效） */
+  faceBypassEnabled?: boolean;
 };
 
 /** 面板增量更新（允许只改 output 子字段） */

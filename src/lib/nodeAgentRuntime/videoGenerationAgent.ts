@@ -19,6 +19,8 @@ import { parseVideoGenError } from "@/lib/video/formatVideoGenError";
 import { isDreaminaModel } from "@/lib/dreamina/model";
 import { readFileAsDataUrl } from "@/lib/mediaUtils";
 import { joinProjectRelativePath } from "@/lib/paths";
+import { bypassFaceReviewBatch } from "@/lib/seedance/faceBypass";
+import { injectVirtualCharacterPrefix } from "@/lib/seedance/faceBypass/bypassPrompt";
 
 type VideoGenerationAgentInput = {
   videoBlock: VideoNodePersisted;
@@ -121,16 +123,35 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
       }
     }
 
+    // ★ 人脸审核通关：仅 Seedance 2.0 火山方舟模式 + 开关开启时生效
+    const isSeedance2 =
+      draft.modelId === "doubao_seedance_2_0";
+    const bypassEnabled = draft.faceBypassEnabled !== false; // 默认开启
+    if (isSeedance2 && bypassEnabled && !useDreaminaCli && imageDataUrls.length > 0) {
+      try {
+        const results = await bypassFaceReviewBatch(imageDataUrls);
+        imageDataUrls = results.map((r) => r.dataUrl); // 替换为处理后图片
+      } catch {
+        // 任何步骤失败：静默回退，使用原 imageDataUrls
+      }
+    }
+
     // 调用 API（出错时写入节点错误状态，让面板直接显示）
     let jobId: string;
     try {
+      // ★ 提示词前缀注入：声明虚拟角色（与图片处理的开关保持一致）
+      const finalPrompt =
+        isSeedance2 && bypassEnabled
+          ? injectVirtualCharacterPrefix(expandedPrompt)
+          : expandedPrompt;
+
       const result = await startVideoGenerationViaBridge({
         projectPath: ctx.projectPath,
         nodeId: ctx.nodeId,
         payload: {
           workflow: draft.workflow,
           modelId: draft.modelId,
-          prompt: expandedPrompt,
+          prompt: finalPrompt,
           referenceImagePaths:
             (useDreaminaCli ? atImagePaths : imageDataUrls).length > 0
               ? useDreaminaCli
