@@ -4,6 +4,7 @@
 import { useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { ComposeEditorBody } from "@/components/compose/ComposeEditorBody";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import "./ComposeEditorOverlay.css";
@@ -53,13 +54,15 @@ export function ComposeEditorOverlay() {
         aria-label="视频剪辑"
         onClick={(e) => e.stopPropagation()}
       >
-        <ComposeEditorBody
-          nodeId={nodeId}
-          title={title}
-          onClose={() => {
-            useCanvasUiStore.getState().setComposeEditorNodeId(null);
-          }}
-        />
+        <ErrorBoundary name="合成编辑器">
+          <ComposeEditorBody
+            nodeId={nodeId}
+            title={title}
+            onClose={() => {
+              useCanvasUiStore.getState().setComposeEditorNodeId(null);
+            }}
+          />
+        </ErrorBoundary>
       </div>
     </div>,
     document.body,

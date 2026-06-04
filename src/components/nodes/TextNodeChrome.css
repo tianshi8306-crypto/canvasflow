@@ -134,6 +134,9 @@
 }
 
 .textGenPanel--v2 .tgp-upstream-text-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
   flex-shrink: 0;
   max-width: 120px;
   padding: 2px 8px;
@@ -148,6 +151,19 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.textGenPanel--v2 .tgp-upstream-text-tagGlyph {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  font-size: 9px;
+  line-height: 1;
+  flex-shrink: 0;
 }
 
 .textGenPanel--v2 .tgp-upstream-text-tag:hover {

@@ -17,6 +17,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { nodeTypes } from "@/components/canvas/nodeTypes";
 import { FileInputHandler } from "@/components/canvas/FileInputHandler";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MultiSelectionToolbar } from "@/components/canvas/MultiSelectionToolbar";
 import { CanvasSaveWorkflowHost } from "@/components/canvas/CanvasSaveWorkflowHost";
 import { GroupToolbar } from "@/components/canvas/GroupToolbar";
@@ -878,7 +879,9 @@ function FlowCanvasInner() {
 export function FlowCanvas() {
   return (
     <ReactFlowProvider>
-      <FlowCanvasInner />
+      <ErrorBoundary name="画布" onRecover={() => {}} fallback={<div className="canvasErrorFallback" />}>
+        <FlowCanvasInner />
+      </ErrorBoundary>
     </ReactFlowProvider>
   );
 }

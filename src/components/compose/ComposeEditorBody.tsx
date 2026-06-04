@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useComposeNodeEditor } from "@/hooks/useComposeNodeEditor";
 
@@ -15,6 +15,9 @@ import { ComposeTimelineTrack } from "@/components/compose/ComposeTimelineTrack"
 
 import { IconClose } from "@/components/compose/composeEditorIcons";
 import { ComposeEditorExportMenu } from "@/components/compose/ComposeEditorExportMenu";
+
+import { BgmSelector, readBgmParams, type BgmAlignSettings } from "@/components/nodes/BgmSelector";
+import { useProjectStore } from "@/store/projectStore";
 
 
 
@@ -48,7 +51,46 @@ export function ComposeEditorBody({ nodeId, title, onClose }: Props) {
 
   }, [editor, nodeId, onClose]);
 
+  // BGM 参数管理
+  const nodeParams = useProjectStore((s) => s.nodes.find((n) => n.id === nodeId)?.data?.params);
+  const updateNodeData = useProjectStore((s) => s.updateNodeData);
+  const bgmState = useMemo(() => readBgmParams(nodeParams as Record<string, unknown> | undefined), [nodeParams]);
+  const [bgmCollapsed, setBgmCollapsed] = useState(
+    !bgmState.presetId && !bgmState.relPath,
+  );
 
+  const patchNodeParams = useCallback(
+    (patch: Record<string, unknown>) => {
+      updateNodeData(nodeId, {
+        params: {
+          ...(nodeParams && typeof nodeParams === "object" ? nodeParams : {}),
+          ...patch,
+        },
+      });
+    },
+    [nodeId, nodeParams, updateNodeData],
+  );
+
+  const handleBgmPresetChange = useCallback(
+    (presetId: string | undefined) => {
+      patchNodeParams({ bgmPresetId: presetId ?? null });
+    },
+    [patchNodeParams],
+  );
+
+  const handleBgmRelPathChange = useCallback(
+    (relPath: string | undefined) => {
+      patchNodeParams({ bgmRelPath: relPath ?? null });
+    },
+    [patchNodeParams],
+  );
+
+  const handleBgmSettingsChange = useCallback(
+    (settings: BgmAlignSettings) => {
+      patchNodeParams({ bgmSettings: settings });
+    },
+    [patchNodeParams],
+  );
 
   const handleToggleOutput = () => {
 
@@ -335,6 +377,19 @@ export function ComposeEditorBody({ nodeId, title, onClose }: Props) {
             </div>
 
           ) : null}
+
+          <BgmSelector
+            nodeId={nodeId}
+            videoDurationSec={editor.totalSec}
+            selectedPresetId={bgmState.presetId}
+            customBgmRelPath={bgmState.relPath}
+            settings={bgmState.settings}
+            onPresetChange={handleBgmPresetChange}
+            onCustomBgmChange={handleBgmRelPathChange}
+            onSettingsChange={handleBgmSettingsChange}
+            collapsed={bgmCollapsed}
+            onToggleCollapsed={() => setBgmCollapsed((v) => !v)}
+          />
 
         </section>
 

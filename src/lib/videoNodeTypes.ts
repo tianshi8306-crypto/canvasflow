@@ -129,6 +129,8 @@ export type VideoGenerationDraft = {
   cameraMovement?: CameraMovementDraft;
   /** Seedance 2.0 人脸审核通关开关（默认开启，仅火山方舟模式生效） */
   faceBypassEnabled?: boolean;
+  /** 人脸审核绕过模式：scramble=块打乱(默认) | erase=移除人脸 | standard=模糊像素化 */
+  faceBypassMode?: "scramble" | "erase" | "standard";
 };
 
 /** 面板增量更新（允许只改 output 子字段） */

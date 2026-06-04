@@ -60,6 +60,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .manage(app_state)
         .manage(dreamina_state)
         .manage(Arc::new(canvas_mcp_bridge::CanvasMcpBridge::new()))
@@ -147,6 +148,9 @@ pub fn run() {
             commands::video_tools_cmd::extract_video_audio_to_assets,
             commands::video_tools_cmd::trim_video_to_assets,
             commands::video_tools_cmd::delogo_video_to_assets,
+            commands::video_tools_cmd::auto_delogo_video_to_assets,
+            commands::video_tools_cmd::platform_export_video,
+            commands::bgm_cmd::overlay_bgm_to_video,
             commands::dreamina_cmd::dreamina_cli_status,
             commands::dreamina_cmd::dreamina_cli_login_runtime,
             commands::dreamina_cmd::dreamina_cli_start_login,

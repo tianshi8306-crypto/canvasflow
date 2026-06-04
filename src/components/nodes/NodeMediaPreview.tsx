@@ -303,19 +303,36 @@ export function NodeMediaPreview({
   }
   if (kind === "video") {
     return (
-      <video
-        src={src}
-        className={videoClassName ?? "nodeMediaClip"}
-        style={videoStyle}
-        muted
-        autoPlay={videoAutoPlay}
-        loop={videoLoop}
-        playsInline
-        controls={videoControls}
-        preload={videoAutoPlay ? "auto" : "metadata"}
-        onLoadedMetadata={onVideoLoadedMetadata}
-        onError={() => setBroken(true)}
-      />
+      <div
+        tabIndex={0}
+        className="nodeMediaVideoWrapper"
+        onKeyDown={(e) => {
+          if (e.key === " " || e.key === "Spacebar") {
+            e.preventDefault();
+            const video = e.currentTarget.querySelector("video");
+            if (!video) return;
+            if (video.paused) {
+              void video.play();
+            } else {
+              video.pause();
+            }
+          }
+        }}
+      >
+        <video
+          src={src}
+          className={videoClassName ?? "nodeMediaClip"}
+          style={videoStyle}
+          muted
+          autoPlay={videoAutoPlay}
+          loop={videoLoop}
+          playsInline
+          controls={videoControls}
+          preload={videoAutoPlay ? "auto" : "metadata"}
+          onLoadedMetadata={onVideoLoadedMetadata}
+          onError={() => setBroken(true)}
+        />
+      </div>
     );
   }
   return <AudioWavePreview src={src} onBroken={() => setBroken(true)} />;

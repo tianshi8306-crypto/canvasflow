@@ -1,8 +1,8 @@
 import type { IncomingImagePanelRef } from "@/lib/imageGeneration/types";
-import { textContentFromUpstreamNode } from "@/lib/incomingScriptBinding";
+import { orderedIncomingTextNodeIds, textContentFromUpstreamNode } from "@/lib/incomingScriptBinding";
 import type { VideoIncomingRefItem } from "@/hooks/useVideoIncomingReferenceItems";
 import type { FlowNodeData } from "@/lib/types";
-import type { Node } from "@xyflow/react";
+import type { Edge, Node } from "@xyflow/react";
 
 /** 面板参考条上的文本上游：@文本N / @[nodeId] / @节点名 → 正文 */
 export type PanelTextRef = {
@@ -52,6 +52,34 @@ export function buildVideoPanelTextRefs(items: VideoIncomingRefItem[]): PanelTex
       displayToken: label ? `@${label}` : undefined,
     });
   });
+  return out;
+}
+
+/** 文本节点 Composer：上游 textNode / llm，@文本1、@文本2…（仅文本上游序号） */
+export function buildTextNodeUpstreamTextRefs(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  textNodeId: string,
+): PanelTextRef[] {
+  const out: PanelTextRef[] = [];
+  const ids = orderedIncomingTextNodeIds(nodes, edges, textNodeId);
+  let slot = 0;
+  for (const id of ids) {
+    const n = nodes.find((x) => x.id === id);
+    if (!n?.type || (n.type !== "textNode" && n.type !== "llm")) continue;
+    const content = textContentFromUpstreamNode(n.data);
+    if (!content.trim()) continue;
+    slot += 1;
+    const label = n.data.label?.trim() || (n.type === "llm" ? "LLM 节点" : "文本节点");
+    out.push({
+      sourceNodeId: id,
+      label,
+      content,
+      panelToken: `@文本${slot}`,
+      nodeToken: `@[${id}]`,
+      displayToken: label ? `@${label}` : undefined,
+    });
+  }
   return out;
 }
 

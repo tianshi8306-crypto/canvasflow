@@ -1,3 +1,4 @@
+pub mod bgm_cmd;
 pub mod assets_cmd;
 pub mod dreamina_cmd;
 pub mod download_cmd;

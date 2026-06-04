@@ -129,9 +129,45 @@ function VideoPromptMediaPill({
   compliance?: SeedanceImageComplianceResult;
   mirrorFont: string;
 }) {
+  const rawKind =
+    seg.mediaKind ??
+    (seg.kind === "atTextRef"
+      ? "text"
+      : seg.kind === "atRef"
+        ? seg.refKind
+        : "image");
+  const kind = rawKind;
+
+  if (kind === "text") {
+    return (
+      <span className="mention-token-slot">
+        <span className="mention-token-measure" aria-hidden>
+          {seg.token}
+        </span>
+        <span
+          role={onActivate ? "button" : undefined}
+          className={`mention-pill mention-pill--with-media mention-pill--video-ref mention-pill--density-compact${active ? " mention-pill--ref-active" : ""}${onActivate ? " mention-pill--clickable" : ""}`}
+          title={onActivate ? `查看上游：${seg.label}` : seg.label}
+          onMouseDown={
+            onActivate
+              ? (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onActivate();
+                }
+              : undefined
+          }
+        >
+          <span className="mention-pill-thumb mention-pill-thumb--text" aria-hidden>
+            文
+          </span>
+          <span className="mention-pill-label">{seg.label}</span>
+        </span>
+      </span>
+    );
+  }
+
   const pillVariant = seg.kind === "atNamed" ? "video-named" : "video-ref";
-  const rawKind = seg.mediaKind ?? (seg.kind === "atRef" ? seg.refKind : "image");
-  const kind = rawKind === "text" ? "image" : rawKind;
 
   return (
     <VideoPromptRefChip
@@ -227,6 +263,8 @@ export const VideoPromptMentionInput = forwardRef<
   const pickerHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingValueRef = useRef(value);
   const pendingCursorRef = useRef(0);
+  const isComposingRef = useRef(false);
+  const [localValue, setLocalValue] = useState(value);
   const [showDropdown, setShowDropdown] = useState(false);
   const [dropdownQuery, setDropdownQuery] = useState("");
   const [dropdownIndex, setDropdownIndex] = useState(0);
@@ -237,10 +275,13 @@ export const VideoPromptMentionInput = forwardRef<
 
   useLayoutEffect(() => {
     setMirrorFont(readMirrorFont(overlayRef.current));
-  }, [value, className]);
+  }, [localValue, className]);
 
   useEffect(() => {
-    pendingValueRef.current = value;
+    if (!isComposingRef.current) {
+      setLocalValue(value);
+      pendingValueRef.current = value;
+    }
   }, [value]);
 
   const clearPickerHoverTimer = useCallback(() => {
@@ -279,14 +320,14 @@ export const VideoPromptMentionInput = forwardRef<
   const overlaySegments = useMemo(
     () =>
       enrichVideoPromptSegmentsWithMedia(
-        parseVideoPromptInlineSegments(value, namedAssets),
+        parseVideoPromptInlineSegments(localValue, namedAssets),
         incomingRefs,
         displayNamesByEdge,
       ),
-    [value, namedAssets, incomingRefs, displayNamesByEdge],
+    [localValue, namedAssets, incomingRefs, displayNamesByEdge],
   );
 
-  useMentionTextMirror(textareaRef, overlayRef, [value]);
+  useMentionTextMirror(textareaRef, overlayRef, [localValue]);
 
   const schedulePickerHoverPreview = useCallback(
     (index: number) => {
@@ -372,6 +413,7 @@ export const VideoPromptMentionInput = forwardRef<
       }
 
       pendingValueRef.current = newValue;
+      setLocalValue(newValue);
       onChange(newValue);
       setShowDropdown(false);
       setPickerPos(null);
@@ -409,6 +451,7 @@ export const VideoPromptMentionInput = forwardRef<
       namedAssets,
     );
     pendingValueRef.current = normalized;
+    setLocalValue(normalized);
     pendingCursorRef.current = newStart;
     onChange(normalized);
     requestAnimationFrame(() => {
@@ -439,25 +482,70 @@ export const VideoPromptMentionInput = forwardRef<
     [pickerItems.length, resolvePickerPosition, updatePickerAnchor],
   );
 
-  const handleChange = useCallback(
-    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-      const newValue = e.target.value;
-      const cursor = e.target.selectionStart ?? 0;
-      pendingValueRef.current = newValue;
-      pendingCursorRef.current = cursor;
-      onChange(newValue);
-
+  const syncAtDropdownFromPrompt = useCallback(
+    (newValue: string, cursor: number) => {
       const textBefore = newValue.slice(0, cursor);
       const atMatch = textBefore.match(/@([^@\n]*)$/);
       if (atMatch && pickerItems.length > 0) {
-        openDropdown(atMatch[1]);
+        const q = atMatch[1];
+        const hasMatches =
+          !q ||
+          pickerItems.some(
+            (it) =>
+              it.menuTitle.toLowerCase().includes(q.toLowerCase()) ||
+              it.menuShortcut.toLowerCase().includes(q.toLowerCase()) ||
+              it.insertToken.toLowerCase().includes(q.toLowerCase()) ||
+              it.fileName.toLowerCase().includes(q.toLowerCase()) ||
+              (it.stemName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
+              (it.displayName?.toLowerCase().includes(q.toLowerCase()) ?? false),
+          );
+        if (hasMatches) {
+          openDropdown(q);
+        } else {
+          setShowDropdown(false);
+          setPickerPos(null);
+          clearPickerHoverPreview();
+        }
       } else {
         setShowDropdown(false);
         setPickerPos(null);
         clearPickerHoverPreview();
       }
     },
-    [onChange, openDropdown, pickerItems.length, clearPickerHoverPreview],
+    [openDropdown, pickerItems, clearPickerHoverPreview],
+  );
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+      const newValue = e.target.value;
+      const cursor = e.target.selectionStart ?? 0;
+      setLocalValue(newValue);
+      pendingValueRef.current = newValue;
+      pendingCursorRef.current = cursor;
+      if (!isComposingRef.current) {
+        onChange(newValue);
+      }
+      syncAtDropdownFromPrompt(newValue, cursor);
+    },
+    [onChange, syncAtDropdownFromPrompt],
+  );
+
+  const handleCompositionStart = useCallback(() => {
+    isComposingRef.current = true;
+  }, []);
+
+  const handleCompositionEnd = useCallback(
+    (e: React.CompositionEvent<HTMLTextAreaElement>) => {
+      isComposingRef.current = false;
+      const newValue = e.currentTarget.value;
+      const cursor = e.currentTarget.selectionStart ?? newValue.length;
+      setLocalValue(newValue);
+      pendingValueRef.current = newValue;
+      pendingCursorRef.current = cursor;
+      onChange(newValue);
+      syncAtDropdownFromPrompt(newValue, cursor);
+    },
+    [onChange, syncAtDropdownFromPrompt],
   );
 
   const pickItem = useCallback(
@@ -503,6 +591,7 @@ export const VideoPromptMentionInput = forwardRef<
           }
           const pos = maxLength != null ? Math.min(newCursor, maxLength) : newCursor;
           pendingValueRef.current = trimmed;
+          setLocalValue(trimmed);
           pendingCursorRef.current = pos;
           onChange(trimmed);
           setShowDropdown(false);
@@ -517,6 +606,7 @@ export const VideoPromptMentionInput = forwardRef<
       }
 
       if (!showDropdown || filteredItems.length === 0) return;
+      if (isComposingRef.current || e.nativeEvent.isComposing) return;
       if (e.key === "ArrowDown") {
         e.preventDefault();
         setDropdownIndex((i) => Math.min(i + 1, filteredItems.length - 1));
@@ -579,7 +669,7 @@ export const VideoPromptMentionInput = forwardRef<
     pickerHoverIndex != null ? filteredItems[pickerHoverIndex] : undefined;
 
   const pickerPortal =
-    showDropdown && pickerPos && typeof document !== "undefined"
+    showDropdown && pickerPos && filteredItems.length > 0 && typeof document !== "undefined"
       ? createPortal(
           <div
             ref={pickerListRef}
@@ -590,11 +680,8 @@ export const VideoPromptMentionInput = forwardRef<
             onPointerDown={(e) => e.stopPropagation()}
             onMouseLeave={clearPickerHoverPreview}
           >
-            {filteredItems.length === 0 ? (
-              <div className="video-at-picker__empty">无匹配素材</div>
-            ) : (
-              filteredItems.map((item, i) => {
-                const cited = promptContainsRefToken(value, item);
+            {filteredItems.map((item, i) => {
+                const cited = promptContainsRefToken(localValue, item);
                 return (
                   <button
                     key={item.edgeId}
@@ -637,8 +724,7 @@ export const VideoPromptMentionInput = forwardRef<
                     </span>
                   </button>
                 );
-              })
-            )}
+              })}
           </div>,
           document.body,
         )
@@ -675,8 +761,10 @@ export const VideoPromptMentionInput = forwardRef<
       <textarea
         ref={textareaRef}
         className={`mention-textarea mmPromptInput ${RF_NODE_INPUT_CLASS}`}
-        value={value}
+        value={localValue}
         onChange={handleChange}
+        onCompositionStart={handleCompositionStart}
+        onCompositionEnd={handleCompositionEnd}
         onKeyDown={handleKeyDown}
         onBlur={handleBlur}
         onSelect={(e) => {

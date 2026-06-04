@@ -70,7 +70,7 @@ describe("collectIncomingImageRefs", () => {
 });
 
 describe("aggregateImagePrompt", () => {
-  it("merges script beat, upstream text, and local prompt", () => {
+  it("merges script beat and local prompt without auto-injecting upstream text", () => {
     const beatId = "beat-1";
     const script = node("S", "scriptNode", {
       scriptBeats: [{ id: beatId, description: "beat desc" } as ScriptBeat],
@@ -83,7 +83,7 @@ describe("aggregateImagePrompt", () => {
 
     const { prompt } = aggregateImagePrompt(nodes, edges, "T");
     expect(prompt).toContain("shot visual");
-    expect(prompt).toContain("text upstream");
+    expect(prompt).not.toContain("text upstream");
     expect(prompt).toContain("local");
     expect(prompt.endsWith("local")).toBe(true);
   });

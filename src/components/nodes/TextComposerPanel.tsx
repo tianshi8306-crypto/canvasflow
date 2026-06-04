@@ -264,6 +264,16 @@ export function TextComposerPanel({
     void focusPartnerNode(upstreamImage.nodeId, { kind: "image" });
   }, [focusPartnerNode, upstreamImage?.nodeId]);
 
+  const insertModelAtToken = useCallback(
+    (token: string) => {
+      const cur = modelInput;
+      if (cur.includes(token)) return;
+      const spacerBefore = cur.length > 0 && !/\s$/.test(cur) ? " " : "";
+      setModelInput(`${cur}${spacerBefore}${token}`);
+    },
+    [modelInput, setModelInput],
+  );
+
   const handleFocusUpstreamText = useCallback(
     (sourceNodeId: string) => {
       const source = upstreamTextSources.find((s) => s.nodeId === sourceNodeId);
@@ -418,21 +428,31 @@ export function TextComposerPanel({
             <div className="tgp-v2-zone-a-start">
               {upstreamTextSources.length > 0 && !isImageToPrompt && !isTextToMusic ? (
                 <div className="tgp-upstream-text-tags" aria-label="上游文本节点">
-                  {upstreamTextSources.map((source) => (
+                  {upstreamTextSources.map((source, index) => {
+                    const token = `@文本${index + 1}`;
+                    return (
                     <button
                       key={source.nodeId}
                       type="button"
                       className="tgp-upstream-text-tag"
-                      title={`定位上游「${source.label}」· ${formatUpstreamTextCharCount(source.charCount)} 字`}
+                      title={`${token} · Shift+单击插入 · 单击定位「${source.label}」`}
                       onPointerDown={onPointerDown}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (e.shiftKey) {
+                          insertModelAtToken(token);
+                          return;
+                        }
                         handleFocusUpstreamText(source.nodeId);
                       }}
                     >
-                      {source.label}
+                      <span className="tgp-upstream-text-tagGlyph" aria-hidden>
+                        文
+                      </span>
+                      {token}
                     </button>
-                  ))}
+                    );
+                  })}
                 </div>
               ) : null}
               <span className="tgp-v2-hint">{zoneAHint}</span>

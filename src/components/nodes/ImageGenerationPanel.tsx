@@ -805,6 +805,7 @@ export function ImageGenerationPanel({
           onChange={setPrompt}
           incomingRefs={displayImageRefs}
           textPickerItems={textPickerItems}
+          panelItems={displayPanelItems}
           nodeLabels={nodeLabels}
           placeholder={
             displayPanelItems.length > 0
@@ -825,7 +826,6 @@ export function ImageGenerationPanel({
           onClose={() => setSlashCursorRect(null)}
         />
       ) : null}
-
 
       <ImageGenerationStatusRail
         isGenerating={isGenerating}

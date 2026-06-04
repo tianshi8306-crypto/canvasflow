@@ -672,6 +672,40 @@ export function VideoMultimodalInputPanel({
           <span className="mmBypassHint">
             自动优化参考图，大幅提升 Seedance 2.0 人脸审核通过率
           </span>
+          {draft.faceBypassEnabled !== false && (
+            <div className="mmBypassModes">
+              <button
+                type="button"
+                className={`mmBypassModeBtn ${(draft.faceBypassMode ?? "scramble") === "scramble" ? "mmBypassModeBtn--active" : ""}`}
+                onClick={() => {
+                  recordBeforeDiscreteMutation(useProjectStore.getState);
+                  patchDraft({ faceBypassMode: "scramble" });
+                }}
+              >
+                块打乱
+              </button>
+              <button
+                type="button"
+                className={`mmBypassModeBtn ${draft.faceBypassMode === "erase" ? "mmBypassModeBtn--active" : ""}`}
+                onClick={() => {
+                  recordBeforeDiscreteMutation(useProjectStore.getState);
+                  patchDraft({ faceBypassMode: "erase" });
+                }}
+              >
+                移除人脸
+              </button>
+              <button
+                type="button"
+                className={`mmBypassModeBtn ${draft.faceBypassMode === "standard" ? "mmBypassModeBtn--active" : ""}`}
+                onClick={() => {
+                  recordBeforeDiscreteMutation(useProjectStore.getState);
+                  patchDraft({ faceBypassMode: "standard" });
+                }}
+              >
+                标准
+              </button>
+            </div>
+          )}
         </div>
       )}
 

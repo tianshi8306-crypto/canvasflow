@@ -52,7 +52,6 @@ import {
   validateConnection,
 } from "@/lib/flowConnectionPolicy";
 import { applyTextWorkflowSyncToNodes } from "@/lib/textNodeWorkflowSync";
-import { patchVideoNodesWithUpstreamTextPrompt } from "@/lib/videoGeneration/videoTextPromptSync";
 import { patchVideoNodesWithUpstreamVideoPrompt } from "@/lib/videoGeneration/videoVideoPromptSync";
 import { CANVAS_EDGE_STYLE_DEFAULT } from "@/lib/canvasColors";
 import { makeFlowEdge } from "@/lib/flowEdge";
@@ -397,9 +396,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       const tn = s.nodes.find((n) => n.id === normalized.target);
       if (tn?.type === "videoNode") {
         nodes = patchVideoNodesWithUpstreamVideoPrompt(nodes, edges, normalized.target, {
-          onlyIfPromptEmpty: true,
-        });
-        nodes = patchVideoNodesWithUpstreamTextPrompt(nodes, edges, normalized.target, {
           onlyIfPromptEmpty: true,
         });
       }

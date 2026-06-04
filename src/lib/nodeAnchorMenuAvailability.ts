@@ -20,7 +20,6 @@ export function isAnchorPartnerOfferedForKind(
   if (!allowed) return false;
   if (anchorType === "ffmpegConcat" && partnerKey === "ffmpegConcat") return false;
   if (anchorType === "scriptNode" && partnerKey === "scriptNode") return false;
-  if (anchorType === "textNode" && partnerKey === "textNode") return false;
   return true;
 }
 
@@ -72,8 +71,6 @@ export function isAnchorMenuRowAvailable(
   const { anchorNodeId, nodes, edges } = ctx;
 
   if (anchorType === "scriptNode" && partner === "scriptNode") return false;
-  if (anchorType === "textNode" && partner === "textNode") return false;
-
   if (anchorType === "textNode") {
     if (direction === "outgoing") {
       if (partner === "videoNode" && hasOutgoingToType(edges, nodes, anchorNodeId, "videoNode")) {

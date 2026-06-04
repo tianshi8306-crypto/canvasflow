@@ -78,14 +78,10 @@ export function aggregateImagePrompt(
     items,
     readImageReferenceEdgeOrder(node?.data.params),
   );
-  const textItems = ordered.filter((i) => i.kind === "text");
-  const textTruncated = textItems.length > MAX_INCOMING_IMAGE_TEXT_REFS;
-  const segments = textItems
-    .slice(0, MAX_INCOMING_IMAGE_TEXT_REFS)
-    .map((i) => i.textContent.trim())
-    .filter(Boolean);
+  const textTruncated = ordered.filter((i) => i.kind === "text").length > MAX_INCOMING_IMAGE_TEXT_REFS;
 
-  const parts = dedupeAdjacent([scriptPart, ...segments, localPrompt].filter(Boolean));
+  /** 上游文本仅通过 prompt 内 @文本N / 参考条插入带入，连线 alone 不拼正文 */
+  const parts = dedupeAdjacent([scriptPart, localPrompt].filter(Boolean));
   const prompt = truncateAggregatedPrompt(parts, localPrompt);
 
   return { prompt: prompt.trim(), textTruncated };

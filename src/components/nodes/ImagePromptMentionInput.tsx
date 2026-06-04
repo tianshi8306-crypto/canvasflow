@@ -31,6 +31,7 @@ import {
   mapImagePromptCursorAfterSegmentReplace,
 } from "@/lib/imageGeneration/imagePromptMentionEditing";
 import type { ResolvedIncomingImageRef } from "@/lib/imageGeneration/types";
+import type { IncomingImagePanelRef } from "@/lib/imageGeneration/types";
 import { applyAtomicTokenDeletion } from "@/lib/mentionInputEditing";
 import { USER_INPUT_PLACEHOLDER } from "@/lib/slashPresets";
 import { useMentionTextMirror } from "@/hooks/useMentionTextMirror";
@@ -47,6 +48,8 @@ export interface ImagePromptMentionInputProps {
   incomingRefs: ResolvedIncomingImageRef[];
   /** 参考条上的文本上游（@文本N） */
   textPickerItems?: ImageTextRefPickerItem[];
+  /** 参考条顺序（解析 @文本N → 源节点） */
+  panelItems?: IncomingImagePanelRef[];
   nodeLabels?: Record<string, string>;
   placeholder?: string;
   className?: string;
@@ -130,6 +133,44 @@ function PickerHoverPreview({
   );
 }
 
+function ImageRefTextPill({
+  seg,
+  active,
+  onActivate,
+}: {
+  seg: ImagePromptInlineSegmentWithMedia;
+  active: boolean;
+  onActivate?: () => void;
+}) {
+  if (seg.kind !== "atTextRef") return null;
+  return (
+    <span className="mention-token-slot">
+      <span className="mention-token-measure" aria-hidden>
+        {seg.token}
+      </span>
+      <span
+        role={onActivate ? "button" : undefined}
+        className={`mention-pill mention-pill--with-media mention-pill--video-ref mention-pill--density-compact${active ? " mention-pill--ref-active" : ""}${onActivate ? " mention-pill--clickable" : ""}`}
+        title={onActivate ? `查看上游：${seg.label}` : seg.label}
+        onMouseDown={
+          onActivate
+            ? (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onActivate();
+              }
+            : undefined
+        }
+      >
+        <span className="mention-pill-thumb mention-pill-thumb--text" aria-hidden>
+          文
+        </span>
+        <span className="mention-pill-label">{seg.label}</span>
+      </span>
+    </span>
+  );
+}
+
 function ImageRefMediaPill({
   seg,
   active,
@@ -141,7 +182,7 @@ function ImageRefMediaPill({
   mirrorFont: string;
   onActivate?: () => void;
 }) {
-  if (seg.kind === "text" || seg.kind === "style") return null;
+  if (seg.kind === "text" || seg.kind === "style" || seg.kind === "atTextRef") return null;
   const hasMedia = Boolean(seg.path || seg.assetId);
   const pillVariant = seg.kind === "atNamed" || seg.kind === "nodeMention" ? "video-named" : "video-ref";
 
@@ -182,6 +223,7 @@ export const ImagePromptMentionInput = forwardRef<
       onChange,
       incomingRefs,
       textPickerItems = [],
+      panelItems = [],
       nodeLabels = {},
       placeholder,
       className = "",
@@ -199,6 +241,8 @@ export const ImagePromptMentionInput = forwardRef<
     const pickerHoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const pendingValueRef = useRef(value);
     const pendingCursorRef = useRef(0);
+    const isComposingRef = useRef(false);
+    const [localValue, setLocalValue] = useState(value);
     const [showDropdown, setShowDropdown] = useState(false);
     const [dropdownQuery, setDropdownQuery] = useState("");
     const [dropdownIndex, setDropdownIndex] = useState(0);
@@ -209,10 +253,13 @@ export const ImagePromptMentionInput = forwardRef<
 
     useLayoutEffect(() => {
       setMirrorFont(readMentionMirrorFont(overlayRef.current));
-    }, [value, className]);
+    }, [localValue, className]);
 
     useEffect(() => {
-      pendingValueRef.current = value;
+      if (!isComposingRef.current) {
+        setLocalValue(value);
+        pendingValueRef.current = value;
+      }
     }, [value]);
 
     const clearPickerHoverTimer = useCallback(() => {
@@ -262,14 +309,15 @@ export const ImagePromptMentionInput = forwardRef<
     const overlaySegments = useMemo(
       () =>
         enrichImagePromptSegmentsWithMedia(
-          parseImagePromptInlineSegments(value, incomingRefs, nodeLabels),
+          parseImagePromptInlineSegments(localValue, incomingRefs, nodeLabels),
           incomingRefs,
           nodeLabels,
+          panelItems,
         ),
-      [value, incomingRefs, nodeLabels],
+      [localValue, incomingRefs, nodeLabels, panelItems],
     );
 
-    useMentionTextMirror(textareaRef, overlayRef, [value]);
+    useMentionTextMirror(textareaRef, overlayRef, [localValue]);
 
     const resolvePickerPosition = useCallback(
       (rowCount: number): { left: number; top: number } | null => {
@@ -352,6 +400,7 @@ export const ImagePromptMentionInput = forwardRef<
         }
 
         pendingValueRef.current = newValue;
+        setLocalValue(newValue);
         onChange(newValue);
         setShowDropdown(false);
         setPickerPos(null);
@@ -377,6 +426,7 @@ export const ImagePromptMentionInput = forwardRef<
         const newValue =
           textBefore.slice(0, textBefore.length - slashMatch[0].length) + template + textAfter;
         pendingValueRef.current = newValue;
+        setLocalValue(newValue);
         onChange(newValue);
         requestAnimationFrame(() => {
           textarea.focus();
@@ -418,6 +468,7 @@ export const ImagePromptMentionInput = forwardRef<
         nodeLabels,
       );
       pendingValueRef.current = normalized;
+      setLocalValue(normalized);
       pendingCursorRef.current = newStart;
       onChange(normalized);
       requestAnimationFrame(() => {
@@ -453,9 +504,12 @@ export const ImagePromptMentionInput = forwardRef<
       (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const newValue = e.target.value;
         const cursor = e.target.selectionStart ?? 0;
+        setLocalValue(newValue);
         pendingValueRef.current = newValue;
         pendingCursorRef.current = cursor;
-        onChange(newValue);
+        if (!isComposingRef.current) {
+          onChange(newValue);
+        }
 
         const textBefore = newValue.slice(0, cursor);
         const slashMatch = textBefore.match(/\/([^/\n]*)$/);
@@ -469,7 +523,25 @@ export const ImagePromptMentionInput = forwardRef<
 
         const atMatch = textBefore.match(/@([^@\n]*)$/);
         if (atMatch && pickerItems.length > 0) {
-          openDropdown(atMatch[1]);
+          const q = atMatch[1];
+          const hasMatches =
+            !q ||
+            pickerItems.some(
+              (it) =>
+                it.menuTitle.toLowerCase().includes(q.toLowerCase()) ||
+                it.menuShortcut.toLowerCase().includes(q.toLowerCase()) ||
+                it.insertToken.toLowerCase().includes(q.toLowerCase()) ||
+                it.fileName.toLowerCase().includes(q.toLowerCase()) ||
+                (it.stemName?.toLowerCase().includes(q.toLowerCase()) ?? false) ||
+                (it.displayName?.toLowerCase().includes(q.toLowerCase()) ?? false),
+            );
+          if (hasMatches) {
+            openDropdown(q);
+          } else {
+            setShowDropdown(false);
+            setPickerPos(null);
+            clearPickerHoverPreview();
+          }
         } else {
           setShowDropdown(false);
           setPickerPos(null);
@@ -477,6 +549,23 @@ export const ImagePromptMentionInput = forwardRef<
         }
       },
       [onChange, openDropdown, pickerItems.length, clearPickerHoverPreview, onSlashTrigger],
+    );
+
+    const handleCompositionStart = useCallback(() => {
+      isComposingRef.current = true;
+    }, []);
+
+    const handleCompositionEnd = useCallback(
+      (e: React.CompositionEvent<HTMLTextAreaElement>) => {
+        isComposingRef.current = false;
+        const newValue = e.currentTarget.value;
+        const cursor = e.currentTarget.selectionStart ?? newValue.length;
+        setLocalValue(newValue);
+        pendingValueRef.current = newValue;
+        pendingCursorRef.current = cursor;
+        onChange(newValue);
+      },
+      [onChange],
     );
 
     const pickItem = useCallback(
@@ -526,6 +615,7 @@ export const ImagePromptMentionInput = forwardRef<
             }
             const pos = maxLength != null ? Math.min(newCursor, maxLength) : newCursor;
             pendingValueRef.current = trimmed;
+            setLocalValue(trimmed);
             pendingCursorRef.current = pos;
             onChange(trimmed);
             setShowDropdown(false);
@@ -540,6 +630,7 @@ export const ImagePromptMentionInput = forwardRef<
         }
 
         if (!showDropdown || filteredItems.length === 0) return;
+        if (isComposingRef.current || e.nativeEvent.isComposing) return;
         if (e.key === "ArrowDown") {
           e.preventDefault();
           setDropdownIndex((i) => Math.min(i + 1, filteredItems.length - 1));
@@ -603,7 +694,7 @@ export const ImagePromptMentionInput = forwardRef<
       pickerHoverIndex != null ? filteredItems[pickerHoverIndex] : undefined;
 
     const pickerPortal =
-      showDropdown && pickerPos && typeof document !== "undefined"
+      showDropdown && pickerPos && filteredItems.length > 0 && typeof document !== "undefined"
         ? createPortal(
             <div
               ref={pickerListRef}
@@ -614,10 +705,7 @@ export const ImagePromptMentionInput = forwardRef<
               onPointerDown={(e) => e.stopPropagation()}
               onMouseLeave={clearPickerHoverPreview}
             >
-              {filteredItems.length === 0 ? (
-                <div className="video-at-picker__empty">无匹配参考</div>
-              ) : (
-                filteredItems.map((item, i) => {
+              {filteredItems.map((item, i) => {
                   const cited = promptContainsImageRefToken(value, item);
                   const isTextRef = item.insertToken.startsWith("@文本");
                   return (
@@ -665,9 +753,8 @@ export const ImagePromptMentionInput = forwardRef<
                         <span className="video-at-picker__shortcut">{item.menuShortcut}</span>
                       </span>
                     </button>
-                  );
-                })
-              )}
+                );
+              })}
             </div>,
             document.body,
           )
@@ -695,6 +782,20 @@ export const ImagePromptMentionInput = forwardRef<
                 </span>
               );
             }
+            if (seg.kind === "atTextRef") {
+              return (
+                <ImageRefTextPill
+                  key={`text-${idx}-${seg.token}`}
+                  seg={seg}
+                  active={Boolean(seg.sourceNodeId && seg.sourceNodeId === activeRefSourceNodeId)}
+                  onActivate={
+                    seg.sourceNodeId && onRefPillActivate
+                      ? () => onRefPillActivate(seg.sourceNodeId!)
+                      : undefined
+                  }
+                />
+              );
+            }
             return (
               <ImageRefMediaPill
                 key={`${seg.kind}-${idx}-${seg.token}`}
@@ -713,8 +814,10 @@ export const ImagePromptMentionInput = forwardRef<
         <textarea
           ref={textareaRef}
           className={`mention-textarea ${RF_NODE_INPUT_CLASS}`}
-          value={value}
+          value={localValue}
           onChange={handleChange}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
           onSelect={(e) => {

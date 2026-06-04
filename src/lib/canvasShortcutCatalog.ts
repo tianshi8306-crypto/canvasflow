@@ -121,6 +121,7 @@ export function buildCanvasShortcutColumns(): ShortcutColumn[] {
         },
         { id: "delete", label: "删除", binding: { kind: "keys", tokens: ["Del"] } },
         { id: "copy", label: "复制", binding: { kind: "keys", tokens: ["mod", "C"] } },
+        { id: "duplicate", label: "创建副本", binding: { kind: "keys", tokens: ["mod", "D"] } },
         { id: "paste", label: "粘贴", binding: { kind: "keys", tokens: ["mod", "V"] } },
         {
           id: "dbl-pane",

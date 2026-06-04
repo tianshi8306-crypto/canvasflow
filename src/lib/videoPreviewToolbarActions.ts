@@ -12,7 +12,8 @@ export type VideoPreviewToolbarMenuMode =
   | "trim"
   | "concat"
   | "subtitle-auto"
-  | "subtitle-region";
+  | "subtitle-region"
+  | "platform_export";
 
 export type VideoPreviewToolbarMenuOption = {
   id: string;
@@ -39,6 +40,19 @@ export type VideoPreviewToolbarItem = {
 /** 预览顶栏主区：对齐 LibTV 2.3 视频工具 + 参考图胶囊布局 */
 
 export const VIDEO_PREVIEW_TOOLBAR_PRIMARY: VideoPreviewToolbarItem[] = [
+  {
+    id: "export",
+    label: "导出发布",
+    kind: "menu",
+    hasMenu: true,
+    menuOptions: [
+      { id: "export-douyin", label: "抖音 (9:16 竖屏)", mode: "platform_export" },
+      { id: "export-bilibili", label: "B站 (16:9 横屏)", mode: "platform_export" },
+      { id: "export-xiaohongshu", label: "小红书 (3:4)", mode: "platform_export" },
+      { id: "export-youtube_shorts", label: "YouTube Shorts (9:16)", mode: "platform_export" },
+      { id: "export-youtube", label: "YouTube (16:9)", mode: "platform_export" },
+    ],
+  },
   {
     id: "clip",
     label: "剪辑",

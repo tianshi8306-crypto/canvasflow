@@ -170,7 +170,8 @@ export function parseAtReferences(prompt: string, namedAssets?: NamedAsset[]): P
       /^图\d+$/.test(name) ||
       /^视频\d+$/.test(name) ||
       /^声音\d+$/.test(name) ||
-      /^音频\d+$/.test(name)
+      /^音频\d+$/.test(name) ||
+      /^文本\d+$/.test(name)
     ) {
       continue;
     }

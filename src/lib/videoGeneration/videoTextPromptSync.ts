@@ -147,7 +147,7 @@ export function videoUpstreamTextPanelHint(state: IncomingScriptUpstreamState): 
   if (state === "none") {
     return "将文本节点连线到本节点，可注入为 Seedance 文生视频 prompt。";
   }
-  return "已连接上游文本（Seedance 文生视频）：prompt 为空时会自动注入。";
+  return "将文本节点连线到本节点，在 prompt 中用 @文本N 或 Shift+单击参考条插入后再生成。";
 }
 
 export function videoUpstreamTextStatusMessage(sources: VideoUpstreamTextSource[]): string {

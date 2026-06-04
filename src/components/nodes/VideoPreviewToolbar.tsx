@@ -7,6 +7,7 @@ import {
   type VideoPreviewToolbarItem,
   type VideoPreviewToolbarMenuOption,
 } from "@/lib/videoPreviewToolbarActions";
+import { platformExportVideo } from "@/lib/compose/platformExportBridge";
 import { MediaPromptReverseButton } from "@/components/nodes/MediaPromptReverseButton";
 import { PreviewToolbarMenuPortal } from "@/components/nodes/nodeChrome";
 import {
@@ -109,6 +110,29 @@ function IconAudioSplit() {
   );
 }
 
+function IconExport() {
+  return (
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        d="M8 10V3.5M5.5 7 8 9.5 10.5 7"
+      />
+      <rect x="2" y="1.5" width="12" height="13" rx="1.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+        d="M2 6.5h12"
+        strokeDasharray="2 2"
+      />
+    </svg>
+  );
+}
+
 function IconDownload() {
   return (
     <svg viewBox="0 0 16 16" aria-hidden>
@@ -143,6 +167,7 @@ const PRIMARY_ICONS: Record<string, () => JSX.Element> = {
   parse: IconParse,
   subtitle: IconSubtitle,
   audioSplit: IconAudioSplit,
+  export: IconExport,
 };
 
 export function VideoPreviewToolbar({ nodeId }: Props) {
@@ -210,15 +235,29 @@ export function VideoPreviewToolbar({ nodeId }: Props) {
         setVideoTrimEditingNodeId(null);
         return;
       }
+      if (opt.mode === "platform_export") {
+        const preset = opt.id.startsWith("export-") ? opt.id.slice("export-".length) : opt.id;
+        if (!projectPath?.trim() || !mediaPath) {
+          setStatusText("请先有可导出的视频");
+          return;
+        }
+        setStatusText(`正在导出为${opt.label}…`);
+        platformExportVideo(projectPath, mediaPath, preset)
+          .then(() => setStatusText(`${opt.label}导出完成`))
+          .catch((e) => setStatusText(`导出失败：${e instanceof Error ? e.message : String(e)}`));
+        return;
+      }
       setStatusText(opt.stubMessage ?? "即将支持");
     },
     [
       enterVideoSubtitleRegionMode,
       enterVideoTrimMode,
       extractVideoAudioLeftOfNode,
+      mediaPath,
       nodeId,
       openVideoClipConcat,
       openVideoToolbarWorkflow,
+      projectPath,
       setStatusText,
       setVideoSubtitleRegionEditingNodeId,
       setVideoTrimEditingNodeId,

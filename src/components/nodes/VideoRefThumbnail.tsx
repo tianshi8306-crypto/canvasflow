@@ -1,10 +1,9 @@
-import { useCallback, useMemo, type PointerEvent as ReactPointerEvent } from "react";
+import { useCallback, type PointerEvent as ReactPointerEvent } from "react";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
 import {
   VideoRefThumbAudioCenterPlay,
   VideoRefThumbAudioProvider,
 } from "@/components/nodes/VideoRefThumbAudioScrub";
-import { videoRefTextThumbExcerpt } from "@/lib/videoRefTextThumbExcerpt";
 import type { VideoIncomingRefKind } from "@/hooks/useVideoIncomingReferenceItems";
 
 export type VideoRefThumbnailProps = {
@@ -47,7 +46,7 @@ export function VideoRefThumbnail({
   assetId,
   kind,
   nodeLabel,
-  textContent,
+  textContent: _textContent,
   hasAudioDialogue = false,
   edgeId,
   useFocusLoop = false,
@@ -75,13 +74,8 @@ export function VideoRefThumbnail({
   const isText = kind === "text";
   const isPendingMedia = !isText && !hasMedia;
 
-  const textExcerpt = useMemo(
-    () => (isText ? videoRefTextThumbExcerpt(textContent) : ""),
-    [isText, textContent],
-  );
-
   const title = isText
-    ? "拖动换位 · Shift+单击插入 @"
+    ? `${nodeLabel} · ${atToken ?? `@文本${badgeLabel}`} · Shift+单击插入`
     : isPendingMedia
       ? `${nodeLabel}（待出片）`
       : kind === "audio"
@@ -173,12 +167,9 @@ export function VideoRefThumbnail({
       </button>
       <div className="mmThumbInner">
         {isText ? (
-          <div className="mmThumbTextMicro" aria-hidden>
-            {textExcerpt ? (
-              <div className="mmThumbTextMicro-inner">{textExcerpt}</div>
-            ) : (
-              <span className="mmThumbTextMicro-empty">空</span>
-            )}
+          <div className="mmThumbTextGlyph" aria-hidden>
+            <span className="mmThumbTextGlyphMark">文</span>
+            <span className="mmThumbTextGlyphLabel">{atToken ?? `@文本${badgeLabel}`}</span>
           </div>
         ) : null}
         {isPendingMedia && kind !== "audio" ? (

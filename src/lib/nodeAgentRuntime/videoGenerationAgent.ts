@@ -129,7 +129,9 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
     const bypassEnabled = draft.faceBypassEnabled !== false; // 默认开启
     if (isSeedance2 && bypassEnabled && !useDreaminaCli && imageDataUrls.length > 0) {
       try {
-        const results = await bypassFaceReviewBatch(imageDataUrls);
+        const results = await bypassFaceReviewBatch(imageDataUrls, {
+          mode: draft.faceBypassMode ?? "scramble",
+        });
         imageDataUrls = results.map((r) => r.dataUrl); // 替换为处理后图片
       } catch {
         // 任何步骤失败：静默回退，使用原 imageDataUrls

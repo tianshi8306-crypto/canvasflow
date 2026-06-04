@@ -12,7 +12,6 @@ import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
 import { isEdgeDisabled } from "@/lib/edgeState";
 import type { ResolvedIncomingImagePanelRef } from "@/lib/imageGeneration/types";
 import { imageRefAtToken, imageTextRefAtToken } from "@/lib/imageGeneration/imagePromptAtTokens";
-import { videoRefTextThumbExcerpt } from "@/lib/videoRefTextThumbExcerpt";
 import {
   fitHoverPreviewBox,
   readMediaNaturalSize,
@@ -282,10 +281,10 @@ export function ImageRefThumbStrip({
               ? undefined
               : imageRefAtToken(imageSlotBeforeIndex(items, idx));
             const insertToken = isText ? imageTextRefAtToken(idx + 1) : imageAtToken;
+            const textSlotLabel = isText ? `文本${idx + 1}` : "";
             const title = isText
-              ? `${item.nodeLabel} · 拖动换位 · Shift+单击插入 ${insertToken} · 点击 × 移除连线`
+              ? `${item.nodeLabel} · @${textSlotLabel} · 拖动换位 · Shift+单击插入 ${insertToken} · 点击 × 移除连线`
               : `参考图 ${badge} · 拖动换位 · 单击选中 · Shift+单击插入 ${imageAtToken} · 悬停预览 · 点击 × 移除连线`;
-            const textExcerpt = isText ? videoRefTextThumbExcerpt(item.textContent) : "";
             return (
               <div
                 key={edgeId}
@@ -342,12 +341,9 @@ export function ImageRefThumbStrip({
                   className={`igpRefStrip-thumbInner${isText ? " igpRefStrip-thumbInner--text" : ""}`}
                 >
                   {isText ? (
-                    <div className="igpRefStrip-textMicro" aria-hidden>
-                      {textExcerpt ? (
-                        <div className="igpRefStrip-textMicro-inner">{textExcerpt}</div>
-                      ) : (
-                        <span className="igpRefStrip-textMicro-empty">空</span>
-                      )}
+                    <div className="igpRefStrip-textGlyph" aria-hidden>
+                      <span className="igpRefStrip-textGlyphMark">文</span>
+                      <span className="igpRefStrip-textGlyphLabel">@{textSlotLabel}</span>
                     </div>
                   ) : (
                     <NodeMediaPreview

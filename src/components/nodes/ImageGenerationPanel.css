@@ -170,7 +170,36 @@
 }
 
 .imageGenPanel--minimal .igpRefStrip-thumbInner--text {
-  background: #fff;
+  background: rgba(38, 38, 42, 0.95);
+}
+
+.imageGenPanel--minimal .igpRefStrip-textGlyph {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.imageGenPanel--minimal .igpRefStrip-textGlyphMark {
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.imageGenPanel--minimal .igpRefStrip-textGlyphLabel {
+  font-size: 8px;
+  line-height: 1;
+  opacity: 0.88;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
 }
 
 .imageGenPanel--minimal .igpRefStrip-textMicro {

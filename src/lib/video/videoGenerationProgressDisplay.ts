@@ -6,6 +6,7 @@ export type VideoGenerationProgressInput = {
   status?: VideoJobStatusLike | null;
   progress?: number | null;
   cancelling?: boolean;
+  submitting?: boolean;
 };
 
 /** 仅当后端/API 返回有效 progress 时才给出 0~99 整数百分比 */
@@ -16,13 +17,14 @@ export function getVideoGenerationProgressPercent(
 }
 
 export function isVideoGenerationInProgress(input: VideoGenerationProgressInput): boolean {
-  if (input.cancelling) return true;
+  if (input.cancelling || input.submitting) return true;
   return input.status === "queued" || input.status === "running";
 }
 
 /** 分阶段文案：无真实 progress 时不显示假数字 */
 export function getVideoGenerationDisplayLabel(input: VideoGenerationProgressInput): string {
   if (input.cancelling) return "取消中…";
+  if (input.submitting) return "提交中…";
 
   const percent = getVideoGenerationProgressPercent(input);
   const status = input.status;

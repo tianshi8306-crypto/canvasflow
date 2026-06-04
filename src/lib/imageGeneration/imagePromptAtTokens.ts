@@ -2,8 +2,7 @@ import { assetNameStem } from "@/lib/seedance/promptBuilder";
 import { parseAtReferences, type NamedAsset } from "@/lib/seedance/promptBuilder";
 import { IMAGE_STYLE_TOKEN_RE, isImageStyleId } from "@/lib/imageGeneration/imageStyleTokens";
 import { IMAGE_STYLE_OPTIONS, type ImageStyleId } from "@/lib/imageGeneration/catalog";
-import type { ResolvedIncomingImageRef } from "@/lib/imageGeneration/types";
-import type { IncomingImagePanelRef } from "@/lib/imageGeneration/types";
+import type { IncomingImagePanelRef, ResolvedIncomingImageRef } from "@/lib/imageGeneration/types";
 
 const MENTION_NODE_RE = /@\[([^\]]+)\]/;
 
@@ -53,6 +52,7 @@ export type ImagePromptInlineSegment =
   | { kind: "style"; styleId: ImageStyleId; label: string; token: string }
   | { kind: "nodeMention"; nodeId: string; label: string; token: string }
   | { kind: "atRef"; index: number; token: string; label: string }
+  | { kind: "atTextRef"; slot: number; token: string; label: string }
   | { kind: "atNamed"; name: string; token: string; label: string };
 
 export type ImagePromptInlineSegmentWithMedia = ImagePromptInlineSegment & {
@@ -235,7 +235,12 @@ function findSourceNodeIdForSegment(
   seg: Exclude<ImagePromptInlineSegment, { kind: "text" | "style" }>,
   refs: ResolvedIncomingImageRef[],
   nodeLabels: Record<string, string> = {},
+  panelItems: IncomingImagePanelRef[] = [],
 ): string | undefined {
+  if (seg.kind === "atTextRef") {
+    const item = panelItems[seg.slot - 1];
+    return item?.kind === "text" ? item.sourceNodeId : undefined;
+  }
   const metaMap = buildImageRefAtMeta(refs, nodeLabels);
   if (seg.kind === "nodeMention") {
     return metaMap.has(seg.nodeId) ? seg.nodeId : undefined;
@@ -265,11 +270,15 @@ export function enrichImagePromptSegmentsWithMedia(
   segments: ImagePromptInlineSegment[],
   refs: ResolvedIncomingImageRef[],
   nodeLabels: Record<string, string> = {},
+  panelItems: IncomingImagePanelRef[] = [],
 ): ImagePromptInlineSegmentWithMedia[] {
   return segments.map((seg) => {
     if (seg.kind === "text" || seg.kind === "style") return seg;
-    const sourceNodeId = findSourceNodeIdForSegment(seg, refs, nodeLabels);
+    const sourceNodeId = findSourceNodeIdForSegment(seg, refs, nodeLabels, panelItems);
     if (!sourceNodeId) return seg;
+    if (seg.kind === "atTextRef") {
+      return { ...seg, sourceNodeId };
+    }
     const ref = refs.find((r) => r.sourceNodeId === sourceNodeId);
     if (!ref) return seg;
     const meta = buildImageRefAtMeta(refs, nodeLabels).get(sourceNodeId);
@@ -298,6 +307,23 @@ export function parseImagePromptInlineSegments(
   const named = buildImageNamedAssetsFromRefs(refs, nodeLabels);
   const atRefs = parseAtReferences(prompt, named);
   const markers: SegmentMarker[] = [];
+
+  const textPanelRe = /@文本(\d+)/g;
+  let textPanelMatch: RegExpExecArray | null;
+  while ((textPanelMatch = textPanelRe.exec(prompt)) !== null) {
+    const slot = parseInt(textPanelMatch[1], 10);
+    if (!Number.isFinite(slot) || slot < 1) continue;
+    markers.push({
+      start: textPanelMatch.index,
+      end: textPanelMatch.index + textPanelMatch[0].length,
+      seg: {
+        kind: "atTextRef",
+        slot,
+        token: textPanelMatch[0],
+        label: `文本${slot}`,
+      },
+    });
+  }
 
   for (const ref of atRefs) {
     if (ref.name) {

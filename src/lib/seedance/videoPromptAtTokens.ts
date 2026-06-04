@@ -412,6 +412,7 @@ export function getVideoRefAtMeta(
 export type VideoPromptInlineSegment =
   | { kind: "text"; text: string }
   | { kind: "atRef"; refKind: AtReferenceKind; index: number; token: string; label: string }
+  | { kind: "atTextRef"; slot: number; token: string; label: string }
   | { kind: "atNamed"; name: string; token: string; label: string };
 
 export type VideoPromptInlineSegmentWithMedia = VideoPromptInlineSegment & {
@@ -448,6 +449,10 @@ export function findEdgeIdForPromptSegment(
   items: VideoIncomingRefItem[],
   displayNamesByEdge?: Map<string, string>,
 ): string | undefined {
+  if (seg.kind === "atTextRef") {
+    const item = items[seg.slot - 1];
+    return item?.kind === "text" ? item.edgeId : undefined;
+  }
   const metaMap = buildVideoRefAtMeta(items, displayNamesByEdge);
   for (const it of items) {
     const meta = metaMap.get(it.edgeId);
@@ -498,20 +503,41 @@ export function parseVideoPromptInlineSegments(
   prompt: string,
   namedAssets?: NamedAsset[],
 ): VideoPromptInlineSegment[] {
+  const markers: Array<{ start: number; end: number; seg: Exclude<VideoPromptInlineSegment, { kind: "text" }> }> =
+    [];
+
+  const textPanelRe = /@文本(\d+)/g;
+  let textPanelMatch: RegExpExecArray | null;
+  while ((textPanelMatch = textPanelRe.exec(prompt)) !== null) {
+    const slot = parseInt(textPanelMatch[1], 10);
+    if (!Number.isFinite(slot) || slot < 1) continue;
+    markers.push({
+      start: textPanelMatch.index,
+      end: textPanelMatch.index + textPanelMatch[0].length,
+      seg: {
+        kind: "atTextRef",
+        slot,
+        token: textPanelMatch[0],
+        label: `文本${slot}`,
+      },
+    });
+  }
+
   const refs = [...parseAtReferences(prompt, namedAssets)].sort((a, b) => a.startIndex - b.startIndex);
-  const segments: VideoPromptInlineSegment[] = [];
-  let last = 0;
 
   for (const ref of refs) {
-    if (ref.startIndex > last) {
-      segments.push({ kind: "text", text: prompt.slice(last, ref.startIndex) });
-    }
+    const overlaps = markers.some((m) => ref.startIndex < m.end && ref.endIndex > m.start);
+    if (overlaps) continue;
     if (ref.name) {
-      segments.push({
-        kind: "atNamed",
-        name: ref.name,
-        token: ref.fullMatch,
-        label: ref.name,
+      markers.push({
+        start: ref.startIndex,
+        end: ref.endIndex,
+        seg: {
+          kind: "atNamed",
+          name: ref.name,
+          token: ref.fullMatch,
+          label: ref.name,
+        },
       });
     } else {
       const label =
@@ -520,15 +546,33 @@ export function parseVideoPromptInlineSegments(
           : ref.kind === "video"
             ? `视频${ref.index}`
             : `声音${ref.index}`;
-      segments.push({
-        kind: "atRef",
-        refKind: ref.kind,
-        index: ref.index,
-        token: ref.fullMatch,
-        label,
+      markers.push({
+        start: ref.startIndex,
+        end: ref.endIndex,
+        seg: {
+          kind: "atRef",
+          refKind: ref.kind,
+          index: ref.index,
+          token: ref.fullMatch,
+          label,
+        },
       });
     }
-    last = ref.endIndex;
+  }
+
+  markers.sort((a, b) => a.start - b.start || a.end - b.end);
+  const deduped: typeof markers = [];
+  for (const m of markers) {
+    if (deduped.some((d) => m.start < d.end && m.end > d.start)) continue;
+    deduped.push(m);
+  }
+
+  const segments: VideoPromptInlineSegment[] = [];
+  let last = 0;
+  for (const m of deduped) {
+    if (m.start > last) segments.push({ kind: "text", text: prompt.slice(last, m.start) });
+    segments.push(m.seg);
+    last = m.end;
   }
 
   if (last < prompt.length) {

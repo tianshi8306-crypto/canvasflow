@@ -406,3 +406,219 @@ fn run_ffmpeg_delogo_or_err(ffmpeg: &str, args: &[String]) -> Result<(), String>
         Err("ffmpeg 去字幕失败，请确认已安装 ffmpeg 且框选区域有效".into())
     }
 }
+
+/// 平台适配导出：缩放+补黑边+编码为指定平台尺寸
+///
+/// 预设支持的平台：
+/// - douyin: 1080×1920 9:16 竖屏，4 Mbps
+/// - bilibili: 1920×1080 16:9 横屏，自动码率
+/// - xiaohongshu: 1080×1440 3:4，4 Mbps
+/// - youtube_shorts: 1080×1920 9:16 竖屏，自动码率
+/// - youtube: 1920×1080 16:9 横屏，自动码率
+#[tauri::command]
+pub fn platform_export_video(
+    app: tauri::AppHandle,
+    project_path: String,
+    video_rel_path: String,
+    preset: String,
+) -> Result<db::ImportedMediaItem, String> {
+    let (width, height, bitrate_kbps) = match preset.as_str() {
+        "douyin" => (1080, 1920, Some(4000)),
+        "bilibili" => (1920, 1080, None),
+        "xiaohongshu" => (1080, 1440, Some(4000)),
+        "youtube_shorts" => (1080, 1920, None),
+        "youtube" => (1920, 1080, None),
+        _ => return Err(format!("不支持的平台预设：{}", preset)),
+    };
+
+    let root = PathBuf::from(&project_path);
+    let src = root.join(&video_rel_path);
+    if !src.is_file() {
+        return Err(format!("视频文件不存在：{}", src.display()));
+    }
+
+    let settings = settings::load_settings(&app)?;
+    let ffmpeg = resolve_ffmpeg_bin_auto(&app, &settings);
+
+    let stem = src
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(sanitize_stem)
+        .unwrap_or_else(|| "video".into());
+
+    let (_rel, out_abs) = allocate_tool_output(
+        &root,
+        "video",
+        "mp4",
+        &format!("platform_{}", preset),
+        &stem,
+    )?;
+
+    let src_esc = escape_ffmpeg_path(&src);
+    let out_esc = escape_ffmpeg_path(&out_abs);
+
+    // scale 保持宽高比缩放到目标尺寸内，pad 居中补黑边
+    let vf = format!(
+        "scale={w}:{h}:force_original_aspect_ratio=decrease,pad={w}:{h}:(ow-iw)/2:(oh-ih)/2",
+        w = width,
+        h = height,
+    );
+
+    let mut args: Vec<String> = vec![
+        "-y".to_string(),
+        "-i".to_string(),
+        src_esc,
+        "-vf".to_string(),
+        vf,
+        "-c:v".to_string(),
+        "libx264".to_string(),
+        "-preset".to_string(),
+        "fast".to_string(),
+        "-pix_fmt".to_string(),
+        "yuv420p".to_string(),
+        "-c:a".to_string(),
+        "aac".to_string(),
+    ];
+    // 码率控制
+    if let Some(kbps) = bitrate_kbps.filter(|k| *k > 0) {
+        let rate = format!("{}k", kbps);
+        let buf = format!("{}k", kbps * 2);
+        args.push("-b:v".to_string());
+        args.push(rate.clone());
+        args.push("-maxrate".to_string());
+        args.push(rate);
+        args.push("-bufsize".to_string());
+        args.push(buf);
+    } else {
+        args.push("-crf".to_string());
+        args.push("23".to_string());
+    }
+    args.push("-b:a".to_string());
+    args.push("128k".to_string());
+    args.push(out_esc);
+
+    run_ffmpeg_or_err_export(&ffmpeg, &args)?;
+
+    if !out_abs.is_file() {
+        return Err("平台导出失败：未生成输出文件".into());
+    }
+    if out_abs.metadata().map(|m| m.len()).unwrap_or(0) < 256 {
+        let _ = std::fs::remove_file(&out_abs);
+        return Err("平台导出失败：输出文件过小".into());
+    }
+
+    finalize_tool_output(&root, &out_abs, "video", &format!("platform_{}", preset), &stem)
+}
+
+fn run_ffmpeg_or_err_export(ffmpeg: &str, args: &[String]) -> Result<(), String> {
+    if run_ffmpeg(ffmpeg, args)? {
+        Ok(())
+    } else {
+        Err("平台导出失败，请确认已安装 ffmpeg".into())
+    }
+}
+
+/// 自动去字幕：对视频底部字幕条区域运行 FFmpeg delogo（无需用户框选）
+///
+/// Seedance / 即梦等 AI 生成平台常在视频底部 8-12% 处叠加硬字幕。
+/// 本命令自动取底部 8% 作为 delogo 区域（保留视频主体内容不受影响），
+/// 使用 3 段重叠窄带避免宽区 delogo 的模糊伪影。
+#[tauri::command]
+pub fn auto_delogo_video_to_assets(
+    app: tauri::AppHandle,
+    project_path: String,
+    video_rel_path: String,
+    source_width: Option<u32>,
+    source_height: Option<u32>,
+    margin: Option<f64>,
+    band: Option<f64>,
+) -> Result<db::ImportedMediaItem, String> {
+    let root = PathBuf::from(&project_path);
+    let src = root.join(&video_rel_path);
+    if !src.is_file() {
+        return Err(format!("视频文件不存在：{}", src.display()));
+    }
+
+    // 自动探测视频尺寸（调用方可不传）
+    let (sw, sh) = match (source_width, source_height) {
+        (Some(w), Some(h)) if w >= 8 && h >= 8 => (w as f64, h as f64),
+        _ => {
+            let probe = crate::media::probe_media(&src)?;
+            match (probe.width, probe.height) {
+                (Some(w), Some(h)) if w >= 8 && h >= 8 => (w as f64, h as f64),
+                _ => return Err("无法获取视频尺寸".into()),
+            }
+        }
+    };
+
+    let margin = margin.unwrap_or(0.92).clamp(0.80, 0.98);
+    let band = band.unwrap_or(0.08).clamp(0.03, 0.18);
+
+    // 将底部拆成 3 段重叠窄带，每段约 band/3 高度，避免 delogo 在大区域上的模糊伪影
+    let y_start = (sh * margin).round(); // 字幕区顶部 y 坐标（sh*margin 处）
+    let strip_h = (sh * band).round().max(12.0);
+    let seg_h = (strip_h / 3.0).ceil().max(4.0);
+    let overlap = 2.0_f64;
+
+    let segments: Vec<(f64, f64)> = (0..3)
+        .map(|i| {
+            let y0 = (y_start + i as f64 * (seg_h - overlap)).round().max(0.0);
+            let sh_seg = seg_h.min(sh - y0).max(4.0);
+            (y0, sh_seg)
+        })
+        .collect();
+
+    let settings = settings::load_settings(&app)?;
+    let ffmpeg = resolve_ffmpeg_bin_auto(&app, &settings);
+
+    let stem = src
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .map(sanitize_stem)
+        .unwrap_or_else(|| "video".into());
+    let (_rel, out_abs) = allocate_tool_output(&root, "video", "mp4", "auto_delogo", &stem)?;
+
+    let src_esc = escape_ffmpeg_path(&src);
+    let out_esc = escape_ffmpeg_path(&out_abs);
+
+    let vf = segments
+        .iter()
+        .map(|(y0, sh_seg)| {
+            format!(
+                "delogo=x=0:y={}:w={}:h={}",
+                *y0 as i32,
+                sw as i32,
+                *sh_seg as i32,
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",");
+
+    let encode_args = vec![
+        "-y".to_string(),
+        "-i".to_string(),
+        src_esc,
+        "-vf".to_string(),
+        vf,
+        "-c:v".to_string(),
+        "libx264".to_string(),
+        "-preset".to_string(),
+        "fast".to_string(),
+        "-crf".to_string(),
+        "20".to_string(),
+        "-c:a".to_string(),
+        "copy".to_string(),
+        out_esc,
+    ];
+    run_ffmpeg_delogo_or_err(&ffmpeg, &encode_args)?;
+
+    if !out_abs.is_file() {
+        return Err("自动去字幕失败：未生成输出文件".into());
+    }
+    if out_abs.metadata().map(|m| m.len()).unwrap_or(0) < 256 {
+        let _ = std::fs::remove_file(&out_abs);
+        return Err("自动去字幕失败：输出文件过小".into());
+    }
+
+    finalize_tool_output(&root, &out_abs, "video", "auto_delogo", &stem)
+}

@@ -30,6 +30,10 @@ describe("getVideoGenerationDisplayLabel", () => {
   it("shows cancelling label", () => {
     expect(getVideoGenerationDisplayLabel({ status: "running", cancelling: true })).toBe("取消中…");
   });
+
+  it("shows submitting label before job is queued", () => {
+    expect(getVideoGenerationDisplayLabel({ submitting: true })).toBe("提交中…");
+  });
 });
 
 describe("isVideoGenerationInProgress", () => {
@@ -38,5 +42,6 @@ describe("isVideoGenerationInProgress", () => {
     expect(isVideoGenerationInProgress({ status: "running" })).toBe(true);
     expect(isVideoGenerationInProgress({ status: "succeeded" })).toBe(false);
     expect(isVideoGenerationInProgress({ status: "failed", cancelling: true })).toBe(true);
+    expect(isVideoGenerationInProgress({ submitting: true })).toBe(true);
   });
 });

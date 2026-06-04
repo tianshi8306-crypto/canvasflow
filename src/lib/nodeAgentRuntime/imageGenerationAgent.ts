@@ -89,6 +89,7 @@ export const imageGenerationAgentRuntime: NodeTaskAgentRuntime<
     const finalPrompt = buildImagePromptWithStyles(sensed.prompt, sensed.styleIds ?? []);
     ctx.setStatusText("正在调用图片模型生成…");
     const stopProgress = startImageGenProgressTicker(ctx);
+
     let rel: string;
     try {
       rel = await invoke<string>("generate_image_asset", {
@@ -105,7 +106,7 @@ export const imageGenerationAgentRuntime: NodeTaskAgentRuntime<
         aspect: sensed.aspect,
         resolution: sensed.resolution,
         count: sensed.count,
-        negativePrompt: sensed.negativePrompt,
+        negativePrompt: sensed.negativePrompt || undefined,
       });
     } catch (err) {
       refreshDreaminaAuthOnGenerationFailure(sensed.modelId);

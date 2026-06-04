@@ -4,7 +4,7 @@
  * Seedance 2.0 人脸审核通关模块入口。
  *
  * 提供两个对外接口：
- * - bypassFaceReview()    处理单张参考图
+ * - bypassFaceReview()      处理单张参考图
  * - bypassFaceReviewBatch() 批量处理（每张图独立错误隔离）
  *
  * 每步独立 try-catch，任何步骤失败自动回退原 dataUrl，
@@ -13,7 +13,7 @@
  * 零外部依赖，纯 Canvas 2D API + 浏览器原生 Image/FileReader。
  */
 
-import { blurSharpenAndReEncode, type BlurSharpenOptions } from "./blurSharpen";
+import { destroyFaceFeatures, type BlurSharpenOptions } from "./blurSharpen";
 
 export type { BlurSharpenOptions };
 
@@ -31,7 +31,7 @@ export interface FaceBypassResult {
 }
 
 /**
- * 处理单张参考图：模糊-锐化回弹 + JPEG 重编码
+ * 处理单张参考图：四层防御管线（模糊→像素化→量化→JPEG）
  *
  * @param originalDataUrl 原始图片 data URL
  * @param options 参数覆盖
@@ -43,7 +43,7 @@ export async function bypassFaceReview(
 ): Promise<FaceBypassResult> {
   const t0 = performance.now();
   try {
-    const dataUrl = await blurSharpenAndReEncode(originalDataUrl, options);
+    const dataUrl = await destroyFaceFeatures(originalDataUrl, options);
     return {
       dataUrl,
       elapsedMs: performance.now() - t0,

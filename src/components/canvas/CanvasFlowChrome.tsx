@@ -184,6 +184,86 @@ export function CanvasFlowChrome() {
       const key = e.key.toLowerCase();
       const mod = e.ctrlKey || e.metaKey;
 
+      // === 核心画布快捷键 ===
+
+      // Ctrl+Z：撤销
+      if (mod && !e.shiftKey && key === "z") {
+        e.preventDefault();
+        useProjectStore.getState().undo();
+        return;
+      }
+
+      // Ctrl+Shift+Z 或 Ctrl+Y：重做
+      if ((mod && e.shiftKey && key === "z") || (mod && !e.shiftKey && key === "y")) {
+        e.preventDefault();
+        useProjectStore.getState().redo();
+        return;
+      }
+
+      // Ctrl+G：成组
+      if (mod && !e.shiftKey && key === "g") {
+        e.preventDefault();
+        useProjectStore.getState().groupSelectedNodes();
+        return;
+      }
+
+      // Ctrl+Enter：生成选中节点
+      if (mod && key === "enter") {
+        e.preventDefault();
+        const { selectedNodeIds: selIds, nodes: allNodes, runNodeSubgraph, runGroupSubgraph, runWorkflow } =
+          useProjectStore.getState();
+        if (selIds.length === 1) {
+          const n = allNodes.find((nd) => nd.id === selIds[0]);
+          if (n?.type === "group") {
+            void runGroupSubgraph(selIds[0]);
+            return;
+          }
+          void runNodeSubgraph(selIds[0]);
+          return;
+        }
+        void runWorkflow();
+        return;
+      }
+
+      // Ctrl+Alt+Shift+G：解组
+      if (mod && e.altKey && e.shiftKey && key === "g") {
+        e.preventDefault();
+        useProjectStore.getState().ungroupSelectedNodes();
+        return;
+      }
+
+      // Ctrl+D：复制选中节点
+      if (mod && !e.shiftKey && key === "d") {
+        e.preventDefault();
+        const { selectedNodeIds, nodes: allNodes, duplicateGroup, copySelection, pasteSelection, flowClipboardCount } =
+          useProjectStore.getState();
+        if (selectedNodeIds.length === 1) {
+          const hit = allNodes.find((n) => n.id === selectedNodeIds[0]);
+          if (hit?.type === "group") {
+            duplicateGroup(hit.id);
+            return;
+          }
+        }
+        copySelection();
+        if (flowClipboardCount === 0) return;
+        pasteSelection();
+        return;
+      }
+
+      // Delete / Backspace：删除选中
+      if (key === "delete" || key === "backspace") {
+        e.preventDefault();
+        useProjectStore.getState().deleteSelection();
+        return;
+      }
+
+      // Ctrl+Shift+K：切换快捷键面板
+      if (mod && e.shiftKey && key === "k") {
+        e.preventDefault();
+        setShortcutsOverlayOpen(!useCanvasUiStore.getState().shortcutsOverlayOpen);
+        return;
+      }
+
       if (!mod && !e.altKey && !e.shiftKey && key === "z") {
         e.preventDefault();
         void (async () => {
