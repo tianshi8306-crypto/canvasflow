@@ -158,3 +158,57 @@ jobs:
           uploadUpdaterJson: true
           updaterJsonPreferNsis: true
           args: ${{ matrix.args }}
+
+  fix-latest-json:
+    needs: release
+    runs-on: ubuntu-latest
+    if: always() && needs.release.result == 'success'
+    permissions:
+      contents: write
+    steps:
+      - name: Resolve release tag
+        id: tag
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "value=${{ inputs.tag }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "value=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fix latest.json download URLs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.tag.outputs.value }}"
+          echo "Fixing latest.json for tag: $TAG"
+
+          gh release download "$TAG" -p "latest.json" --clobber
+
+          FIXED=$(python3 -c "
+          import json, sys
+          with open('latest.json') as f:
+              data = json.load(f)
+          changed = False
+          for platform, info in data.get('platforms', {}).items():
+              url = info.get('url', '')
+              if 'vibevideo' in url:
+                  info['url'] = url.replace('tianshi8306-crypto/vibevideo', 'tianshi8306-crypto/canvasflow')
+                  changed = True
+          if changed:
+              with open('latest.json', 'w') as f:
+                  json.dump(data, f, indent=2)
+              print('fixed')
+          else:
+              print('ok')
+          ")
+
+          if [ "$FIXED" = "fixed" ]; then
+            echo "Re-uploading fixed latest.json"
+            ASSET_ID=$(gh release view "$TAG" --json assets -q '.assets[] | select(.name=="latest.json") | .id')
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$ASSET_ID"
+            gh release upload "$TAG" latest.json --clobber
+            echo "latest.json fixed and re-uploaded successfully"
+          else
+            echo "latest.json URLs are correct, no fix needed"
+          fi

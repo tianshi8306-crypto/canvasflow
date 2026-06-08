@@ -1,6 +1,6 @@
 [package]
 name = "canvasflow"
-version = "0.2.0"
+version = "0.3.0"
 description = "CanvasFlow AI Studio - AI-powered video creation with infinite canvas workflow"
 authors = ["CanvasFlow"]
 license = "Apache-2.0"

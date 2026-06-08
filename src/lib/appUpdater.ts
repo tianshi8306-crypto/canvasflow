@@ -49,8 +49,11 @@ export async function checkForAppUpdateOnceAtStartup(): Promise<PendingAppUpdate
   try {
     return await checkForAppUpdateManual({ respectSkipped: true });
   } catch (err) {
-    if (isLikelyOfflineError(err)) return null;
-    console.debug("[appUpdater] check failed", err);
+    if (isLikelyOfflineError(err)) {
+      console.warn("[appUpdater] 网络不可用，跳过更新检查", err);
+      return null;
+    }
+    console.error("[appUpdater] 启动更新检查失败", err);
     return null;
   }
 }
