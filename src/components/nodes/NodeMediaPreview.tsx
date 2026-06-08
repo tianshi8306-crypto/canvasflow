@@ -320,6 +320,7 @@ export function NodeMediaPreview({
         }}
       >
         <video
+          key={src}
           src={src}
           className={videoClassName ?? "nodeMediaClip"}
           style={videoStyle}

@@ -14,6 +14,14 @@ function modelConfigId(m: ImageModelConfig): string {
   return videoModelOptionId(m);
 }
 
+/** 与画布 modelId 对应且已在设置中启用的视频模型项 */
+export function listMatchingEnabledVideoModelConfigs(
+  configs: ImageModelConfig[],
+  modelId: string,
+): ImageModelConfig[] {
+  return (configs ?? []).filter((m) => m.enabled && videoModelConfigMatches(m, modelId));
+}
+
 /** Settings 项是否与画布所选 modelId 对应 */
 export function videoModelConfigMatches(m: ImageModelConfig, modelId: string): boolean {
   const id = modelId.trim();

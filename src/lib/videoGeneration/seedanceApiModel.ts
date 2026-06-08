@@ -6,6 +6,9 @@ export const DOUBAO_SEEDANCE_CANONICAL_ID = "doubao_seedance_2_0";
 /** 火山方舟 Seedance 2.0 推理接入点 model（见 docs/PROJECT_REFERENCE.md） */
 export const DOUBAO_SEEDANCE_API_MODEL = "doubao-seedance-2-0-260128";
 
+/** 火山方舟北京区 API 根地址（视频 contents/generations） */
+export const DOUBAO_SEEDANCE_API_BASE = "https://ark.cn-beijing.volces.com/api/v3";
+
 export function isDoubaoSeedancePreset(m: Pick<ImageModelConfig, "id" | "model">): boolean {
   const model = m.model.trim();
   return (
@@ -17,8 +20,12 @@ export function isDoubaoSeedancePreset(m: Pick<ImageModelConfig, "id" | "model">
 
 /** 加载 Settings 时把旧 slug 升级为真实 API model */
 export function normalizeVideoModelConfigOnLoad(m: ImageModelConfig): ImageModelConfig {
+  let next = m;
   if (isDoubaoSeedancePreset(m) && m.model.trim() === DOUBAO_SEEDANCE_CANONICAL_ID) {
-    return { ...m, model: DOUBAO_SEEDANCE_API_MODEL };
+    next = { ...next, model: DOUBAO_SEEDANCE_API_MODEL };
   }
-  return m;
+  if (isDoubaoSeedancePreset(next) && !next.apiBaseUrl.trim()) {
+    next = { ...next, apiBaseUrl: DOUBAO_SEEDANCE_API_BASE };
+  }
+  return next;
 }

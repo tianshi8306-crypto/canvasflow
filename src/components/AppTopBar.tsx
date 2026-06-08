@@ -1,9 +1,13 @@
 import { isTauri } from "@tauri-apps/api/core";
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { DESKTOP_SHELL_HINT } from "@/lib/tauriEnv";
 import { useProjectStore } from "@/store/projectStore";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { CanvasTabs } from "./CanvasTabs";
 import { WorkspaceMenu } from "./WorkspaceMenu";
+import type { StylePreset } from "@/lib/styleLibrary/types";
+import { STYLE_CATEGORY_META } from "@/lib/styleLibrary/types";
+import { fetchStyleLibrary, getStylePreset } from "@/lib/styleLibrary";
 
 export function AppTopBar() {
   const statusText = useProjectStore((s) => s.statusText);
@@ -12,6 +16,12 @@ export function AppTopBar() {
   const projectPath = useProjectStore((s) => s.projectPath);
   const projectDirty = useProjectStore((s) => s.projectDirty);
   const nodeCount = useProjectStore((s) => s.nodes.length);
+  const activeStyleId = useProjectStore((s) => s.activeStyleId);
+  const setActiveStyleId = useProjectStore((s) => s.setActiveStyleId);
+  const toggleStylePanel = useCanvasUiStore((s) => s.toggleStyleLibraryPanel);
+  const [library, setLibrary] = useState<StylePreset[] | null>(null);
+  const activeStyle = activeStyleId && library ? getStylePreset(activeStyleId, library) : null;
+  useEffect(() => { fetchStyleLibrary().then(setLibrary).catch(() => {}); }, []);
 
   const savedShort = useMemo(() => {
     if (!lastSavedAt) return "";
@@ -61,6 +71,19 @@ export function AppTopBar() {
         <div className="appTopChromeSpacer" aria-hidden />
 
         <div className="appTopTrail">
+          {activeStyle ? (
+            <button
+              className="appTopBadge appTopBadge--style"
+              style={{ "--style-color": STYLE_CATEGORY_META[activeStyle.category].color } as React.CSSProperties}
+              onClick={toggleStylePanel}
+              title={`当前风格：${activeStyle.title}（点击切换）`}
+            >
+              <span className="appTopStyleDot" />
+              {activeStyle.title.slice(0, 12)}
+              {activeStyle.title.length > 12 ? "…" : ""}
+              <span className="appTopStyleClear" onClick={(e) => { e.stopPropagation(); setActiveStyleId(null); }} title="清除风格">×</span>
+            </button>
+          ) : null}
           {!projectPath && nodeCount > 0 ? (
             <span
               className="appTopBadge appTopBadge--warn"

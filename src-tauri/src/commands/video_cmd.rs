@@ -4,8 +4,11 @@
 //! 1. video_gen_start  -> 提交任务到供应商，返回 jobId
 //! 2. video_gen_get_job -> 轮询供应商接口，状态 succeeded 时下载视频落盘
 
-use crate::command_common::resolve_ffmpeg_bin;
-use crate::commands::types::{DreaminaVideoRecoverRequest, VideoGenStartResponse, VideoGenerationStartRequest, VideoJobSnapshot};
+use crate::command_common::{normalize_openai_api_base, resolve_ffmpeg_bin};
+use crate::commands::types::{
+    DreaminaVideoRecoverRequest, VideoGenStartResponse, VideoGenerationStartRequest, VideoJobPollHint,
+    VideoJobSnapshot,
+};
 use crate::project_asset_store::{self, AssetWriteContext};
 use crate::dreamina_cli::DreaminaCliState;
 use crate::dreamina_gen;
@@ -19,6 +22,152 @@ use std::process::Command;
 
 /// Doubao Seedance API 基址
 const DEFAULT_SEEDANCE_API_BASE: &str = "https://ark.cn-beijing.volces.com/api/v3";
+
+fn video_jobs_dir(project_path: &str) -> PathBuf {
+    PathBuf::from(project_path)
+        .join(".canvasflow")
+        .join("video-jobs")
+}
+
+fn sanitize_job_id_for_filename(job_id: &str) -> String {
+    job_id
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+fn persist_video_job(project_path: &str, job_id: &str, job: &VideoMockJob) -> Result<(), String> {
+    let dir = video_jobs_dir(project_path);
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let path = dir.join(format!("{}.json", sanitize_job_id_for_filename(job_id)));
+    let raw = serde_json::to_string_pretty(job).map_err(|e| e.to_string())?;
+    std::fs::write(path, raw).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn load_persisted_video_job(project_path: &str, job_id: &str) -> Result<Option<VideoMockJob>, String> {
+    let path = video_jobs_dir(project_path).join(format!(
+        "{}.json",
+        sanitize_job_id_for_filename(job_id)
+    ));
+    if !path.is_file() {
+        return Ok(None);
+    }
+    let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let job: VideoMockJob = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    Ok(Some(job))
+}
+
+fn job_not_found_snapshot(id: &str, model_id: &str) -> VideoJobSnapshot {
+    VideoJobSnapshot {
+        id: id.to_string(),
+        status: "failed".into(),
+        progress: None,
+        error: Some("任务不存在（可能已过期）".into()),
+        model_id: model_id.to_string(),
+        result_rel_path: None,
+    }
+}
+
+/// 内存任务表丢失时（热重载/重启），凭工程持久化记录 + 轮询上下文直接查供应商/即梦 CLI。
+async fn poll_orphaned_video_job(
+    app: &tauri::AppHandle,
+    state: &AppState,
+    id: &str,
+    hint: &VideoJobPollHint,
+    disk_job: Option<VideoMockJob>,
+) -> Result<VideoJobSnapshot, String> {
+    let project_path = hint.project_path.trim();
+    let node_id = hint.node_id.trim();
+    if project_path.is_empty() || node_id.is_empty() {
+        return Err("缺少工程或节点上下文".into());
+    }
+
+    let model_id = disk_job
+        .as_ref()
+        .map(|j| j.model_id.clone())
+        .unwrap_or_else(|| hint.model_id.trim().to_string());
+    if model_id.is_empty() {
+        return Err("缺少 modelId".into());
+    }
+
+    let workflow = disk_job
+        .as_ref()
+        .and_then(|j| j.dreamina_workflow.clone())
+        .or_else(|| hint.workflow.clone())
+        .unwrap_or_else(|| "text_to_video".into());
+    let is_dreamina = disk_job
+        .as_ref()
+        .map(|j| j.is_dreamina)
+        .unwrap_or_else(|| dreamina_gen::is_dreamina_model(&model_id));
+    let poll_count = disk_job.as_ref().map(|j| j.polls.saturating_add(1)).unwrap_or(1);
+
+    eprintln!(
+        "[video_cmd] 恢复孤儿任务 poll: id={id} dreamina={is_dreamina} project={project_path}"
+    );
+
+    let snap = if is_dreamina {
+        dreamina_gen::poll_video_via_cli(
+            &state.http,
+            id,
+            project_path,
+            &model_id,
+            &workflow,
+            Some(node_id),
+            poll_count,
+        )
+        .await?
+    } else if id.starts_with("mock_") {
+        return Err("mock 任务无法在无内存表时恢复".into());
+    } else {
+        let mut http_snap = poll_video_job_http(
+            &state.http,
+            id,
+            project_path,
+            &model_id,
+            app,
+            Some(node_id),
+            Some(workflow.as_str()),
+        )
+        .await?;
+        if http_snap.status == "queued" && poll_count >= 2 {
+            http_snap.status = "running".into();
+        }
+        http_snap
+    };
+
+    let mut job_record = disk_job.unwrap_or(VideoMockJob {
+        project_path: project_path.to_string(),
+        node_id: node_id.to_string(),
+        model_id: model_id.clone(),
+        polls: poll_count,
+        result_rel_path: None,
+        cancelled: false,
+        is_dreamina,
+        dreamina_workflow: Some(workflow),
+    });
+    job_record.polls = poll_count;
+    if snap.status == "succeeded" {
+        job_record.result_rel_path = snap.result_rel_path.clone();
+    }
+
+    {
+        let mut map = state
+            .video_jobs
+            .lock()
+            .map_err(|_| "video_jobs 锁异常".to_string())?;
+        map.insert(id.to_string(), job_record.clone());
+    }
+    let _ = persist_video_job(project_path, id, &job_record);
+
+    Ok(snap)
+}
 
 const DOUBAO_SEEDANCE_CANONICAL_ID: &str = "doubao_seedance_2_0";
 const DOUBAO_SEEDANCE_API_MODEL: &str = "doubao-seedance-2-0-260128";
@@ -65,39 +214,54 @@ fn seedance_api_model_id(cfg: &settings::ImageModelConfig) -> String {
     model.to_string()
 }
 
-/// 从 settings 中解析视频模型配置
+/// 从 settings 中解析视频模型配置（多个匹配项时优先使用已保存 API Key 的项）
 fn resolve_video_model_config(
     app: &tauri::AppHandle,
     model_id: &str,
 ) -> Result<(String, String, String), String> {
     let app_settings = settings::load_settings(app)?;
-    let cfg = app_settings
+    let candidates: Vec<&settings::ImageModelConfig> = app_settings
         .video_models
         .iter()
-        .find(|m| video_model_config_matches(m, model_id))
-        .ok_or_else(|| {
-            format!(
-                "视频模型不存在或已禁用：{}（请确认已在 设置→视频模型 启用，且模型标识为火山接入点 ID）",
-                model_id
-            )
-        })?;
+        .filter(|m| video_model_config_matches(m, model_id))
+        .collect();
 
-    let api_model = seedance_api_model_id(cfg);
-    if api_model.trim().is_empty() {
-        return Err(format!("视频模型「{}」未填写 API 接入点 model", cfg.label));
+    if candidates.is_empty() {
+        return Err(format!(
+            "视频模型不存在或已禁用：{}（请确认已在 设置→视频模型 启用，且模型标识为火山接入点 ID）",
+            model_id
+        ));
     }
 
-    let key_id = format!("video-model:{}", cfg.id);
-    let api_key =
-        get_api_key(&key_id)?.ok_or_else(|| format!("未配置视频模型 API Key：{}", cfg.label))?;
+    let mut missing_key_label: Option<String> = None;
+    for cfg in candidates {
+        let api_model = seedance_api_model_id(cfg);
+        if api_model.trim().is_empty() {
+            return Err(format!("视频模型「{}」未填写 API 接入点 model", cfg.label));
+        }
 
-    let base_url = if cfg.api_base_url.trim().is_empty() {
-        DEFAULT_SEEDANCE_API_BASE.to_string()
-    } else {
-        cfg.api_base_url.trim().to_string()
-    };
+        let key_id = format!("video-model:{}", cfg.id);
+        let api_key = match get_api_key(&key_id)? {
+            Some(k) => k,
+            None => {
+                missing_key_label = Some(cfg.label.clone());
+                continue;
+            }
+        };
 
-    Ok((base_url, api_key, api_model))
+        let base_url = if cfg.api_base_url.trim().is_empty() {
+            DEFAULT_SEEDANCE_API_BASE.to_string()
+        } else {
+            cfg.api_base_url.trim().to_string()
+        };
+
+        return Ok((base_url, api_key, api_model));
+    }
+
+    Err(format!(
+        "未配置视频模型 API Key：{}",
+        missing_key_label.unwrap_or_else(|| model_id.to_string())
+    ))
 }
 
 /// 调用 Seedance 提交视频生成任务
@@ -494,19 +658,21 @@ pub async fn video_gen_start(
         .video_jobs
         .lock()
         .map_err(|_| "video_jobs 锁异常".to_string())?;
-    map.insert(
-        job_id.clone(),
-        VideoMockJob {
-            project_path: req.project_path.trim().to_string(),
-            node_id: req.node_id.trim().to_string(),
-            model_id,
-            polls: 0,
-            result_rel_path: None,
-            cancelled: false,
-            is_dreamina,
-            dreamina_workflow: Some(workflow),
-        },
-    );
+    let job_record = VideoMockJob {
+        project_path: req.project_path.trim().to_string(),
+        node_id: req.node_id.trim().to_string(),
+        model_id: model_id.clone(),
+        polls: 0,
+        result_rel_path: None,
+        cancelled: false,
+        is_dreamina,
+        dreamina_workflow: Some(workflow),
+    };
+    map.insert(job_id.clone(), job_record.clone());
+    drop(map);
+    if let Err(e) = persist_video_job(req.project_path.trim(), &job_id, &job_record) {
+        eprintln!("[video_gen_start] 持久化 video job 失败（不影响提交）: {e}");
+    }
     Ok(VideoGenStartResponse { job_id })
 }
 
@@ -515,10 +681,38 @@ pub async fn video_gen_get_job(
     app: tauri::AppHandle,
     state: tauri::State<'_, AppState>,
     job_id: String,
+    hint: Option<VideoJobPollHint>,
 ) -> Result<VideoJobSnapshot, String> {
     let id = job_id.trim();
     if id.is_empty() {
         return Err("jobId 不能为空".into());
+    }
+
+    // 内存表丢失：凭工程持久化 + 轮询上下文恢复（热重载/重启后仍可取回即梦成片）
+    {
+        let in_map = state
+            .video_jobs
+            .lock()
+            .map_err(|_| "video_jobs 锁异常".to_string())?
+            .contains_key(id);
+        if !in_map {
+            let fallback_model = hint
+                .as_ref()
+                .map(|h| h.model_id.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .unwrap_or_else(|| "doubao_seedance_2_0".into());
+
+            if let Some(ref h) = hint {
+                if !h.project_path.trim().is_empty() {
+                    let disk = load_persisted_video_job(h.project_path.trim(), id).ok().flatten();
+                    match poll_orphaned_video_job(&app, &state, id, h, disk).await {
+                        Ok(snap) => return Ok(snap),
+                        Err(e) => eprintln!("[video_cmd] 孤儿任务恢复轮询失败: {e}"),
+                    }
+                }
+            }
+            return Ok(job_not_found_snapshot(id, &fallback_model));
+        }
     }
 
     // ============================================================
@@ -527,14 +721,7 @@ pub async fn video_gen_get_job(
     let dreamina_poll_ctx = {
         let mut map = state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
         let Some(j) = map.get_mut(id) else {
-            return Ok(VideoJobSnapshot {
-                id: id.to_string(),
-                status: "failed".into(),
-                progress: None,
-                error: Some("任务不存在（可能已过期）".into()),
-                model_id: "doubao_seedance_2_0".into(),
-                result_rel_path: None,
-            });
+            return Ok(job_not_found_snapshot(id, "doubao_seedance_2_0"));
         };
 
         if j.cancelled {
@@ -563,11 +750,13 @@ pub async fn video_gen_get_job(
 
         if j.is_dreamina {
             j.polls += 1;
+            let poll_count = j.polls;
             Some((
                 j.project_path.clone(),
                 j.model_id.clone(),
                 j.dreamina_workflow.clone().unwrap_or_else(|| "text_to_video".into()),
                 j.node_id.clone(),
+                poll_count,
             ))
         } else {
             j.polls += 1;
@@ -575,7 +764,7 @@ pub async fn video_gen_get_job(
         }
     };
 
-    if let Some((project_path, model_id, workflow, node_id)) = dreamina_poll_ctx {
+    if let Some((project_path, model_id, workflow, node_id, poll_count)) = dreamina_poll_ctx {
         let snap = dreamina_gen::poll_video_via_cli(
             &state.http,
             id,
@@ -583,6 +772,7 @@ pub async fn video_gen_get_job(
             &model_id,
             &workflow,
             Some(node_id.as_str()),
+            poll_count,
         )
         .await?;
         if snap.status == "succeeded" {
@@ -591,6 +781,10 @@ pub async fn video_gen_get_job(
                     state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
                 if let Some(job) = map.get_mut(id) {
                     job.result_rel_path = Some(rel.clone());
+                    let job_clone = job.clone();
+                    let project = job_clone.project_path.clone();
+                    drop(map);
+                    let _ = persist_video_job(&project, id, &job_clone);
                 }
             }
         }
@@ -624,7 +818,13 @@ pub async fn video_gen_get_job(
                 result_rel_path: rel,
             });
         }
-        (j.project_path.clone(), j.model_id.clone(), j.node_id.clone(), j.dreamina_workflow.clone())
+        (
+            j.project_path.clone(),
+            j.model_id.clone(),
+            j.node_id.clone(),
+            j.dreamina_workflow.clone(),
+            j.polls,
+        )
     };
 
     // 锁已释放，可以安全做 async IO
@@ -632,6 +832,7 @@ pub async fn video_gen_get_job(
     let model_id = job_data.1;
     let node_id = job_data.2;
     let workflow = job_data.3;
+    let poll_count = job_data.4;
     let http = state.http.clone();
     let id_owned = id.to_string();
 
@@ -652,6 +853,10 @@ pub async fn video_gen_get_job(
                 let mut map = state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
                 if let Some(job) = map.get_mut(&id_owned) {
                     job.result_rel_path = Some(rel.clone());
+                    let job_clone = job.clone();
+                    let project = job_clone.project_path.clone();
+                    drop(map);
+                    let _ = persist_video_job(&project, &id_owned, &job_clone);
                 }
                 return Ok(VideoJobSnapshot {
                     id: id_owned,
@@ -667,10 +872,14 @@ pub async fn video_gen_get_job(
                     "[video_cmd] poll_video_job_http 未成功（status={}, error={:?}）",
                     snap.status, snap.error
                 );
-                // API 返回了状态但未成功，把真实状态返回给前端，不 fallback
+                let status = if snap.status == "queued" && poll_count >= 2 {
+                    "running".to_string()
+                } else {
+                    snap.status.clone()
+                };
                 return Ok(VideoJobSnapshot {
                     id: id_owned,
-                    status: snap.status,
+                    status,
                     progress: snap.progress,
                     error: snap.error.clone(),
                     model_id,
@@ -844,11 +1053,20 @@ pub async fn test_video_model_connection(
         get_api_key(&key_id)?.ok_or_else(|| "请先填写并保存 API Key".to_string())?
     };
 
-    let base_url = if cfg.api_base_url.trim().is_empty() {
-        DEFAULT_SEEDANCE_API_BASE.to_string()
-    } else {
-        cfg.api_base_url.trim().to_string()
+    let base_url = {
+        let raw = if cfg.api_base_url.trim().is_empty() {
+            DEFAULT_SEEDANCE_API_BASE.to_string()
+        } else {
+            cfg.api_base_url.trim().to_string()
+        };
+        let normalized = normalize_openai_api_base(&raw);
+        if normalized.is_empty() {
+            DEFAULT_SEEDANCE_API_BASE.to_string()
+        } else {
+            normalized
+        }
     };
+    let model_id = cfg.model.trim();
     let url = format!("{}/models", base_url.trim_end_matches('/'));
 
     let resp = state
@@ -861,6 +1079,12 @@ pub async fn test_video_model_connection(
 
     let status = resp.status();
     let text = resp.text().await.map_err(|e| e.to_string())?;
+    if status.as_u16() == 401 || status.as_u16() == 403 {
+        return Err(format!(
+            "API Key 无效或无权访问（{}）：请检查火山方舟控制台密钥与接入点权限",
+            status.as_u16()
+        ));
+    }
     if !status.is_success() {
         return Err(format!(
             "连接失败({})：{}",
@@ -869,13 +1093,38 @@ pub async fn test_video_model_connection(
         ));
     }
 
-    Ok(format!(
-        "连接成功（{}）：模型「{}」API 可达",
-        status.as_u16(),
-        cfg.label.trim().is_empty()
-            .then(|| cfg.model.as_str())
-            .unwrap_or(cfg.label.as_str())
-    ))
+    let parsed: serde_json::Value =
+        serde_json::from_str(&text).unwrap_or_else(|_| serde_json::json!({ "raw": text }));
+    let model_listed = parsed
+        .get("data")
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter().any(|m| {
+                m.get("id")
+                    .and_then(|id| id.as_str())
+                    .map(|id| id == model_id)
+                    .unwrap_or(false)
+            })
+        })
+        .unwrap_or(false);
+
+    let model_label = if cfg.label.trim().is_empty() {
+        model_id
+    } else {
+        cfg.label.as_str()
+    };
+
+    if model_listed {
+        Ok(format!(
+            "连接成功：已确认模型「{}」({}) 在接入点可用",
+            model_label, model_id
+        ))
+    } else {
+        Ok(format!(
+            "连接成功（API 可达），模型列表中未找到「{}」。若视频生成正常可忽略；否则请核对火山方舟接入点 ID 是否为 {}",
+            model_id, model_id
+        ))
+    }
 }
 
 #[cfg(test)]
@@ -897,6 +1146,7 @@ mod video_model_match_tests {
             supports_multi_ref_fusion: true,
             max_reference_images: 4,
             supports_image_edit: true,
+            endpoint_type: None,
         }
     }
 

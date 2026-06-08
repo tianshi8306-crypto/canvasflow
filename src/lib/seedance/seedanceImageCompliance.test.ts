@@ -60,7 +60,7 @@ describe("seedanceImageCompliance", () => {
 });
 
 describe("collectSeedanceImageComplianceValidationErrors", () => {
-  it("blocks pending and failed refs", () => {
+  it("ignores pending and blocks failed refs", () => {
     const map = new Map([
       [
         "e1",
@@ -101,9 +101,8 @@ describe("collectSeedanceImageComplianceValidationErrors", () => {
       ],
       map,
     );
-    expect(errs).toHaveLength(2);
+    expect(errs).toHaveLength(1);
     expect(errs[0]?.message).toContain("参考 3");
-    expect(errs[1]?.message).toContain("校验中");
   });
 
   it("mergeSeedanceComplianceIntoValidation marks invalid", () => {

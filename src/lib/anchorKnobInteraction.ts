@@ -13,14 +13,24 @@ export function getRestingKnobPos(zone: DOMRect, side: "left" | "right"): KnobPo
   return getSimpleAnchorRestingKnobPos(zone.width, zone.height, side);
 }
 
-/** 指针在 zone 内的圆钮位置（返回圆心坐标，配合 CSS translate(-50%, -50%)） */
-export function clientToKnobPos(zone: DOMRect, clientX: number, clientY: number): KnobPos {
+/** 指针在 zone 内的圆钮位置（返回圆心坐标，配合 CSS translate(-50%, -50%)）。
+ * `zone` 来自 getBoundingClientRect（屏幕坐标），`left`/`top` 最终作用在
+ * 节点的本地 CSS 坐标空间，需要除以 React Flow 的缩放倍率。 */
+export function clientToKnobPos(
+  zone: DOMRect,
+  clientX: number,
+  clientY: number,
+  zoom: number,
+): KnobPos {
   const pad = 4;
-  const cx = clientX - zone.left;
-  const cy = clientY - zone.top;
+  const scale = zoom <= 0 ? 1 : zoom;
+  const cx = (clientX - zone.left) / scale;
+  const cy = (clientY - zone.top) / scale;
+  const zoneW = zone.width / scale;
+  const zoneH = zone.height / scale;
   return {
-    left: Math.max(pad + KNOB_R, Math.min(zone.width - pad - KNOB_R, cx)),
-    top: Math.max(pad + KNOB_R, Math.min(zone.height - pad - KNOB_R, cy)),
+    left: Math.max(pad + KNOB_R, Math.min(zoneW - pad - KNOB_R, cx)),
+    top: Math.max(pad + KNOB_R, Math.min(zoneH - pad - KNOB_R, cy)),
   };
 }
 

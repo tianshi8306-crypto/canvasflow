@@ -183,11 +183,8 @@ export function collectSeedanceImageComplianceValidationErrors(
   for (const ref of refs) {
     const r = byEdge.get(ref.edgeId);
     if (!r) continue;
+    // pending：后台探测中，不向面板展示、不阻断生成按钮
     if (r.status === "pending") {
-      errors.push({
-        code: "SEEDANCE_COMPLIANCE_PENDING",
-        message: `参考 ${ref.badgeLabel}：Seedance 合规校验中，请稍候`,
-      });
       continue;
     }
     if (r.pass) continue;

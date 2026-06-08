@@ -142,7 +142,7 @@ export function VideoModelPicker({
     : (selected?.label ?? selectableModels[0]?.label ?? "选择模型");
 
   const menu =
-    open && selectableModels.length > 0 && menuStyle && typeof document !== "undefined"
+    open && orderedModels.length > 0 && menuStyle && typeof document !== "undefined"
       ? createPortal(
           <div
             className="igp-model-menu igp-model-menu--portal vgp-model-menu--portal videoGenPanel--chrome"
@@ -200,12 +200,18 @@ export function VideoModelPicker({
         ref={triggerRef}
         type="button"
         className={`igp-model-trigger${open ? " open" : ""}`}
-        title="视频模型"
-        disabled={loading || selectableModels.length === 0}
+        disabled={loading || orderedModels.length === 0}
+        title={
+          loading
+            ? "正在加载视频模型…"
+            : orderedModels.length === 0
+              ? "请先在 设置 → 视频模型 中添加并启用模型"
+              : "视频模型"
+        }
         aria-expanded={open}
         onClick={(e) => {
           e.stopPropagation();
-          if (loading || selectableModels.length === 0) return;
+          if (loading || orderedModels.length === 0) return;
           setOpenSafe(!open);
         }}
       >

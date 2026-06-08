@@ -87,6 +87,7 @@ function CanvasAnchorSide({
   const connectionInProgress = useStore((s) => s.connection.inProgress);
   const connectionToNode = useStore((s) => s.connection.toNode);
   const connectionIsValid = useStore((s) => s.connection.isValid);
+  const zoom = useStore((s) => s.transform[2]);
   const nodeId = useNodeId();
   const updateNodeInternals = useUpdateNodeInternals();
   const handleRef = useRef<HTMLDivElement>(null);
@@ -110,9 +111,9 @@ function CanvasAnchorSide({
         return;
       }
       setMagnetized(true);
-      setKnobPos(clientToKnobPos(r, clientX, clientY));
+      setKnobPos(clientToKnobPos(r, clientX, clientY, zoom));
     },
-    [],
+    [zoom],
   );
 
   const onZonePointerMove = useCallback(

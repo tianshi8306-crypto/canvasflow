@@ -35,6 +35,7 @@ export type CanvasProjectMeta = {
   textNodeCounter?: number;
   audioNodeCounter?: number;
   scriptNodeCounter?: number;
+  activeStyleId?: string | null;
 };
 
 /** v2 canvas（统一图片节点：imageAsset → imageNode） */
@@ -236,12 +237,15 @@ function parseCanvasMeta(raw: unknown): CanvasProjectMeta | undefined {
     typeof m.scriptNodeCounter === "number" && Number.isFinite(m.scriptNodeCounter)
       ? Math.max(0, Math.floor(m.scriptNodeCounter))
       : undefined;
+  const activeStyleId =
+    m.activeStyleId == null || typeof m.activeStyleId === "string" ? (m.activeStyleId as string | null) : undefined;
   if (
     imageNodeCounter == null &&
     videoNodeCounter == null &&
     textNodeCounter == null &&
     audioNodeCounter == null &&
-    scriptNodeCounter == null
+    scriptNodeCounter == null &&
+    activeStyleId === undefined
   ) {
     return undefined;
   }
@@ -251,6 +255,7 @@ function parseCanvasMeta(raw: unknown): CanvasProjectMeta | undefined {
     textNodeCounter,
     audioNodeCounter,
     scriptNodeCounter,
+    activeStyleId,
   };
 }
 
@@ -278,7 +283,8 @@ export function serializeCanvas(
       meta.videoNodeCounter != null ||
       meta.textNodeCounter != null ||
       meta.audioNodeCounter != null ||
-      meta.scriptNodeCounter != null)
+      meta.scriptNodeCounter != null ||
+      meta.activeStyleId !== undefined)
   ) {
     payload.meta = meta;
   }

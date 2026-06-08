@@ -375,7 +375,15 @@ pub fn relocate_asset_rel_path(
     Ok(Some(row.asset_id))
 }
 
-/// 查找已落盘的 AI 生成物（按 jobId 短码或完整 id 匹配路径/meta）
+fn job_id_alnum_token(job_id: &str, max_len: usize) -> String {
+    job_id
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric())
+        .take(max_len)
+        .collect()
+}
+
+/// 查找已落盘的 AI 生成物（必须精确匹配 meta.jobId，避免 Seedance 等同前缀任务误复用首个成片）
 pub fn find_gen_asset_by_job_id(
     conn: &Connection,
     media_type: &str,
@@ -385,24 +393,37 @@ pub fn find_gen_asset_by_job_id(
     if trimmed.is_empty() {
         return Ok(None);
     }
-    let token: String = trimmed
-        .chars()
-        .filter(|c| c.is_ascii_alphanumeric())
-        .take(8)
-        .collect();
-    if token.is_empty() {
-        return Ok(None);
-    }
-    let path_like = format!("%_{token}_%");
-    let meta_like = format!("%{trimmed}%");
-    let sql = "SELECT rel_path FROM assets
+
+    // 1) 权威：meta_json.jobId 精确匹配
+    let sql_exact = "SELECT rel_path FROM assets
                WHERE media_type = ?1
-                 AND rel_path LIKE 'assets/%'
-                 AND rel_path LIKE '%/gen/%'
-                 AND (rel_path LIKE ?2 OR meta_json LIKE ?3)
+                 AND rel_path LIKE 'assets/%/gen/%'
+                 AND json_extract(meta_json, '$.jobId') = ?2
                ORDER BY created_at DESC
                LIMIT 1";
-    match conn.query_row(sql, params![media_type, path_like, meta_like], |row| row.get(0)) {
+    match conn.query_row(sql_exact, params![media_type, trimmed], |row| row.get(0)) {
+        Ok(rel) => return Ok(Some(rel)),
+        Err(rusqlite::Error::QueryReturnedNoRows) => {}
+        Err(e) => return Err(e.to_string()),
+    }
+
+    // 2) 兼容旧库：路径含完整 job token，且 meta 无 jobId 或与当前 id 一致
+    let full_token = job_id_alnum_token(trimmed, 32);
+    if full_token.len() < 4 {
+        return Ok(None);
+    }
+    let path_like = format!("%_{full_token}_%");
+    let sql_path = "SELECT rel_path FROM assets
+               WHERE media_type = ?1
+                 AND rel_path LIKE 'assets/%/gen/%'
+                 AND rel_path LIKE ?2
+                 AND (
+                   json_extract(meta_json, '$.jobId') IS NULL
+                   OR json_extract(meta_json, '$.jobId') = ?3
+                 )
+               ORDER BY created_at DESC
+               LIMIT 1";
+    match conn.query_row(sql_path, params![media_type, path_like, trimmed], |row| row.get(0)) {
         Ok(rel) => Ok(Some(rel)),
         Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
         Err(e) => Err(e.to_string()),
@@ -506,6 +527,47 @@ mod tests {
         .expect("log");
         let events = list_run_events(&conn, run_id).expect("events");
         assert_eq!(events.len(), 1);
+    }
+
+    #[test]
+    fn find_gen_asset_does_not_reuse_same_8char_prefix_job() {
+        let dir = tempdir().expect("tempdir");
+        let conn = open_run_db(dir.path()).expect("db");
+        upsert_asset(
+            &conn,
+            "assets/video/gen/seedance/seedance_t2v_20260605_cgt20250_node_a_abcd.mp4",
+            "video",
+            Some("seedance"),
+            Some(r#"{"jobId":"cgt-20250605-task-aaaa"}"#),
+        )
+        .expect("upsert");
+        let found = find_gen_asset_by_job_id(&conn, "video", "cgt-20250605-task-bbbb")
+            .expect("find");
+        assert!(found.is_none(), "must not return first job video for different job id");
+        let own = find_gen_asset_by_job_id(&conn, "video", "cgt-20250605-task-aaaa")
+            .expect("find own")
+            .expect("some");
+        assert!(own.contains("cgt20250"));
+    }
+
+    #[test]
+    fn find_gen_asset_does_not_reuse_8char_path_when_meta_job_id_missing() {
+        let dir = tempdir().expect("tempdir");
+        let conn = open_run_db(dir.path()).expect("db");
+        upsert_asset(
+            &conn,
+            "assets/video/gen/seedance/seedance_t2v_20260605_cgt20250_node_a_abcd.mp4",
+            "video",
+            Some("seedance"),
+            None,
+        )
+        .expect("upsert");
+        let found = find_gen_asset_by_job_id(&conn, "video", "cgt-20250605-task-bbbb")
+            .expect("find");
+        assert!(
+            found.is_none(),
+            "legacy path with 8-char token must not match a different job"
+        );
     }
 
     #[test]

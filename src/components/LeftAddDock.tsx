@@ -18,6 +18,7 @@ import {
   LeftAddDockSupportPopover,
 } from "@/components/LeftAddDockSupportPopover";
 import { MaterialLibraryModal } from "@/components/MaterialLibraryModal";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
 
 function makeNode(type: string, data: FlowNodeData): Node<FlowNodeData> {
   return {
@@ -112,6 +113,8 @@ export function LeftAddDock({ open, onOpen, onClose, projectPath, onRequestUploa
   const materialLibraryBtnRef = useRef<HTMLButtonElement>(null);
   const [supportOpen, setSupportOpen] = useState(false);
   const [materialLibraryOpen, setMaterialLibraryOpen] = useState(false);
+  const styleLibOpen = useCanvasUiStore((s) => s.styleLibraryPanelOpen);
+  const toggleStyleLib = () => useCanvasUiStore.getState().toggleStyleLibraryPanel();
 
   const handleClosePanels = useCallback(() => {
     setMaterialLibraryOpen(false);
@@ -207,6 +210,20 @@ export function LeftAddDock({ open, onOpen, onClose, projectPath, onRequestUploa
           aria-haspopup="dialog"
         >
           <IconHeadsetSupport />
+        </button>
+
+        <button
+          type="button"
+          className={`leftAddDockFab${styleLibOpen ? " leftAddDockFab--active" : ""}`}
+          onClick={toggleStyleLib}
+          title="风格库"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <circle cx="6" cy="5" r="4" stroke="currentColor" strokeWidth="1.2" fill="none"/>
+            <path d="M9.5 8.5L13 12" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+            <circle cx="10.5" cy="3.5" r="1.5" fill="currentColor" opacity="0.5"/>
+            <circle cx="3.5" cy="5" r="1" fill="currentColor" opacity="0.6"/>
+          </svg>
         </button>
       </div>
 

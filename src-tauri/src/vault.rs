@@ -130,11 +130,9 @@ fn read_from_local_vault(provider_id: &str) -> Result<Option<String>, String> {
     Ok(lv.keys.get(provider_id).cloned())
 }
 
-/// 将本地明文 vault 中的 Key 迁入系统凭据，并删除明文副本。
+/// 将本地明文 vault 中的 Key 迁入系统凭据；读回失败时保留本地兜底。
 fn migrate_local_key_to_keyring(provider_id: &str, api_key: &str) {
-    if store_in_keyring(provider_id, api_key).is_ok() {
-        let _ = remove_local_key(provider_id);
-    }
+    let _ = store_api_key(provider_id, api_key);
 }
 
 /// 应用启动时一次性迁移：避免旧版本留下的 api-keys.json 长期明文驻留。
@@ -145,7 +143,7 @@ pub fn migrate_plaintext_vault_to_keyring() {
     if !lv.keys.is_empty() {
         let pending: Vec<(String, String)> = lv.keys.drain().collect();
         for (provider_id, api_key) in pending {
-            if store_in_keyring(&provider_id, &api_key).is_ok() {
+            if store_api_key(&provider_id, &api_key).is_ok() {
                 continue;
             }
             lv.keys.insert(provider_id, api_key);
@@ -178,20 +176,20 @@ pub fn migrate_plaintext_vault_to_keyring() {
 }
 
 pub fn store_api_key(provider_id: &str, api_key: &str) -> Result<(), String> {
-    match store_in_keyring(provider_id, api_key) {
-        Ok(()) => {
-            // 系统凭据成功：不再写明文副本；并清理历史遗留明文。
-            let _ = remove_local_key(provider_id);
+    let keyring_store_ok = store_in_keyring(provider_id, api_key).is_ok();
+    // 始终保留本地镜像，避免 Windows 凭据库读失败导致画布无法使用已保存的 Key
+    match store_in_local_vault(provider_id, api_key) {
+        Ok(()) => Ok(()),
+        Err(local_err) if keyring_store_ok => {
+            eprintln!(
+                "[vault] keyring ok but local mirror failed for {provider_id}: {local_err}"
+            );
             Ok(())
         }
-        Err(keyring_err) => {
-            store_in_local_vault(provider_id, api_key).map_err(|local_err| {
-                format!(
-                    "系统凭据写入失败：{}；本地兜底写入失败：{}",
-                    keyring_err, local_err
-                )
-            })
-        }
+        Err(local_err) => Err(format!(
+            "系统凭据与本地兜底均写入失败：{}",
+            local_err
+        )),
     }
 }
 
@@ -206,24 +204,16 @@ pub fn get_api_key(provider_id: &str) -> Result<Option<String>, String> {
         }
     }
 
-    match read_from_keyring(provider_id) {
-        Ok(Some(v)) => return Ok(Some(v)),
-        Ok(None) => {}
-        Err(keyring_err) => {
-            if let Ok(Some(v)) = read_from_local_vault(provider_id) {
-                migrate_local_key_to_keyring(provider_id, &v);
-                return Ok(Some(v));
-            }
-            return Err(keyring_err);
-        }
-    }
-
-    if let Some(v) = read_from_local_vault(provider_id)? {
+    // 本地明文兜底优先：Windows 凭据库偶发读失败时仍可提交生成
+    if let Ok(Some(v)) = read_from_local_vault(provider_id) {
         migrate_local_key_to_keyring(provider_id, &v);
         return Ok(Some(v));
     }
 
-    Ok(None)
+    match read_from_keyring(provider_id) {
+        Ok(Some(v)) => Ok(Some(v)),
+        Ok(None) | Err(_) => Ok(None),
+    }
 }
 
 pub fn delete_api_key(provider_id: &str) -> Result<(), String> {

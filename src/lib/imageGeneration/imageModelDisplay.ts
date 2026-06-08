@@ -3,6 +3,7 @@ import type { ImageModelConfig } from "@/lib/settingsPanelTypes";
 const ESTIMATE_BY_VARIANT: Record<string, string> = {
   "Doubao-Seedream-5.0-lite": "20s",
   seedream: "20s",
+  "gpt-image": "25s",
   nano: "15s",
   pro: "50s",
 };

@@ -36,6 +36,9 @@ pub struct ImageModelConfig {
     pub max_reference_images: u8,
     #[serde(default = "default_true")]
     pub supports_image_edit: bool,
+    /// API 端点类型：images | chat，默认 images
+    #[serde(default)]
+    pub endpoint_type: Option<String>,
 }
 
 fn default_true() -> bool {

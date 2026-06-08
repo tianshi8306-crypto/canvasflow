@@ -37,13 +37,16 @@ export async function getAssetByRelPath(
 }
 
 /**
- * 解析预览/调用后端所需的工程相对路径：优先 `assetId` 查库，否则使用 `relPath`。
+ * 解析预览/调用后端所需的工程相对路径：有 `relPath` 时优先（生成落盘真值），否则按 `assetId` 查库。
  */
 export async function resolveAssetRelPath(
   projectPath: string | null | undefined,
   relPath: string | undefined,
   assetId: string | undefined,
 ): Promise<string | null> {
+  const pathNow = relPath?.trim();
+  if (pathNow) return pathNow;
+
   const id = assetId?.trim();
   const root = projectPath?.trim();
   if (id && root) {
@@ -57,7 +60,7 @@ export async function resolveAssetRelPath(
       /* fall through */
     }
   }
-  return relPath?.trim() || null;
+  return null;
 }
 
 export async function importMediaFiles(

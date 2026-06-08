@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { FlowCanvas } from "@/components/FlowCanvas";
 import { AppTopBar } from "@/components/AppTopBar";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import StyleLibraryPanel from "@/components/styleLibrary/StyleLibraryPanel";
 import { ScriptNodeFullscreenOverlay } from "@/components/ScriptNodeFullscreenOverlay";
 import { ComposeEditorOverlay } from "@/components/compose/ComposeEditorOverlay";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -368,6 +369,7 @@ export default function App() {
           toggleShortcutsOverlay();
         }}
       />
+      <StyleLibraryPanel />
       {scriptFullscreenNodeId ? <ScriptNodeFullscreenOverlay /> : null}
       {composeEditorNodeId ? <ComposeEditorOverlay /> : null}
       <ConfirmDialog />

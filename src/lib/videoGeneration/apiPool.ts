@@ -44,6 +44,14 @@ export type VideoGenerationStartRequest = {
   payload: VideoGenerationStartPayload;
 };
 
+/** 轮询时附带工程上下文，内存任务表丢失后仍可恢复即梦/Seedance 查询 */
+export type VideoJobPollHint = {
+  projectPath: string;
+  nodeId: string;
+  modelId: string;
+  workflow?: string;
+};
+
 /**
  * 视频生成 API 池：可替换为真实供应商适配器，默认注册 Mock。
  */

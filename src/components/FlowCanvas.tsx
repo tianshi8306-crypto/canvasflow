@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { useShallow } from "zustand/react/shallow";
 
 import { nodeTypes } from "@/components/canvas/nodeTypes";
+import { FlowConnectionEdge } from "@/components/canvas/FlowConnectionEdge";
 import { FileInputHandler } from "@/components/canvas/FileInputHandler";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { MultiSelectionToolbar } from "@/components/canvas/MultiSelectionToolbar";
@@ -88,8 +89,10 @@ import { CANVAS_NODE_CHROME_ROOT_ID } from "@/lib/canvasNodeChromePortal";
 import { isReactFlowSelectionEchoSuppressed } from "@/lib/reactFlowControlled";
 import { useEdgeDeleteAffordance } from "@/hooks/canvas/useEdgeDeleteAffordance";
 import { EdgeDeleteAffordance } from "@/components/canvas/EdgeDeleteAffordance";
+import { useProjectVideoJobPolling } from "@/hooks/useProjectVideoJobPolling";
 
 function FlowCanvasInner() {
+  useProjectVideoJobPolling();
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodes = useProjectStore(useShallow((s) => s.nodes));
   const edges = useProjectStore(useShallow((s) => s.edges));
@@ -724,6 +727,7 @@ function FlowCanvasInner() {
           setNodeDragSuppressUi(false);
         }}
         nodeTypes={nodeTypes satisfies NodeTypes}
+        edgeTypes={{ default: FlowConnectionEdge }}
         fitView={false}
         panOnDrag={false}
         panActivationKeyCode="Space"

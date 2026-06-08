@@ -3,6 +3,7 @@ import { memo, useMemo, type Dispatch, type SetStateAction } from "react";
 import { formatUserError } from "@/lib/errors";
 import {
   defaultApiBaseUrlByModelName,
+  endpointTypeByModelName,
   MAINSTREAM_IMAGE_MODEL_CATALOG,
   variantsByModelName,
 } from "@/lib/imageGeneration/modelCatalog";
@@ -238,6 +239,7 @@ export const SettingsImageModelsSection = memo(function SettingsImageModelsSecti
                     const nextVariants = variantsByModelName(modelName);
                     const firstVariant = nextVariants[0]?.value ?? "";
                     const baseUrl = defaultApiBaseUrlByModelName(modelName);
+                    const epType = endpointTypeByModelName(modelName);
                     setSettings((prev) =>
                       prev
                         ? {
@@ -252,6 +254,7 @@ export const SettingsImageModelsSection = memo(function SettingsImageModelsSecti
                                     model: firstVariant,
                                     label: "",
                                     apiBaseUrl: baseUrl,
+                                    endpointType: epType,
                                   }
                                 : x,
                             ),

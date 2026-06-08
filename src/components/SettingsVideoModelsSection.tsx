@@ -3,7 +3,10 @@ import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { AppSettings } from "@/lib/settingsPanelTypes";
 import { formatUserError } from "@/lib/errors";
 import { newVideoModelTemplate } from "@/lib/settingsModelTemplates";
-import { DOUBAO_SEEDANCE_API_MODEL } from "@/lib/videoGeneration/seedanceApiModel";
+import {
+  DOUBAO_SEEDANCE_API_BASE,
+  DOUBAO_SEEDANCE_API_MODEL,
+} from "@/lib/videoGeneration/seedanceApiModel";
 import { SettingsFormField } from "@/components/SettingsFormField";
 import { SettingsSectionHeader } from "@/components/settings/SettingsSectionHeader";
 
@@ -142,7 +145,7 @@ export function SettingsVideoModelsSection({
                     : prev,
                 )
               }
-              placeholder="https://xxx/v1"
+              placeholder={DOUBAO_SEEDANCE_API_BASE}
             />
           </SettingsFormField>
           <SettingsFormField label="API Key（视频节点；不会回显，保存后写入系统凭据）">

@@ -3,7 +3,7 @@
  * 写：commitNodeMediaPatch · 读：resolveNodeMediaRelPath · 打开工程由 Tauri reconcile。
  */
 import type { FlowNodeData } from "@/lib/types";
-import { resolveAssetRelPath } from "@/shared/api/assets";
+import { getAssetByRelPath, resolveAssetRelPath } from "@/shared/api/assets";
 
 /** 画布上携带本地媒体文件的节点类型（与 Rust `canvas_asset_backfill` 一致） */export const CANVAS_MEDIA_NODE_TYPES = [
   "imageNode",
@@ -43,7 +43,33 @@ export function commitNodeMediaPatch(
 ): Pick<FlowNodeData, "path" | "assetId"> {
   const path = relPath.trim();
   const id = assetId?.trim();
-  return id ? { path, assetId: id } : { path };
+  if (id) return { path, assetId: id };
+  // 显式清除旧 assetId，避免预览仍走索引里第一个成片的 UUID
+  return { path, assetId: undefined };
+}
+
+/** 生成落盘后写回节点：绑定新 path，并尽量同步 DB 中的 assetId */
+export async function commitGeneratedMediaPatchForProject(
+  projectPath: string | null | undefined,
+  relPath: string,
+): Promise<Pick<FlowNodeData, "path" | "assetId">> {
+  const path = relPath.trim();
+  if (!path) return { path: "", assetId: undefined };
+  const root = projectPath?.trim();
+  if (root) {
+    try {
+      const { isTauri } = await import("@tauri-apps/api/core");
+      if (isTauri()) {
+        const row = await getAssetByRelPath(root, path);
+        if (row?.assetId?.trim()) {
+          return commitNodeMediaPatch(path, row.assetId);
+        }
+      }
+    } catch {
+      /* 索引未就绪时仍清除旧 assetId，仅用 path 预览 */
+    }
+  }
+  return commitNodeMediaPatch(path, null);
 }
 
 /** 解析当前工程下的权威相对路径（优先 `assetId` 查库）。 */

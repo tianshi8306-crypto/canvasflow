@@ -56,6 +56,8 @@ export type ProjectState = {
   flowClipboardCount: number;
   /** 脚本节点画布内「展开全屏」时对应的节点 id（与侧栏「全屏表格」共用） */
   scriptFullscreenNodeId: string | null;
+  /** 当前激活的风格库预设 ID（null = 无风格约束） */
+  activeStyleId: string | null;
 
   /** 图片节点序号计数器，每个工程独立（用于 "图片 1", "图片 2" ...） */
   imageNodeCounter: number;
@@ -81,6 +83,7 @@ export type ProjectState = {
   setSelectedEdgeIds: (ids: string[]) => void;
   setStatusText: (t: string) => void;
   setViewport: (v: Viewport) => void;
+  setActiveStyleId: (id: string | null) => void;
   openScriptFullscreen: (nodeId: string) => void;
   closeScriptFullscreen: () => void;
   setLastRunId: (runId: string) => void;
@@ -183,7 +186,7 @@ export type ProjectState = {
     mode: "vocal" | "bgm",
   ) => Promise<void>;
   /** 在右侧创建/聚焦视频合成节点，用于多段剪辑拼接 */
-  openVideoClipConcat: (videoNodeId: string) => void;
+  openVideoClipConcat: (videoNodeId: string) => Promise<void>;
   /** 按脚本镜号准备合成节点并可选自动 FFmpeg 导出成片 */
   exportScriptCompose: (
     scriptNodeId: string,

@@ -100,6 +100,7 @@ export function VideoChromePreview({
   return (
     <div className="vidChromePreview" ref={previewContainerRef}>
       <VideoMinimalPlayer
+        key={src}
         src={src}
         trimEditing={trimEditing}
         trimRange={videoBlock.sourceTrim}

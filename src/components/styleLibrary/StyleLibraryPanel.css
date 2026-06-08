@@ -1,0 +1,150 @@
+﻿.styleLibBackdrop {
+  position: fixed; inset: 0; z-index: 40; background: rgba(0,0,0,.35);
+}
+
+.styleLibPanel {
+  position: fixed; top: 0; left: 0; bottom: 0; z-index: 41;
+  width: 320px; max-width: 92vw;
+  background: var(--surface-card, #1a1a1f);
+  border-right: 1px solid var(--border, #2a2a30);
+  display: flex; flex-direction: column;
+  transform: translateX(-100%);
+  transition: transform .25s ease;
+}
+.styleLibPanel--open {
+  transform: translateX(0);
+}
+
+.styleLibPanelInner {
+  flex: 1; display: flex; flex-direction: column; overflow: hidden;
+}
+
+.styleLibHeader {
+  display: flex; align-items: center; padding: 14px 16px 10px; gap: 8px;
+}
+.styleLibTitle {
+  flex: 1; font-size: 15px; font-weight: 600; color: var(--text-primary,#eee); margin: 0;
+}
+.styleLibClose {
+  width: 28px; height: 28px; border: none; background: none; color: var(--text-secondary,#888);
+  cursor: pointer; border-radius: 6px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.styleLibClose:hover { background: rgba(255,255,255,.08); color: #fff; }
+
+.styleLibSearch {
+  margin: 0 16px 10px; display: flex; align-items: center; gap: 6px;
+  background: var(--surface-elevated,#25252b); border-radius: 8px; padding: 0 10px;
+  border: 1px solid var(--border,#2a2a30); flex-shrink: 0;
+}
+.styleLibSearchIcon { flex-shrink: 0; color: var(--text-tertiary,#666); }
+.styleLibSearchInput {
+  flex: 1; border: none; background: none; padding: 8px 0; font-size: 13px;
+  color: var(--text-primary,#eee); outline: none; min-width: 0;
+}
+.styleLibSearchInput::placeholder { color: var(--text-tertiary,#555); }
+
+.styleLibCats {
+  display: flex; flex-wrap: wrap; gap: 6px; padding: 0 16px 10px; flex-shrink: 0;
+}
+.styleLibCat {
+  padding: 4px 12px; border-radius: 16px; font-size: 12px; border: 1px solid var(--border,#333);
+  background: var(--surface-elevated,#25252b); color: var(--text-secondary,#999);
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.styleLibCat:hover { border-color: var(--cat-color,#888); color: #fff; }
+.styleLibCat--active {
+  border-color: var(--cat-color,#888); background: var(--cat-color,#888); color: #111;
+}
+
+.styleLibActiveHint {
+  margin: 0 16px 10px; padding: 8px 12px; border-radius: 8px;
+  background: rgba(255,255,255,.04); font-size: 12px; color: var(--text-secondary,#aaa);
+  display: flex; align-items: center; gap: 8px; flex-shrink: 0;
+}
+.styleLibClearBtn {
+  margin-left: auto; padding: 2px 10px; border-radius: 4px; border: none;
+  background: rgba(255,255,255,.06); color: var(--text-secondary,#999); font-size: 11px; cursor: pointer;
+}
+.styleLibClearBtn:hover { background: rgba(255,80,80,.15); color: #f66; }
+
+.styleLibList {
+  flex: 1; overflow-y: auto; padding: 0 16px 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.styleLibList::-webkit-scrollbar { width: 6px; }
+.styleLibList::-webkit-scrollbar-thumb {
+  background: rgba(255,255,255,.12); border-radius: 3px;
+}
+
+.styleLibCard {
+  display: block; width: 100%; text-align: left; border: 1px solid var(--border,#2a2a30);
+  border-radius: 10px; background: var(--surface-elevated,#1e1e24); cursor: pointer;
+  overflow: hidden; transition: border-color .15s; padding: 0;
+}
+.styleLibCard:hover { border-color: rgba(255,255,255,.15); }
+.styleLibCard--active { border-color: #c084fc; box-shadow: 0 0 0 1px #c084fc; }
+
+/* ── 缩略图区域 ── */
+.styleLibCardThumb {
+  position: relative;
+  overflow: hidden;
+  background: #111;
+}
+/* 视频缩略图容器：限制最大高度，保证完整比例 */
+.styleLibCardThumb--video {
+  max-height: 200px;
+}
+
+/* 封面图 — contain 保证完整比例不裁剪 */
+.styleLibCardPoster {
+  width: 100%; height: 100%; object-fit: contain;
+  display: block; transition: opacity .2s ease;
+}
+/* 视频 — contain 保证完整比例不裁剪 */
+.styleLibCardVideo {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%; object-fit: contain;
+  display: block;
+}
+/* 播放按钮图标 */
+.styleLibCardPlayIcon {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%);
+  pointer-events: none; transition: opacity .2s ease;
+}
+.styleLibCard:hover .styleLibCardPlayIcon { opacity: .85; }
+
+/* 信息卡片缩略图（无视频条目） */
+.styleLibCardThumbInner {
+  width: 100%; height: 100%; display: flex; flex-direction: column;
+  justify-content: space-between; padding: 10px 12px;
+  border-bottom: 1px solid;
+}
+.styleLibCardCat {
+  font-size: 10px; font-weight: 600; padding: 2px 8px; border-radius: 4px;
+  align-self: flex-start; letter-spacing: .04em;
+}
+.styleLibCardTitle {
+  font-size: 13px; font-weight: 600; color: #fff; line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.styleLibCardThumbTags { display: flex; flex-wrap: wrap; gap: 4px; }
+.styleLibCardThumbTag {
+  padding: 1px 6px; border-radius: 3px; font-size: 10px;
+  background: rgba(255,255,255,.08); color: var(--text-secondary,#aaa);
+}
+
+/* 卡片正文 */
+.styleLibCardBody { padding: 10px 12px; }
+.styleLibCardHint {
+  font-size: 11px; color: var(--text-secondary,#888); margin: 0 0 6px;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4;
+}
+.styleLibCardTags { display: flex; flex-wrap: wrap; gap: 4px; }
+.styleLibCardTag {
+  padding: 1px 8px; border-radius: 10px; font-size: 10px;
+  background: rgba(255,255,255,.06); color: var(--text-tertiary,#777);
+}
+
+.styleLibEmpty {
+  text-align: center; padding: 32px 0; color: var(--text-tertiary,#555); font-size: 12px;
+}

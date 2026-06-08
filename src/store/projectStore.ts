@@ -79,9 +79,11 @@ import {
   resolveExportFormat,
   findConcatNodeForScriptVideos,
   formatComposeMissingHint,
+  applyIncomingComposeClipSync,
   patchComposeNodeAfterExport,
   timelineClipsToNodePatch,
 } from "@/lib/compose";
+import { resolveNodeMediaRelPath } from "@/lib/nodeMediaRef";
 import { orderedIncomingScriptNodeIds } from "@/lib/incomingScriptBinding";
 import { extractVideoAudioToAssets } from "@/lib/videoToolbarAudioExtract";
 import { delogoVideoToAssets } from "@/lib/videoToolbarDelogo";
@@ -155,6 +157,31 @@ export function resetProjectSaveRevisionBaseline(revision = 0) {
   lastSavedGraphRevision = revision;
 }
 
+/** 视频/合成节点连入剪辑节点后，把上游成片写入时间线 */
+async function syncComposeClipFromNewEdge(
+  get: () => ProjectState,
+  composeNodeId: string,
+  sourceNodeId: string,
+) {
+  const { projectPath, nodes, edges, updateNodeData, setStatusText } = get();
+  if (!projectPath?.trim()) {
+    setStatusText("请先打开工程后再导入剪辑片段");
+    return;
+  }
+  try {
+    await applyIncomingComposeClipSync(
+      composeNodeId,
+      sourceNodeId,
+      projectPath,
+      nodes,
+      edges,
+      { updateNodeData, setStatusText },
+    );
+  } catch (e) {
+    setStatusText(`导入剪辑片段失败：${formatUserError(e)}`);
+  }
+}
+
 export const useProjectStore = create<ProjectState>((set, get) => {
   const loadSnapshotIntoStore = (snapshot: ProjectGraphSnapshot) => {
     runWithReactFlowGraphSyncLock(() => {
@@ -212,6 +239,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   statusText: "未打开工程",
   flowClipboardCount: 0,
   scriptFullscreenNodeId: null,
+  activeStyleId: null,
   /** 图片节点序号计数器，每个工程独立（用于 "图片 1", "图片 2" ...） */
   imageNodeCounter: 0,
   videoNodeCounter: 0,
@@ -268,6 +296,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   setViewport: (v) => set({ viewport: v }),
   openScriptFullscreen: (nodeId) => set({ scriptFullscreenNodeId: nodeId }),
   closeScriptFullscreen: () => set({ scriptFullscreenNodeId: null }),
+  setActiveStyleId: (id) => {
+    set({ activeStyleId: id });
+    markGraphDirtyOnly();
+    if (get().projectPath) scheduleSave(get);
+  },
   setLastRunId: (runId: string) => set({ lastRunId: runId }),
 
   onNodesChange: (changes) => {
@@ -402,6 +435,18 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       return { edges, nodes };
     });
     afterGraphEdit();
+
+    const targetNode = get().nodes.find((n) => n.id === normalized.target);
+    if (
+      targetNode?.type === "ffmpegConcat" &&
+      (sn.type === "videoNode" || sn.type === "ffmpegConcat")
+    ) {
+      const composeId = normalized.target;
+      const sourceId = normalized.source;
+      setTimeout(() => {
+        void syncComposeClipFromNewEdge(get, composeId, sourceId);
+      }, 0);
+    }
   },
 
   deleteEdge: (edgeId) => {
@@ -422,7 +467,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   updateNodeData: (id, patch, opts) => {
     if (!opts?.silent) recordBeforeDiscreteMutation(get);
     set((s) => ({
-      nodes: s.nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, ...patch } } : n)),
+      nodes: s.nodes.map((n) => {
+        if (n.id !== id) return n;
+        const data = { ...n.data, ...patch };
+        for (const [key, val] of Object.entries(patch)) {
+          if (val === undefined) delete (data as Record<string, unknown>)[key];
+        }
+        return { ...n, data };
+      }),
       ...(opts?.silent ? {} : { projectDirty: true }),
     }));
     if (opts?.silent) {
@@ -514,6 +566,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         textNodeCounter: 0,
         audioNodeCounter: 0,
         scriptNodeCounter: 0,
+        activeStyleId: null,
       });
       useCanvasUiStore.getState().resetEmptyGuide();
       bindActiveTabToProject();
@@ -548,6 +601,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         textNodeCounter,
         audioNodeCounter,
         scriptNodeCounter,
+        activeStyleId,
       } = get();
       if (!projectPath) return;
       const { projectDirty, graphRevision } = get();
@@ -565,6 +619,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           textNodeCounter,
           audioNodeCounter,
           scriptNodeCounter,
+          activeStyleId,
         });
         await yieldToMain();
         await invoke("write_canvasflow_json_bytes", { projectPath, content });
@@ -592,6 +647,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       textNodeCounter,
       audioNodeCounter,
       scriptNodeCounter,
+      activeStyleId,
     } = get();
     try {
       const folder = await pickProjectFolder(get().projectPath);
@@ -604,6 +660,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         textNodeCounter,
         audioNodeCounter,
         scriptNodeCounter,
+        activeStyleId,
       });
       await invoke("write_canvasflow_json_bytes", { projectPath: folder, content });
       await useProjectBibleStore.getState().loadForProject(folder);
@@ -1006,8 +1063,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     get().setStatusText("已在左侧添加输入节点并联线；成片输出请从本节点右侧连接");
   },
 
-  openVideoClipConcat: (videoNodeId) => {
+  openVideoClipConcat: async (videoNodeId) => {
     const state = get();
+    const projectPath = state.projectPath;
     const vNode = state.nodes.find((n) => n.id === videoNodeId && n.type === "videoNode");
     if (!vNode) return;
     if (!vNode.data.path?.trim() && !vNode.data.assetId?.trim()) {
@@ -1022,9 +1080,20 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     });
     if (existingEdge) {
       const concatId = existingEdge.target;
+      if (projectPath) {
+        await syncComposeClipFromNewEdge(get, concatId, videoNodeId);
+      }
       get().setSelectedNodeIds([concatId]);
       useCanvasUiStore.getState().setComposeEditorNodeId(concatId);
-      get().setStatusText("已打开视频剪辑工作台");
+      return;
+    }
+
+    const videoPath =
+      (await resolveNodeMediaRelPath(projectPath, vNode.data))?.trim() ??
+      vNode.data.path?.trim() ??
+      "";
+    if (!videoPath) {
+      get().setStatusText("无法解析视频路径，请确认视频已出片并打开工程");
       return;
     }
 
@@ -1035,7 +1104,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         : 500;
     const concatId = crypto.randomUUID();
     const baseLabel = vNode.data.label?.trim() || "视频";
-    const videoPath = vNode.data.path?.trim() ?? "";
 
     const concatNode: Node<FlowNodeData> = {
       id: concatId,
@@ -1044,18 +1112,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       data: {
         ...newNodeDataByType.ffmpegConcat(),
         label: `${baseLabel} · 剪辑`,
-        timelineClips: videoPath
-          ? [
-              {
-                id: crypto.randomUUID(),
-                relPath: videoPath,
-                inSec: 0,
-                outSec: null,
-                sourceNodeId: videoNodeId,
-              },
-            ]
-          : [],
-        inputs: videoPath ? [videoPath] : [],
+        timelineClips: [
+          {
+            id: crypto.randomUUID(),
+            relPath: videoPath,
+            inSec: 0,
+            outSec: null,
+            sourceNodeId: videoNodeId,
+          },
+        ],
+        inputs: [videoPath],
         output: "assets/exports/final.mp4",
       },
     };

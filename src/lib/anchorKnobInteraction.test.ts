@@ -18,9 +18,9 @@ describe("anchorKnobInteraction", () => {
   it("magnet knob center follows pointer within zone", () => {
     const cx = zone.left + zone.width / 2;
     const cy = zone.top + zone.height / 2;
-    const pos = clientToKnobPos(zone, cx, cy);
-    expect(pos.left).toBeCloseTo(cx - zone.left, 0);
-    expect(pos.top).toBeCloseTo(cy - zone.top, 0);
+    const pos = clientToKnobPos(zone, cx, cy, 1);
+    expect(pos.left).toBeCloseTo((cx - zone.left) / 1, 0);
+    expect(pos.top).toBeCloseTo((cy - zone.top) / 1, 0);
   });
 
   it("distance to resting is zero at default center", () => {

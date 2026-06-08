@@ -9,6 +9,7 @@ import type {
   ProviderConfig,
 } from "@/lib/settingsPanelTypes";
 import { ensureModelListDefaults } from "@/lib/settingsModelDefaults";
+import { normalizeImageModelConfigOnLoad } from "@/lib/imageGeneration/normalizeImageModelConfig";
 import { normalizeVideoModelConfigOnLoad } from "@/lib/videoGeneration/seedanceApiModel";
 import { normalizeProjectAutoSaveIdleSec } from "@/lib/projectAutoSaveSettings";
 import {
@@ -59,13 +60,15 @@ export function normalizeLoadedSettings(s: AppSettings): AppSettings {
     // 素材
     uploadQuality: s.uploadQuality ?? "standard",
     projectAutoSaveIdleSec: normalizeProjectAutoSaveIdleSec(s.projectAutoSaveIdleSec),
-    imageModels: (s.imageModels ?? []).map((m) => ({
-      ...m,
-      vendorName: m.vendorName ?? m.modelName ?? "",
-      modelName: m.modelName ?? m.vendorName ?? "",
-      modelVariant: m.modelVariant ?? m.model ?? "",
-      apiBaseUrl: m.apiBaseUrl ?? "",
-    })),
+    imageModels: (s.imageModels ?? []).map((m) =>
+      normalizeImageModelConfigOnLoad({
+        ...m,
+        vendorName: m.vendorName ?? m.modelName ?? "",
+        modelName: m.modelName ?? m.vendorName ?? "",
+        modelVariant: m.modelVariant ?? m.model ?? "",
+        apiBaseUrl: m.apiBaseUrl ?? "",
+      }),
+    ),
     videoModels: (s.videoModels ?? []).map((m) =>
       normalizeVideoModelConfigOnLoad({
         ...m,
@@ -95,13 +98,15 @@ export function mergeImportedSettings(prev: AppSettings, parsed: Partial<AppSett
     ...next,
     providers: Array.isArray(parsed.providers) ? (parsed.providers as ProviderConfig[]) : prev.providers,
     imageModels: Array.isArray(parsed.imageModels)
-      ? (parsed.imageModels as ImageModelConfig[]).map((m) => ({
-          ...m,
-          vendorName: m.vendorName ?? m.modelName ?? "",
-          modelName: m.modelName ?? m.vendorName ?? "",
-          modelVariant: m.modelVariant ?? m.model ?? "",
-          apiBaseUrl: m.apiBaseUrl ?? "",
-        }))
+      ? (parsed.imageModels as ImageModelConfig[]).map((m) =>
+          normalizeImageModelConfigOnLoad({
+            ...m,
+            vendorName: m.vendorName ?? m.modelName ?? "",
+            modelName: m.modelName ?? m.vendorName ?? "",
+            modelVariant: m.modelVariant ?? m.model ?? "",
+            apiBaseUrl: m.apiBaseUrl ?? "",
+          }),
+        )
       : prev.imageModels,
     videoModels: Array.isArray(parsed.videoModels)
       ? (parsed.videoModels as ImageModelConfig[]).map((m) => ({

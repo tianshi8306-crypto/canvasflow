@@ -51,12 +51,21 @@ CanvasFlow AI Studio 是一款跨平台桌面创作工具，将**无限画布 + 
 | **文本** | `textNode` | 自由文本输入，可连接到任意节点作为 prompt 素材 |
 | **LLM** | `llm` | OpenAI 兼容 API 流式生成，可切换 Provider / Model |
 | **脚本** | `scriptNode` | AI 生成结构化分镜脚本（ScriptBeat），全屏编辑表格 |
-| **视频** | `videoNode` | 多模态生成面板（文生视频 / 图生视频 / 参考图+视频等），通过即梦 CLI 本地调用 |
-| **图片** | `imageNode` | 文生图 / 图生图 / 多参考图融合，支持 `@image#1:xxx.png` 引用格式 |
+| **视频** | `videoNode` | 多模态生成面板（文生视频 / 图生视频 / 首尾帧 / 视频续写等），支持即梦 Seedance 2.0 与 OpenAI 兼容接口 |
+| **图片** | `imageNode` | 文生图 / 图生图 / 多参考图融合，支持 `@image#1:xxx.png` 引用格式，兼容 Chat Completions 与 Images API 两种端点 |
 | **音频** | `audioNode` | TTS 文字转语音，支持音色/语速/情感调节 |
 | **媒体导入** | `mediaImport` | 导入本地视频/音频文件，作为工作流素材源 |
-| **FFmpeg 合成** | `ffmpegConcat` | 本地 FFmpeg 拼接多段视频，全屏剪辑台 + 时间线 |
+| **FFmpeg 合成** | `ffmpegConcat` | 本地 FFmpeg 拼接多段视频，全屏剪辑台 + 时间线，支持 BGM 叠加 |
 | **分组** | `group` | 画布分组容器，视觉整理复杂工作流 |
+
+### 🎨 风格库
+
+内置**风格预设库**，快速为视频/图片生成指定视觉风格：
+
+- 7 大风格分类：电影级 / 动漫 / 奇幻 / UGC / 广告 / Meme / 食品
+- 每条预设包含风格提示词、负向提示词、视觉描述，可一键注入生成节点
+- 带封面缩略图预览（支持视频预览），所见即所得
+- 风格库定期更新，支持本地扩展
 
 ### 🎬 从灵感到成片
 
@@ -68,7 +77,8 @@ CanvasFlow AI Studio 是一款跨平台桌面创作工具，将**无限画布 + 
 
 - 脚本节点支持从上游文本 / LLM 输出自动生成结构化分镜表
 - 视频节点支持文生视频、图生视频、首尾帧、视频续写等多种工作流
-- 合成节点提供全屏剪辑台，支持时间线拖拽、从脚本镜头自动填充
+- 合成节点提供全屏剪辑台，支持时间线拖拽、从脚本镜头自动填充、BGM 叠加
+- 视频任务支持持久化轮询——热重载或重启后仍可取回进行中的生成任务
 - FFmpeg 本地导出，无需上传云端
 
 ### ⚙️ 设置系统
@@ -76,6 +86,7 @@ CanvasFlow AI Studio 是一款跨平台桌面创作工具，将**无限画布 + 
 - **模型设置**：5 个子 Tab（总览 / 文本 / 图 / 视 / 音），分别配置 Provider 和 Model
 - **即梦登录**：总览 Tab 内置即梦 AI 扫码授权，自动管理 CLI 登录态
 - **API Key 安全**：密钥写入系统凭据管理器（keyring），**不写入工程文件或配置文件**
+- **图片模型兼容**：自动识别 Chat Completions / Images API 双端点格式，兼容 APIYI、GPT-Image 等服务
 
 ### 💾 本地工程管理
 
@@ -205,8 +216,8 @@ npm run desktop:build:with-ffmpeg
 | 样式系统 | CSS + `--cf-*` 色彩 Token |
 | 后端 | Rust + Tokio |
 | 数据库 | SQLite (rusqlite, bundled) |
-| AI 接入 | OpenAI 兼容 API + 即梦 CLI 本地调用 |
-| 视频合成 | FFmpeg (embedded binary) |
+| AI 接入 | OpenAI 兼容 API（Chat / Images API）+ 即梦 CLI 本地调用 |
+| 视频合成 | FFmpeg (embedded binary) + BGM 混音 |
 | 安全存储 | keyring (系统凭据管理器) |
 | 测试 | Vitest + Playwright + cargo test |
 
@@ -227,7 +238,8 @@ canvasflow/
 │   │   │   ├── FFmpegNode.tsx
 │   │   │   ├── MediaImportNode.tsx
 │   │   │   └── GroupNode.tsx
-│   │   ├── canvas/             # 画布、工具栏、节点类型注册
+│   │   ├── canvas/             # 画布、连线动效、工具栏、节点类型注册
+│   │   ├── styleLibrary/       # 风格库面板 UI
 │   │   └── ...                 # 顶栏、设置面板、灵体面板等
 │   ├── store/                  # Zustand 状态（24 个 store）
 │   │   ├── projectStore.ts     # 工程/画布核心状态
@@ -236,6 +248,8 @@ canvasflow/
 │   │   └── ...
 │   ├── lib/
 │   │   ├── nodeAgentRuntime/   # 节点级 Agent 运行时
+│   │   ├── styleLibrary/       # 风格库数据模型与加载器
+│   │   ├── videoGeneration/    # 视频生成轮询、任务恢复、卡死检测
 │   │   ├── videoNodeTypes.ts   # 视频节点领域模型
 │   │   └── types.ts            # FlowNodeData 等核心类型
 │   ├── shared/api/             # 前端 API 调用封装
@@ -264,6 +278,9 @@ canvasflow/
 │   │   ├── mcp_stdio.rs        # MCP Server 子进程管理
 │   │   └── compose_concat.rs   # 视频合成
 │   └── tauri.conf.json         # Tauri 配置
+├── public/
+│   ├── styleLibrary.json       # 风格预设数据
+│   └── style-thumbnails/       # 风格封面缩略图
 ├── scripts/
 │   └── tauri-build-with-ffmpeg.mjs  # 生产构建（含 FFmpeg 嵌入）
 ├── docs/                       # 产品文档、迭代记录、设计规范

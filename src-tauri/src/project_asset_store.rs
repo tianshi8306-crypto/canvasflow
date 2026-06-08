@@ -128,7 +128,7 @@ pub fn allocate_project_asset_paths(
 
     let wf = ctx.workflow.map(workflow_short_code).unwrap_or("gen");
     let date = chrono::Utc::now().format("%Y%m%d");
-    let job = short_id(ctx.job_id, 8);
+    let job = short_id(ctx.job_id, 32);
     let node = short_id(ctx.node_id, 8);
     let uniq = &uuid::Uuid::new_v4().to_string()[..4];
 

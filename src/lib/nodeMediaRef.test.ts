@@ -25,6 +25,9 @@ describe("nodeMediaRef", () => {
       path: "assets/a.png",
       assetId: "id-1",
     });
-    expect(commitNodeMediaPatch("assets/a.png", null)).toEqual({ path: "assets/a.png" });
+    expect(commitNodeMediaPatch("assets/a.png", null)).toEqual({
+      path: "assets/a.png",
+      assetId: undefined,
+    });
   });
 });

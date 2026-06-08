@@ -281,6 +281,26 @@ select {
   cursor: default;
 }
 
+.appTopBadge--style {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 2px 8px 2px 4px; border-radius: 14px;
+  background: rgba(255,255,255,.06); color: var(--cf-soft-white-secondary);
+  font-size: 11px; font-weight: 500; cursor: pointer;
+  border: 1px solid var(--style-color, #888); max-width: 180px;
+  transition: background .15s; flex-shrink: 0;
+}
+.appTopBadge--style:hover { background: rgba(255,255,255,.10); }
+.appTopStyleDot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--style-color, #888); flex-shrink: 0;
+}
+.appTopStyleClear {
+  margin-left: 2px; width: 14px; height: 14px; border-radius: 7px;
+  background: rgba(255,255,255,.08); font-size: 12px; line-height: 14px;
+  text-align: center; color: var(--cf-soft-white-tertiary); flex-shrink: 0;
+}
+.appTopStyleClear:hover { background: rgba(255,80,80,.2); color: #f66; }
+
 /* 画布 Tab：无胶囊框，选中用下划线 */
 .canvasTabs {
   display: flex;
@@ -1063,6 +1083,39 @@ body .zoomMenu {
 .canvasWrap .flowEdgeState--disabled .react-flow__edge-path {
   filter: grayscale(0.2);
 }
+
+/* ── 节点选中时上游连线高亮动效 ── */
+
+@keyframes flowHighlightPulse {
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0.45;
+  }
+}
+
+@keyframes flowHighlightDashMove {
+  to {
+    stroke-dashoffset: -33;
+  }
+}
+
+/* 柔光层：呼吸式脉动 */
+.flowHighlightGlow {
+  filter: drop-shadow(0 0 4px rgba(125, 211, 252, 0.5));
+  animation: flowHighlightPulse 2.2s ease-in-out infinite;
+}
+
+/* 流动光点层：从上游 → 下游的流光动效 */
+.flowHighlightDash {
+  stroke-dasharray: 15 18;
+  animation: flowHighlightDashMove 0.9s linear infinite;
+}
+
 
 .flowEdgeDeleteBtn {
   display: flex;
@@ -8483,7 +8536,6 @@ body .zoomMenu {
   visibility: hidden;
   pointer-events: none;
   transition: opacity 0.12s ease;
-  will-change: left, top;
 }
 
 .simple-anchor-zone--left .simple-anchor-knob-wrap,

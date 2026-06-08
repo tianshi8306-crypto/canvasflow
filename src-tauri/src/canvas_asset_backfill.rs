@@ -72,10 +72,11 @@ fn canonical_rel_path(conn: &rusqlite::Connection, asset_id: &str) -> Result<Opt
     }
 }
 
-/// M4：已有 `assetId` 时以索引中的 `rel_path` 为准，纠正缺失或过期的 `path`。
+/// 媒体节点 path / assetId 对齐：节点上已存在且落盘的 `path` 优先于过期 `assetId` 索引。
 fn media_path_needs_reconcile(
     conn: &rusqlite::Connection,
     project_root: &Path,
+    node_type: &str,
     data: &serde_json::Value,
 ) -> Result<Option<(String, String)>, String> {
     let asset_id = data
@@ -83,6 +84,27 @@ fn media_path_needs_reconcile(
         .and_then(|v| v.as_str())
         .map(str::trim)
         .filter(|s| !s.is_empty());
+    let current = data
+        .get("path")
+        .and_then(|v| v.as_str())
+        .map(str::trim)
+        .unwrap_or("");
+
+    // 生成落盘后节点 path 已更新：以磁盘文件为准，回写正确 assetId（避免多节点共用首个成片 UUID）
+    if !current.is_empty() && project_root.join(current).is_file() {
+        if let Some(id) = asset_id {
+            if let Some(canonical) = canonical_rel_path(conn, id)? {
+                if canonical == current {
+                    return Ok(None);
+                }
+            }
+        }
+        let media_type = media_type_for_node(node_type, current);
+        let bound_id = db::upsert_asset(conn, current, media_type, Some("backfill"), None)?;
+        return Ok(Some((bound_id, current.to_string())));
+    }
+
+    // 无可用 path：回退 M4，用 assetId 索引补全 path
     let Some(asset_id) = asset_id else {
         return Ok(None);
     };
@@ -92,11 +114,6 @@ fn media_path_needs_reconcile(
     if !project_root.join(&canonical).is_file() {
         return Ok(None);
     }
-    let current = data
-        .get("path")
-        .and_then(|v| v.as_str())
-        .map(str::trim)
-        .unwrap_or("");
     if current == canonical.as_str() {
         return Ok(None);
     }
@@ -124,7 +141,7 @@ pub fn reconcile_graph_media_nodes(
 
         if has_asset_id {
             if let Some((asset_id, rel_path)) =
-                media_path_needs_reconcile(&conn, project_root, &node.data)?
+                media_path_needs_reconcile(&conn, project_root, &node.node_type, &node.data)?
             {
                 patches.push(NodeAssetIdPatch {
                     node_id: node.id.clone(),
@@ -378,6 +395,28 @@ mod tests {
         }];
         let patches = reconcile_graph_media_nodes(dir.path(), &nodes).unwrap();
         assert!(patches.is_empty());
+    }
+
+    #[test]
+    fn reconcile_path_wins_when_file_exists_but_asset_id_stale() {
+        let dir = tempdir().unwrap();
+        let rel = "assets/video/gen/seedance/node_b.mp4";
+        let stale = "assets/video/gen/seedance/node_a.mp4";
+        fs::create_dir_all(dir.path().join("assets/video/gen/seedance")).unwrap();
+        fs::write(dir.path().join(rel), b"x").unwrap();
+
+        let conn = db::open_run_db(dir.path()).unwrap();
+        let stale_id = db::upsert_asset(&conn, stale, "video", None, None).unwrap();
+
+        let nodes = vec![FlowNode {
+            id: "v2".into(),
+            node_type: "videoNode".into(),
+            data: json!({ "path": rel, "assetId": stale_id }),
+        }];
+        let patches = reconcile_graph_media_nodes(dir.path(), &nodes).unwrap();
+        assert_eq!(patches.len(), 1);
+        assert_eq!(patches[0].rel_path, rel);
+        assert_ne!(patches[0].asset_id, stale_id);
     }
 
     #[test]

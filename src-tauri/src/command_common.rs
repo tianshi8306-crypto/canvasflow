@@ -4,6 +4,41 @@ use crate::settings::{self, AppSettings};
 use std::path::PathBuf;
 use tauri::Manager;
 
+/// 规范化 OpenAI 兼容 API 根地址：补全 `https://`、去掉末尾 `/`。
+pub fn normalize_openai_api_base(raw: &str) -> String {
+    let mut s = raw.trim().to_string();
+    if s.is_empty() {
+        return s;
+    }
+    if !s.starts_with("http://") && !s.starts_with("https://") {
+        s = format!("https://{s}");
+    }
+    while s.ends_with('/') {
+        s.pop();
+    }
+    s
+}
+
+/// 确保根地址以 `/v1` 结尾（`https://api.apiyi.com` → `https://api.apiyi.com/v1`）。
+pub fn openai_v1_api_base(raw: &str) -> String {
+    let base = normalize_openai_api_base(raw);
+    if base.is_empty() {
+        return base;
+    }
+    if base.ends_with("/v1") {
+        base
+    } else {
+        format!("{base}/v1")
+    }
+}
+
+/// 拼接 OpenAI 兼容路径，例如 `images/generations`、`chat/completions`、`models`。
+pub fn openai_v1_url(raw_base: &str, path: &str) -> String {
+    let base = openai_v1_api_base(raw_base);
+    let path = path.trim_start_matches('/');
+    format!("{base}/{path}")
+}
+
 pub fn pick_enabled_provider(settings: &AppSettings) -> Result<settings::ProviderConfig, String> {
     let mut list: Vec<settings::ProviderConfig> = settings
         .providers

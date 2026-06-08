@@ -23,6 +23,8 @@ export type ImageModelConfig = {
   maxReferenceImages?: number;
   /** 为 false 时 image_edit 阻断 */
   supportsImageEdit?: boolean;
+  /** API 端点类型："images" | "chat"，默认 "images" */
+  endpointType?: "images" | "chat";
 };
 
 /** 主题预设 */

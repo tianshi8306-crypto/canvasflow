@@ -1,4 +1,5 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
+import { resolveAssetRelPath } from "@/shared/api/assets";
 import { resolveProjectAssetSrc } from "@/lib/projectMediaUrl";
 import {
   evaluateSeedanceImageCompliance,
@@ -87,4 +88,28 @@ export async function probeSeedanceImageRef(
   }
 
   return evaluateSeedanceImageCompliance({ format });
+}
+
+export type SeedanceComplianceRefItem = {
+  edgeId: string;
+  kind: string;
+  path?: string;
+  assetId?: string;
+};
+
+/** 批量探测参考图合规（生成提交前静默等待用） */
+export async function probeSeedanceImageComplianceForRefs(
+  projectPath: string | null | undefined,
+  items: SeedanceComplianceRefItem[],
+): Promise<Map<string, SeedanceImageComplianceResult>> {
+  const map = new Map<string, SeedanceImageComplianceResult>();
+  for (const item of items) {
+    if (item.kind !== "image") continue;
+    const relPath =
+      (await resolveAssetRelPath(projectPath, item.path, item.assetId))?.trim() ||
+      item.path?.trim() ||
+      "";
+    map.set(item.edgeId, await probeSeedanceImageRef({ projectPath, relPath }));
+  }
+  return map;
 }

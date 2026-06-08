@@ -1,4 +1,4 @@
-﻿/**
+/**
  * 视频节点多模态输入管理面板
  *
  * 设计规格：
@@ -49,6 +49,7 @@ import {
   collectSeedanceImageComplianceValidationErrors,
   mergeSeedanceComplianceIntoValidation,
 } from "@/lib/seedance/seedanceImageCompliance";
+import { probeSeedanceImageComplianceForRefs } from "@/lib/seedance/probeSeedanceImageRef";
 import { validateMultimodalInput } from "@/lib/seedance/validation";
 import { buildVideoPromptFromUpstreamText } from "@/lib/videoGeneration/videoTextPromptSync";
 import { buildVideoPromptFromUpstreamVideo } from "@/lib/videoGeneration/videoVideoPromptSync";
@@ -523,16 +524,59 @@ export function VideoMultimodalInputPanel({
     [validationResult],
   );
 
+  const buildComplianceRefContexts = useCallback(
+    () =>
+      orderedIncomingRefItems
+        .filter((i) => i.kind === "image")
+        .map((item, idx) => ({
+          edgeId: item.edgeId,
+          badgeLabel: refAtMeta.get(item.edgeId)?.badge ?? String(idx + 1),
+        })),
+    [orderedIncomingRefItems, refAtMeta],
+  );
+
   // 处理生成
-  const handleGenerate = useCallback(() => {
+  const handleGenerate = useCallback(async () => {
     if (busy && !cancelling) return;
     if (!validationResult.valid) {
       const msg = validationResult.errors[0]?.message ?? "输入不符合规格";
       setStatusText(msg);
       return;
     }
+
+    const complianceRefs = buildComplianceRefContexts();
+    const hasPendingCompliance = complianceRefs.some(
+      (ref) => imageComplianceByEdge.get(ref.edgeId)?.status === "pending",
+    );
+    let complianceMap = imageComplianceByEdge;
+    if (hasPendingCompliance) {
+      complianceMap = await probeSeedanceImageComplianceForRefs(
+        projectPath,
+        orderedIncomingRefItems,
+      );
+    }
+    const complianceErrors = collectSeedanceImageComplianceValidationErrors(
+      complianceRefs,
+      complianceMap,
+    );
+    if (complianceErrors.length > 0) {
+      const msg = complianceErrors[0]?.message ?? "参考图不符合 Seedance 2.0 规格";
+      setStatusText(msg);
+      return;
+    }
+
     void startGeneration();
-  }, [busy, cancelling, validationResult, startGeneration, setStatusText]);
+  }, [
+    busy,
+    cancelling,
+    validationResult,
+    buildComplianceRefContexts,
+    imageComplianceByEdge,
+    orderedIncomingRefItems,
+    projectPath,
+    startGeneration,
+    setStatusText,
+  ]);
 
   const handleGenerateClick = useCallback(() => {
     if (isGenerating) {
@@ -648,66 +692,6 @@ export function VideoMultimodalInputPanel({
             ) : null}
         </div>
       </div>
-
-      {/* ★ 人脸审核通关开关：仅在 Seedance 2.0 且火山方舟模式时显示 */}
-      {draft.modelId === "doubao_seedance_2_0" && (
-        <div className="mmBypassRow">
-          <label className="mmBypassToggle">
-            <input
-              type="checkbox"
-              checked={draft.faceBypassEnabled !== false}
-              onChange={(e) => {
-                recordBeforeDiscreteMutation(useProjectStore.getState);
-                patchDraft({ faceBypassEnabled: e.target.checked });
-              }}
-            />
-            <span className="mmBypassSwitch" />
-            <span className="mmBypassText">
-              <span className="mmBypassTitle">一键过审</span>
-              <span className="mmBypassStatus">
-                {draft.faceBypassEnabled !== false ? "已开启" : "已关闭"}
-              </span>
-            </span>
-          </label>
-          <span className="mmBypassHint">
-            自动优化参考图，大幅提升 Seedance 2.0 人脸审核通过率
-          </span>
-          {draft.faceBypassEnabled !== false && (
-            <div className="mmBypassModes">
-              <button
-                type="button"
-                className={`mmBypassModeBtn ${(draft.faceBypassMode ?? "scramble") === "scramble" ? "mmBypassModeBtn--active" : ""}`}
-                onClick={() => {
-                  recordBeforeDiscreteMutation(useProjectStore.getState);
-                  patchDraft({ faceBypassMode: "scramble" });
-                }}
-              >
-                块打乱
-              </button>
-              <button
-                type="button"
-                className={`mmBypassModeBtn ${draft.faceBypassMode === "erase" ? "mmBypassModeBtn--active" : ""}`}
-                onClick={() => {
-                  recordBeforeDiscreteMutation(useProjectStore.getState);
-                  patchDraft({ faceBypassMode: "erase" });
-                }}
-              >
-                移除人脸
-              </button>
-              <button
-                type="button"
-                className={`mmBypassModeBtn ${draft.faceBypassMode === "standard" ? "mmBypassModeBtn--active" : ""}`}
-                onClick={() => {
-                  recordBeforeDiscreteMutation(useProjectStore.getState);
-                  patchDraft({ faceBypassMode: "standard" });
-                }}
-              >
-                标准
-              </button>
-            </div>
-          )}
-        </div>
-      )}
 
       {/* ══ 模块 2：参考图（底栏缩略图条 + 悬停浮层预览，无顶部固定预览条） ══ */}
       {displayThumbnails.length > 0 ? (

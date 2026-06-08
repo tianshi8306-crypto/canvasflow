@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   getVideoGenerationClient,
   type VideoGenerationStartRequest,
+  type VideoJobPollHint,
   type VideoJobSnapshot,
 } from "@/lib/videoGeneration/apiPool";
 import { resolveVideoGenerationMode } from "@/lib/videoGeneration/mode";
@@ -39,10 +40,16 @@ export async function startVideoGenerationViaBridge(req: VideoGenerationStartReq
   return getVideoGenerationClient().startJob(req);
 }
 
-export async function getVideoJobViaBridge(jobId: string): Promise<VideoJobSnapshot> {
+export async function getVideoJobViaBridge(
+  jobId: string,
+  hint?: VideoJobPollHint | null,
+): Promise<VideoJobSnapshot> {
   const mode = resolveVideoGenerationMode();
   if (mode === "mock") return getVideoGenerationClient().getJob(jobId);
-  const r = await tryInvoke<VideoJobSnapshot>("video_gen_get_job", { jobId });
+  const r = await tryInvoke<VideoJobSnapshot>("video_gen_get_job", {
+    jobId,
+    hint: hint ?? null,
+  });
   if (r.value) return { ...r.value, source: "bridge" };
   if (mode === "bridge") {
     throw new Error(`video_gen_get_job 调用失败（bridge 模式，不允许回退 mock）：${String(r.error)}`);

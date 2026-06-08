@@ -340,6 +340,10 @@ type CanvasUiState = {
   }) => void;
   closeScriptVersionDiff: () => void;
 
+  /** 风格库面板 */
+  styleLibraryPanelOpen: boolean;
+  toggleStyleLibraryPanel: () => void;
+
   clearTransientUi: () => void;
 };
 
@@ -636,6 +640,9 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
     }),
   closeScriptVersionDiff: () =>
     set({ scriptVersionDiffOpen: false, scriptVersionDiffPreset: null }),
+
+  styleLibraryPanelOpen: false,
+  toggleStyleLibraryPanel: () => set((s) => ({ styleLibraryPanelOpen: !s.styleLibraryPanelOpen })),
 
   clearTransientUi: () =>
     set({

@@ -1,53 +1,112 @@
 import { useEffect, useState } from "react";
+
 import { isTauri } from "@tauri-apps/api/core";
+
 import { useProjectStore } from "@/store/projectStore";
+
 import { getAssetById } from "@/shared/api/assets";
 
+
+
 /**
- * 解析工程素材预览用相对路径：优先 `assetId`（DB 权威），否则回退 `relPath`。
- * 若节点上已有 `relPath`（如刚上传），先乐观使用，避免预览空白/失败。
+
+ * 解析工程素材预览用相对路径。
+
+ * 节点上已有 `relPath`（如生成刚落盘）时优先使用，避免过期 `assetId` 仍指向首个成片。
+
+ * 仅当无 `relPath` 时，才用 `assetId` 查库。
+
  */
+
 export function useResolvedAssetRelPath(
+
   relPath: string | undefined,
+
   assetId: string | undefined,
+
 ): { effectiveRelPath: string | null; loading: boolean } {
+
   const projectPath = useProjectStore((s) => s.projectPath);
+
   const pathNow = relPath?.trim() ?? null;
-  const needsDbLookup = Boolean(assetId?.trim() && projectPath?.trim() && isTauri());
+
+
 
   const [effectiveRelPath, setEffectiveRelPath] = useState<string | null>(pathNow);
-  const [loading, setLoading] = useState(() => needsDbLookup && !pathNow);
+
+  const [loading, setLoading] = useState(false);
+
+
 
   useEffect(() => {
+
     const p = relPath?.trim();
+
     const id = assetId?.trim();
+
     const root = projectPath?.trim();
 
-    if (p) setEffectiveRelPath(p);
 
-    if (id && root && isTauri()) {
-      if (!p) setLoading(true);
-      let cancelled = false;
-      void (async () => {
-        try {
-          const a = await getAssetById(root, id);
-          if (cancelled) return;
-          const fromDb = a?.relPath?.trim();
-          setEffectiveRelPath(fromDb ?? p ?? null);
-        } catch {
-          if (!cancelled) setEffectiveRelPath(p ?? null);
-        } finally {
-          if (!cancelled) setLoading(false);
-        }
-      })();
-      return () => {
-        cancelled = true;
-      };
+
+    if (p) {
+
+      setEffectiveRelPath(p);
+
+      setLoading(false);
+
+      return;
+
     }
 
+
+
+    if (id && root && isTauri()) {
+
+      setLoading(true);
+
+      let cancelled = false;
+
+      void (async () => {
+
+        try {
+
+          const a = await getAssetById(root, id);
+
+          if (cancelled) return;
+
+          setEffectiveRelPath(a?.relPath?.trim() ?? null);
+
+        } catch {
+
+          if (!cancelled) setEffectiveRelPath(null);
+
+        } finally {
+
+          if (!cancelled) setLoading(false);
+
+        }
+
+      })();
+
+      return () => {
+
+        cancelled = true;
+
+      };
+
+    }
+
+
+
     setLoading(false);
-    setEffectiveRelPath(p ?? null);
+
+    setEffectiveRelPath(null);
+
   }, [relPath, assetId, projectPath]);
 
+
+
   return { effectiveRelPath, loading };
+
 }
+

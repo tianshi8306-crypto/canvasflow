@@ -1098,41 +1098,37 @@ pub async fn submit_video_via_cli(
     submit_task(&command_path, subcommand, args)
 }
 
-/// 轮询即梦视频任务；映射为 VideoJobSnapshot 状态。
-pub async fn poll_video_via_cli(
+fn video_poll_status_for_phase(phase: &str, poll_count: u32) -> &'static str {
+    if phase == "pending" {
+        // 首次仍显示排队；之后改 running，前端会加快轮询间隔
+        if poll_count >= 2 {
+            "running"
+        } else {
+            "queued"
+        }
+    } else if phase == "failed" {
+        "failed"
+    } else {
+        "running"
+    }
+}
+
+fn snapshot_from_video_query(
     http: &reqwest::Client,
-    submit_id: &str,
+    q: QueryResult,
+    id: String,
+    model_id: String,
     project_path: &str,
-    model_id: &str,
+    task_type: &str,
+    submit_id: &str,
     workflow: &str,
     node_id: Option<&str>,
+    poll_count: u32,
 ) -> Result<VideoJobSnapshot, String> {
-    let command_path = ensure_command_path(http)?;
-    let id = submit_id.to_string();
-    let model_id = model_id.to_string();
-
-    if let Some(existing) = project_asset_store::find_existing_gen_asset_by_job_id(
-        Path::new(project_path),
-        "video",
-        submit_id,
-    )? {
-        return Ok(VideoJobSnapshot {
-            id,
-            status: "succeeded".into(),
-            progress: Some(1.0),
-            error: None,
-            model_id,
-            result_rel_path: Some(existing),
-        });
-    }
-
-    let task_type = resolve_video_subcommand(workflow).unwrap_or("text2video");
-    let q = query_once(&command_path, submit_id, task_type, true)?;
-
     if q.phase == "pending" {
         return Ok(VideoJobSnapshot {
             id,
-            status: "queued".into(),
+            status: video_poll_status_for_phase("pending", poll_count).into(),
             progress: None,
             error: None,
             model_id,
@@ -1167,7 +1163,7 @@ pub async fn poll_video_via_cli(
             http,
             &q.outputs,
             Path::new(project_path),
-            &task_type,
+            task_type,
             submit_id,
             node_id,
             Some(workflow),
@@ -1204,6 +1200,103 @@ pub async fn poll_video_via_cli(
         model_id,
         result_rel_path: None,
     })
+}
+
+/// 轮询即梦视频任务；映射为 VideoJobSnapshot 状态。
+/// 默认先轻量 query（不触发 CLI 下载），成片就绪后再带 download 或 HTTP 拉取，显著缩短排队阶段耗时。
+pub async fn poll_video_via_cli(
+    http: &reqwest::Client,
+    submit_id: &str,
+    project_path: &str,
+    model_id: &str,
+    workflow: &str,
+    node_id: Option<&str>,
+    poll_count: u32,
+) -> Result<VideoJobSnapshot, String> {
+    let command_path = ensure_command_path(http)?;
+    let id = submit_id.to_string();
+    let model_id = model_id.to_string();
+
+    if let Some(existing) = project_asset_store::find_existing_gen_asset_by_job_id(
+        Path::new(project_path),
+        "video",
+        submit_id,
+    )? {
+        return Ok(VideoJobSnapshot {
+            id,
+            status: "succeeded".into(),
+            progress: Some(1.0),
+            error: None,
+            model_id,
+            result_rel_path: Some(existing),
+        });
+    }
+
+    let task_type = resolve_video_subcommand(workflow).unwrap_or("text2video");
+
+    // 1) 轻量查询：不下载，CLI 返回更快
+    let q = query_once(&command_path, submit_id, &task_type, false)?;
+    if q.phase == "pending" || q.phase == "failed" {
+        return snapshot_from_video_query(
+            http,
+            q,
+            id,
+            model_id,
+            project_path,
+            &task_type,
+            submit_id,
+            workflow,
+            node_id,
+            poll_count,
+        );
+    }
+
+    // 2) 已就绪：优先用 URL / 元数据直接 HTTP 落盘
+    if q.phase == "success" || !q.outputs.is_empty() {
+        if pick_first_output_url(&q.outputs, true).is_some()
+            || pick_first_output(&q.outputs, true).is_some()
+        {
+            return snapshot_from_video_query(
+                http,
+                q,
+                id,
+                model_id,
+                project_path,
+                &task_type,
+                submit_id,
+                workflow,
+                node_id,
+                poll_count,
+            );
+        }
+        // 3) 仅有成功状态、无可用 URL：再跑一次带 download 的 query
+        let q_dl = query_once(&command_path, submit_id, &task_type, true)?;
+        return snapshot_from_video_query(
+            http,
+            q_dl,
+            id,
+            model_id,
+            project_path,
+            &task_type,
+            submit_id,
+            workflow,
+            node_id,
+            poll_count,
+        );
+    }
+
+    snapshot_from_video_query(
+        http,
+        q,
+        id,
+        model_id,
+        project_path,
+        &task_type,
+        submit_id,
+        workflow,
+        node_id,
+        poll_count,
+    )
 }
 
 /// 按 submit_id 从即梦取回已在网页端成功的成片（用于提交阶段误报失败、或下载漏接）
@@ -1251,7 +1344,7 @@ pub async fn recover_dreamina_video_job(
     let mut last_err = String::new();
     for task_type in task_types {
         eprintln!("[dreamina] recover submit_id={id} task_type={task_type}");
-        let q = match query_once(&command_path, &id, &task_type, true) {
+        let q = match query_once(&command_path, &id, &task_type, false) {
             Ok(v) => v,
             Err(e) => {
                 last_err = e;
@@ -1288,16 +1381,29 @@ pub async fn recover_dreamina_video_job(
         }
 
         if q.phase == "success" || !q.outputs.is_empty() {
-            match resolve_video_output_to_project(
-                http,
-                &q.outputs,
-                Path::new(project_path),
-                &task_type,
-                &id,
-                node_id,
-                Some(workflow_hint.unwrap_or(&task_type)),
-            ) {
-                Ok(rel) => {
+            let try_resolve = |outputs: &[MediaOutput]| {
+                resolve_video_output_to_project(
+                    http,
+                    outputs,
+                    Path::new(project_path),
+                    &task_type,
+                    &id,
+                    node_id,
+                    Some(workflow_hint.unwrap_or(&task_type)),
+                )
+            };
+            if let Ok(rel) = try_resolve(&q.outputs) {
+                return Ok(VideoJobSnapshot {
+                    id: id.clone(),
+                    status: "succeeded".into(),
+                    progress: Some(1.0),
+                    error: None,
+                    model_id: model_id.to_string(),
+                    result_rel_path: Some(rel),
+                });
+            }
+            if let Ok(q_dl) = query_once(&command_path, &id, &task_type, true) {
+                if let Ok(rel) = try_resolve(&q_dl.outputs) {
                     return Ok(VideoJobSnapshot {
                         id: id.clone(),
                         status: "succeeded".into(),
@@ -1307,7 +1413,7 @@ pub async fn recover_dreamina_video_job(
                         result_rel_path: Some(rel),
                     });
                 }
-                Err(e) => {
+                if let Err(e) = try_resolve(&q_dl.outputs) {
                     last_err = e;
                 }
             }

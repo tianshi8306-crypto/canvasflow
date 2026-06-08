@@ -12,5 +12,8 @@ export function pickDefaultOutputForImageModel(
   if (key.includes("lite") || key.includes("nano") || key.includes("fast")) {
     return { aspect: "16:9", resolution: "1K" };
   }
+  if (key.includes("gpt-image")) {
+    return { aspect: "1:1", resolution: "2K" };
+  }
   return { aspect: "16:9", resolution: "2K" };
 }
