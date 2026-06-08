@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import { NodeFrame } from "@/components/nodes/NodeFrame";
@@ -36,7 +36,7 @@ function LLMDocGlyph() {
   );
 }
 
-export function LLMNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
+function _LLMNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const params = useMemo(() => getLLMParams(data), [data.params]);
 
@@ -87,3 +87,5 @@ export function LLMNode({ id, data, selected, type }: NodeProps<Node<FlowNodeDat
     </NodeFrame>
   );
 }
+
+export const LLMNode = memo(_LLMNode);

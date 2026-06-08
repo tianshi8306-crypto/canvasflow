@@ -1,5 +1,5 @@
 import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
-import { useMemo } from "react";
+import { memo, useMemo } from "react";
 import { useProjectStore } from "@/store/projectStore";
 import {
   CANVAS_EDGE_STROKE_DEFAULT,
@@ -10,11 +10,15 @@ import {
 /**
  * 画布自定义连线：目标节点被选中时播放流动光点动效，
  * 让用户一眼看清上游数据来源。其余连线保持默认样式。
+ *
+ * 性能优化：使用 memo 避免 target 未改变时的无效重渲染，
+ * store selector 仅订阅 target 是否在 selectedNodeIds 中而非完整数组。
  */
-export function FlowConnectionEdge(edgeProps: EdgeProps) {
+function FlowConnectionEdgeImpl(edgeProps: EdgeProps) {
   const { id, target, markerEnd, style } = edgeProps;
-  const selectedNodeIds = useProjectStore((s) => s.selectedNodeIds);
-  const isHighlighted = selectedNodeIds.includes(target);
+  // 只订阅 target 是否被选中，而非完整 selectedNodeIds 数组，
+  // 避免任意节点选中变化触发全量边重渲染
+  const isHighlighted = useProjectStore((s) => s.selectedNodeIds.includes(target));
 
   const [edgePath] = useMemo(
     () =>
@@ -30,7 +34,6 @@ export function FlowConnectionEdge(edgeProps: EdgeProps) {
     [edgeProps.sourceX, edgeProps.sourceY, edgeProps.sourcePosition, edgeProps.targetX, edgeProps.targetY, edgeProps.targetPosition],
   );
 
-  // 未高亮 → 走 React Flow 默认渲染（保留原有 animated 虚线动效）
   return (
     <g className={isHighlighted ? "flowEdgeHighlighted" : undefined}>
       <BaseEdge
@@ -70,3 +73,6 @@ export function FlowConnectionEdge(edgeProps: EdgeProps) {
     </g>
   );
 }
+
+/** 画布自定义连线组件，已用 memo 优化，仅在 target 选中状态或几何属性变化时重渲染 */
+export const FlowConnectionEdge = memo(FlowConnectionEdgeImpl);

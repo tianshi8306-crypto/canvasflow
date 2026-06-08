@@ -30,6 +30,14 @@ describe("parseVideoGenError", () => {
     expect(p.technicalDetail).toContain("PrivacyInformation");
   });
 
+  it("maps post-TNS check failure to human message", () => {
+    const raw = "视频生成失败：generation failed: post-TNS check did not pass";
+    const p = parseVideoGenError(raw);
+    expect(p.summary).toContain("云端安全审核");
+    expect(p.summary).not.toMatch(/generation failed|TNS check/i);
+    expect(p.technicalDetail).toContain("post-TNS");
+  });
+
   it("keeps short user-facing messages", () => {
     const p = parseVideoGenError("网络超时，请重试");
     expect(p.summary).toBe("网络超时，请重试");

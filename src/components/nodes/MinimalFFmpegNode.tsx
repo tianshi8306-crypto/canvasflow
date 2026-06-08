@@ -1,7 +1,7 @@
 /**
  * 极简视频合成节点 — 画布入口卡片；剪辑在全屏 ComposeEditorOverlay
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import { computeImageNodeFrameSize } from "@/lib/imageGeneration/imageAspectSize";
@@ -22,7 +22,7 @@ import "./MinimalFFmpegNode.css";
 
 const FFMPEG_FRAME_RATIO = 16 / 9;
 
-export function MinimalFFmpegNode({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
+function _MinimalFFmpegNode({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const deleteSelection = useProjectStore((s) => s.deleteSelection);
   const { expandedChrome } = useNodeExpandedChrome(selected);
@@ -136,3 +136,5 @@ export function MinimalFFmpegNode({ id, data, selected = false }: NodeProps<Node
     </NodeChromeProvider>
   );
 }
+
+export const MinimalFFmpegNode = memo(_MinimalFFmpegNode);

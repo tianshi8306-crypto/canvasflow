@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 
 type Props = {
   /** 持久化标签（FlowNodeData.label） */
@@ -11,7 +11,7 @@ type Props = {
 };
 
 /** 节点外置左上可编辑标签 */
-export function NodeMetaLabel({
+function NodeMetaLabelImpl({
   label = "",
   defaultLabel,
   onCommit,
@@ -83,3 +83,5 @@ export function NodeMetaLabel({
     </div>
   );
 }
+
+export const NodeMetaLabel = memo(NodeMetaLabelImpl);

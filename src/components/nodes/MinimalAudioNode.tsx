@@ -1,7 +1,7 @@
 /**
  * 极简音频节点：预览随画布缩放；顶栏/ATP Portal 固定尺寸
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FlowNodeData } from "@/lib/types";
 import { computeAudioNodeFrameSize } from "@/lib/audioNodeFrameSize";
 import { isPassiveAudioAsset } from "@/lib/audioNodeContainerMode";
@@ -29,7 +29,7 @@ interface MinimalAudioNodeProps {
   selected: boolean;
 }
 
-export function MinimalAudioNode({ id, data, selected = false }: MinimalAudioNodeProps) {
+function _MinimalAudioNode({ id, data, selected = false }: MinimalAudioNodeProps) {
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
@@ -206,3 +206,5 @@ export function MinimalAudioNode({ id, data, selected = false }: MinimalAudioNod
     </NodeChromeProvider>
   );
 }
+
+export const MinimalAudioNode = memo(_MinimalAudioNode);

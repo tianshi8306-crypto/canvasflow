@@ -12,7 +12,7 @@ import {
 } from "@xyflow/react";
 import { isTauri } from "@tauri-apps/api/core";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { nodeTypes } from "@/components/canvas/nodeTypes";
@@ -139,6 +139,8 @@ function FlowCanvasInner() {
   const viewportInteractClearTimerRef = useRef<number | undefined>(undefined);
   const lastNodeContextMenuRef = useRef<{ nodeId: string; t: number } | null>(null);
   const setNodeDragSuppressUi = useCanvasUiStore((s) => s.setNodeDragSuppressUi);
+  const setIsNodeDragging = useCanvasUiStore((s) => s.setIsNodeDragging);
+  const isNodeDragging = useCanvasUiStore((s) => s.isNodeDragging);
   const setMaximizedNodeId = useCanvasUiStore((s) => s.setMaximizedNodeId);
   const setAudioTtsPanelNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelNodeId);
   const setAudioTtsPanelPinnedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelPinnedNodeId);
@@ -302,7 +304,7 @@ function FlowCanvasInner() {
     [pulseNodeIds],
   );
 
-  const { edgeView: rawEdgeView, nodesView } = useEdgeViewModel({
+  const { edgeView: rawEdgeView, nodesView: rawNodesView } = useEdgeViewModel({
     nodes,
     edges,
     selectedNodeIds,
@@ -310,6 +312,9 @@ function FlowCanvasInner() {
     nodeRunStateById,
     hermesPulseNodeIds,
   });
+
+  // 给 nodesView 加 useDeferredValue，让 React 在用户拖拽/缩放时优先响应交互，延迟节点重渲染
+  const nodesView = useDeferredValue(rawNodesView);
 
   const edgeView = useMemo(
     () =>
@@ -534,7 +539,7 @@ function FlowCanvasInner() {
 
   return (
     <div
-      className={`canvasWrap${nodeSnapVisual ? " canvasWrap--node-snap-active" : ""}`}
+      className={`canvasWrap${nodeSnapVisual ? " canvasWrap--node-snap-active" : ""}${isNodeDragging ? " canvasWrap--node-dragging" : ""}`}
       ref={wrapRef}
       onDoubleClickCapture={(ev) => {
         const target = ev.target as HTMLElement | null;
@@ -716,9 +721,11 @@ function FlowCanvasInner() {
         }}
         onNodeDragStart={() => {
           setNodeDragSuppressUi(true);
+          setIsNodeDragging(true);
         }}
         onNodeDragStop={() => {
           setNodeDragSuppressUi(false);
+          setIsNodeDragging(false);
         }}
         onSelectionDragStart={() => {
           setNodeDragSuppressUi(true);

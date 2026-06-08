@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperti
 import { useProjectStore } from "@/store/projectStore";
 import { resolveProjectAssetSrc } from "@/lib/projectMediaUrl";
 import { useResolvedAssetRelPath } from "@/hooks/useResolvedAssetRelPath";
+import { useMediaThumbnail } from "@/hooks/useMediaThumbnail";
 
 type Kind = "image" | "video" | "audio";
 
@@ -11,6 +12,8 @@ type NodeMediaPreviewProps = {
   /** 若存在则优先查库解析为 `rel_path`（M1-3.2） */
   assetId?: string;
   kind: Kind;
+  /** 紧凑态：图片用缩略图替代原图，视频用静态截图替代播放器，大幅减少 GPU/解码开销 */
+  compact?: boolean;
   /** 仅 `kind="image"`：覆盖 img 的 class */
   imageClassName?: string;
   /** 仅 `kind="image"`：覆盖 img 的行内样式（悬停预览等需精确 contain 缩放） */
@@ -26,9 +29,9 @@ type NodeMediaPreviewProps = {
   videoLoop?: boolean;
   /** 仅 `kind="image"`：lazy / eager（悬停预览建议 eager） */
   imageLoading?: "lazy" | "eager";
-  /** 仅 `kind="image"`：图片加载完成回调 */
+  /** 仅 `kind="image"`：图片加载完成回调（缩略图模式不触发） */
   onImageLoad?: (e: React.SyntheticEvent<HTMLImageElement>) => void;
-  /** 仅 `kind="image"`：挂载/更新时回调（用于读取 naturalWidth 缓存图） */
+  /** 仅 `kind="image"`：挂载/更新时回调（用于读取 naturalWidth 缓存图，缩略图模式不触发） */
   onImageElement?: (el: HTMLImageElement | null) => void;
   /** 仅 `kind="video"`：视频元数据加载完成 */
   onVideoLoadedMetadata?: (e: React.SyntheticEvent<HTMLVideoElement>) => void;
@@ -247,6 +250,7 @@ export function NodeMediaPreview({
   relPath,
   assetId,
   kind,
+  compact = false,
   imageClassName,
   imageStyle,
   imageLoading = "lazy",
@@ -267,7 +271,6 @@ export function NodeMediaPreview({
   );
   const [broken, setBroken] = useState(false);
   useEffect(() => {
-     
     setBroken(false);
   }, [src]);
 
@@ -289,6 +292,9 @@ export function NodeMediaPreview({
   }
 
   if (kind === "image") {
+    if (compact) {
+      return <CompactImagePreview src={src} kind="image" imageClassName={imageClassName} imageStyle={imageStyle} />;
+    }
     return (
       <NodeImagePreview
         src={src}
@@ -302,6 +308,9 @@ export function NodeMediaPreview({
     );
   }
   if (kind === "video") {
+    if (compact) {
+      return <CompactImagePreview src={src} kind="video" imageClassName={videoClassName ?? "nodeMediaClip"} imageStyle={videoStyle} />;
+    }
     return (
       <div
         tabIndex={0}
@@ -337,4 +346,34 @@ export function NodeMediaPreview({
     );
   }
   return <AudioWavePreview src={src} onBroken={() => setBroken(true)} />;
+}
+
+/** 紧凑态缩略图：用 useMediaThumbnail 生成的低分辨率 JPEG，替代原图/视频元素 */
+function CompactImagePreview({
+  src,
+  kind,
+  imageClassName,
+  imageStyle,
+}: {
+  src: string;
+  kind: "image" | "video";
+  imageClassName?: string;
+  imageStyle?: CSSProperties;
+}) {
+  const { thumbnailSrc, loading } = useMediaThumbnail(src, kind);
+
+  if (loading || !thumbnailSrc) {
+    return <div className="nodeMutedPreview" style={{ fontSize: 11, opacity: 0.7 }}>{loading ? "生成缩略图…" : "无预览"}</div>;
+  }
+
+  return (
+    <img
+      src={thumbnailSrc}
+      alt=""
+      className={imageClassName ?? "nodeThumb"}
+      style={imageStyle}
+      loading="eager"
+      decoding="async"
+    />
+  );
 }

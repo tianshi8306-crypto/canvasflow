@@ -2,12 +2,12 @@ import "./nodeChromeTokens.css";
 import "./nodeChromeShell.css";
 
 export { NodeChromeProvider, useNodeChromeMount } from "./NodeChromeContext";
-export { NodeChromeShell } from "./NodeChromeShell";
+export { NodeChromeShellMemo as NodeChromeShell } from "./NodeChromeShell";
 export { NodeMetaLabel } from "./NodeMetaLabel";
 export { NodeMetaStatus } from "./NodeMetaStatus";
 export { NodePreviewChromeMeta } from "./NodePreviewChromeMeta";
 export { PreviewToolbarMenuPortal } from "./PreviewToolbarMenuPortal";
-export { NodePanelPlaceholder, type NodePanelPlaceholderKind } from "./NodePanelPlaceholder";
+export { NodePanelPlaceholderMemo as NodePanelPlaceholder, type NodePanelPlaceholderKind } from "./NodePanelPlaceholder";
 export {
   NODE_CHROME_AUDIO_PANEL_CLASS,
   NODE_CHROME_GEN_PANEL_CLASS,

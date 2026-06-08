@@ -4,7 +4,7 @@
 
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { type NodeProps, type Node } from "@xyflow/react";
 
@@ -25,6 +25,8 @@ import {
 import type { TextToVideoAspectId } from "@/lib/videoNodeTypes";
 
 import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
+
+import { useNodeCompactMode } from "@/hooks/useNodeCompactMode";
 
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 
@@ -50,7 +52,7 @@ import { VideoPreviewToolbarPortal } from "./VideoPreviewToolbarPortal";
 
 import "./MinimalVideoNode.css";
 
-export function MinimalVideoNode({
+function _MinimalVideoNode({
   id,
 
   data,
@@ -141,6 +143,8 @@ export function MinimalVideoNode({
   );
 
   const frameSize = useMemo(() => computeVideoNodeFrameSize(frameRatio), [frameRatio]);
+
+  const isCompact = useNodeCompactMode(frameSize.width, expandedChrome);
 
   useEffect(() => {
     setVideoSize(null);
@@ -245,6 +249,7 @@ export function MinimalVideoNode({
             nodeId={id}
             relPath={mediaPath}
             assetId={mediaAssetId}
+            compact={isCompact}
             onVideoMeta={handleVideoMeta}
           />
         ) : (
@@ -272,3 +277,5 @@ export function MinimalVideoNode({
     </NodeChromeProvider>
   );
 }
+
+export const MinimalVideoNode = memo(_MinimalVideoNode);

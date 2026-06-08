@@ -1,7 +1,7 @@
 /**
  * 极简图片节点 - 预览区随画布缩放；顶栏/生成面板 Portal 固定尺寸
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FlowNodeData } from "@/lib/types";
 import {
   computeImageNodeFrameSize,
@@ -14,6 +14,7 @@ import {
 } from "@/lib/imageGeneration/imageGenerationProgressDisplay";
 import { useImageI2iAnchorImport } from "@/hooks/canvas/useImageI2iAnchorImport";
 import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
+import { useNodeCompactMode } from "@/hooks/useNodeCompactMode";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
@@ -36,7 +37,7 @@ interface MinimalImageNodeProps {
   selected: boolean;
 }
 
-export function MinimalImageNode({ id, data, selected = false }: MinimalImageNodeProps) {
+function _MinimalImageNode({ id, data, selected = false }: MinimalImageNodeProps) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const deleteSelection = useProjectStore((s) => s.deleteSelection);
   const { expandedChrome } = useNodeExpandedChrome(selected);
@@ -94,6 +95,8 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
     () => computeImageNodeFrameSize(frameRatio),
     [frameRatio],
   );
+
+  const isCompact = useNodeCompactMode(frameSize.width, expandedChrome);
 
   useEffect(() => {
     setImgSize(null);
@@ -174,6 +177,7 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
             relPath={mediaPath}
             assetId={mediaAssetId}
             kind="image"
+            compact={isCompact}
             imageClassName="minimal-image-content"
             onImageLoad={handleImgLoad}
           />
@@ -203,3 +207,5 @@ export function MinimalImageNode({ id, data, selected = false }: MinimalImageNod
     </NodeChromeProvider>
   );
 }
+
+export const MinimalImageNode = memo(_MinimalImageNode);

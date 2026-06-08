@@ -78,6 +78,10 @@ type CanvasUiState = {
   nodeDragSuppressUi: boolean;
   setNodeDragSuppressUi: (v: boolean) => void;
 
+  /** 是否有节点正在被拖拽（用于 CSS backdrop-filter 按需优化） */
+  isNodeDragging: boolean;
+  setIsNodeDragging: (v: boolean) => void;
+
   /** 右键双击后全屏展示的节点 id */
   maximizedNodeId: string | null;
   setMaximizedNodeId: (id: string | null) => void;
@@ -350,6 +354,8 @@ type CanvasUiState = {
 export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   nodeDragSuppressUi: false,
   setNodeDragSuppressUi: (v) => set({ nodeDragSuppressUi: v }),
+  isNodeDragging: false,
+  setIsNodeDragging: (v) => set({ isNodeDragging: v }),
 
   maximizedNodeId: null,
   setMaximizedNodeId: (id) => set({ maximizedNodeId: id }),

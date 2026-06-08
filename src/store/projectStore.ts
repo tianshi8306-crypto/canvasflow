@@ -182,7 +182,31 @@ async function syncComposeClipFromNewEdge(
   }
 }
 
+// ── 拖拽 RAF 节流：将 position 变更从每帧 60fps 降低到每帧最多 1 次 store 写入 ──
+let dragRafId: number | null = null;
+type DragFlushPayload = {
+  changes: NodeChange<Node<FlowNodeData>>[];
+  storeGet: () => ProjectState;
+  /** 只有在 store 闭包内部才能获取，由 onNodesChange 在触发时注入 */
+  flush: () => void;
+};
+let pendingDragPayload: DragFlushPayload | null = null;
+
 export const useProjectStore = create<ProjectState>((set, get) => {
+  // 拖拽 RAF flush：由 onNodesChange 在拖拽过程中注入 lambda
+  function flushDragChanges() {
+    dragRafId = null;
+    const payload = pendingDragPayload;
+    pendingDragPayload = null;
+    payload?.flush();
+  }
+
+  function scheduleRafDragFlush(payload: DragFlushPayload) {
+    pendingDragPayload = payload;
+    if (dragRafId === null) {
+      dragRafId = requestAnimationFrame(flushDragChanges);
+    }
+  }
   const loadSnapshotIntoStore = (snapshot: ProjectGraphSnapshot) => {
     runWithReactFlowGraphSyncLock(() => {
       runIgnoringReactFlowSelectionEcho(() => {
@@ -347,6 +371,33 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const draggingNow = graphChanges.some(
       (c) => c.type === "position" && (c as { dragging?: boolean }).dragging === true,
     );
+
+    // 拖拽中：用 RAF 节流 store 写入，从每帧 60 次降到最多 16 次
+    if (draggingNow && !dragEnded) {
+      scheduleRafDragFlush({
+        changes: nextChanges,
+        storeGet: get,
+        flush: () => {
+          set((s) => {
+            let nextNodes = applyNodeChanges(nextChanges, s.nodes);
+            nextNodes = syncGroupStylesFromDimensions(nextNodes);
+            if (nextNodes === s.nodes) return s;
+            return {
+              nodes: nextNodes,
+              projectDirty: true,
+            };
+          });
+          markGraphDirtyOnly();
+        },
+      });
+      return;
+    }
+
+    // 拖拽结束：先 flush 最后一个等待的 RAF，再应用收尾逻辑
+    if (dragEnded && dragRafId !== null) {
+      flushDragChanges();
+    }
+
     if (dragEnded) {
       ui.setNodeSnapVisual(null);
       if (ui.snapGridEnabled) {
@@ -369,11 +420,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       };
     });
     if (!graphChanged) return;
-    if (dragEnded || !draggingNow) {
-      afterGraphEdit();
-    } else {
-      markGraphDirtyOnly();
-    }
+    afterGraphEdit();
     });
   },
   onEdgesChange: (changes) => {

@@ -81,6 +81,9 @@ export function MinimalAudioWavePlayer({
     paintAudioWaveform(canvas, { peaks, progress: ratio, loading: waveLoading });
   }, [peaks, ratio, waveLoading]);
 
+  // RAF 节流记录
+  const rafWaveformRef = useRef<number>(0);
+
   useEffect(() => {
     setBroken(false);
   }, [src]);
@@ -92,7 +95,12 @@ export function MinimalAudioWavePlayer({
   }, [playbackRate]);
 
   useEffect(() => {
-    redrawWaveform();
+    // 播放时 onTimeUpdate 高频触发，用 RAF 限流到每帧最多重绘一次
+    if (rafWaveformRef.current) return;
+    rafWaveformRef.current = requestAnimationFrame(() => {
+      rafWaveformRef.current = 0;
+      redrawWaveform();
+    });
   }, [redrawWaveform]);
 
   useEffect(() => {

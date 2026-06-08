@@ -1,7 +1,7 @@
 /**
  * 脚本节点 Chrome：壳内迷你表预览 + Portal 底栏主题/生成
  */
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import type { Node, NodeProps } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import { computeScriptNodeFrameSize } from "@/lib/scriptNodeChrome";
@@ -27,7 +27,7 @@ import { incomingVideoUpstreamState } from "@/lib/scriptReferenceVideo";
 import { openScriptNodeFullscreen } from "@/lib/scriptNodeCanvasEntries";
 import "./MinimalScriptNode.css";
 
-export function MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
+function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
@@ -186,3 +186,5 @@ export function MinimalScriptNode({ id, data, selected = false }: NodeProps<Node
     </NodeChromeProvider>
   );
 }
+
+export const MinimalScriptNode = memo(_MinimalScriptNode);

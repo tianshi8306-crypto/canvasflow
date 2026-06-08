@@ -1,9 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { resolveProjectAssetSrc } from "@/lib/projectMediaUrl";
 import { useResolvedAssetRelPath } from "@/hooks/useResolvedAssetRelPath";
 import { useVideoNodeUpload } from "@/hooks/useVideoNodeUpload";
+import { useMediaThumbnail } from "@/hooks/useMediaThumbnail";
 import { defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
 import { VideoMinimalPlayer } from "@/components/nodes/VideoMinimalPlayer";
 import { VideoSubtitleRegionOverlay } from "@/components/nodes/VideoSubtitleRegionOverlay";
@@ -12,23 +14,32 @@ type Props = {
   nodeId: string;
   relPath: string | undefined;
   assetId?: string;
+  /** 紧凑态：用静态缩略图替代视频播放器，大幅减少解码器和 GPU 开销 */
+  compact?: boolean;
   onVideoMeta?: (size: { w: number; h: number }) => void;
   onDurationChange?: (sec: number) => void;
 };
 
+/** 从 store 精确提取当前节点的 video block，避免全量 nodes.find 导致跨节点重渲染 */
+function selectVideoBlockForNode(nodeId: string) {
+  return (s: ReturnType<typeof useProjectStore.getState>) => {
+    const node = s.nodes.find((n) => n.id === nodeId);
+    return node?.data.video ?? defaultVideoNodePersisted();
+  };
+}
+
 /** 画布视频预览：自定义播放条 + 右上上传 */
-export function VideoChromePreview({
+function VideoChromePreview({
   nodeId,
   relPath,
   assetId,
+  compact = false,
   onVideoMeta,
   onDurationChange,
 }: Props) {
   const projectPath = useProjectStore((s) => s.projectPath);
   const setStatusText = useProjectStore((s) => s.setStatusText);
-  const videoBlock = useProjectStore(
-    (s) => s.nodes.find((n) => n.id === nodeId)?.data.video ?? defaultVideoNodePersisted(),
-  );
+  const videoBlock = useProjectStore(useShallow(selectVideoBlockForNode(nodeId)));
   const patchVideoSourceTrim = useProjectStore((s) => s.patchVideoSourceTrim);
   const setVideoSourceMeta = useProjectStore((s) => s.setVideoSourceMeta);
   const patchVideoSubtitleRegion = useProjectStore((s) => s.patchVideoSubtitleRegion);
@@ -49,6 +60,9 @@ export function VideoChromePreview({
   );
   const [broken, setBroken] = useState(false);
   const [subtitleBusy, setSubtitleBusy] = useState(false);
+
+  // 紧凑态缩略图
+  const { thumbnailSrc, loading: thumbLoading } = useMediaThumbnail(src, "video");
 
   const intrinsicW = videoBlock.sourceWidth ?? 0;
   const intrinsicH = videoBlock.sourceHeight ?? 0;
@@ -95,6 +109,24 @@ export function VideoChromePreview({
   }
   if (!src || broken) {
     return <div className="nodeMutedPreview">{broken ? "预览失败" : "无法解析预览地址"}</div>;
+  }
+
+  // 紧凑态：显示静态缩略图，硬件解码开销归零
+  if (compact) {
+    if (thumbLoading || !thumbnailSrc) {
+      return <div className="nodeMutedPreview" style={{ fontSize: 11, opacity: 0.7 }}>生成缩略图…</div>;
+    }
+    return (
+      <div className="vidChromePreview vidChromePreview--compact">
+        <img
+          src={thumbnailSrc}
+          alt=""
+          className="vidChromePreview-thumb"
+          style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          loading="eager"
+        />
+      </div>
+    );
   }
 
   return (
@@ -149,3 +181,6 @@ export function VideoChromePreview({
     </div>
   );
 }
+
+export { VideoChromePreview };
+export default memo(VideoChromePreview);

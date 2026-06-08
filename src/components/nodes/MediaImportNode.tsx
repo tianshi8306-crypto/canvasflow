@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { memo, useRef } from "react";
 import { isTauri } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { type Node, type NodeProps } from "@xyflow/react";
@@ -39,7 +39,7 @@ function MediaImportGlyph() {
   );
 }
 
-export function MediaImportNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
+function _MediaImportNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -127,3 +127,5 @@ export function MediaImportNode({ id, data, selected, type }: NodeProps<Node<Flo
     </NodeFrame>
   );
 }
+
+export const MediaImportNode = memo(_MediaImportNode, (prev, next) => prev.id === next.id && prev.selected === next.selected && prev.data === next.data);

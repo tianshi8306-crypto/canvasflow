@@ -6,7 +6,6 @@ import type React from "react";
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type RefObject,
@@ -226,12 +225,11 @@ function CanvasAnchorSide({
 }
 
 export function CanvasNodeAnchors({ nodeId, nodeType }: CanvasNodeAnchorsProps) {
-  const nodes = useProjectStore((s) => s.nodes);
-  const edges = useProjectStore((s) => s.edges);
-  const menuCtx = useMemo<AnchorMenuGraphContext>(
-    () => ({ anchorNodeId: nodeId, nodes, edges }),
-    [nodeId, nodes, edges],
-  );
+  // 菜单上下文仅在菜单打开时读取最新状态，避免订阅全量 nodes/edges 导致非必要重渲染
+  const getMenuCtx = useCallback((): AnchorMenuGraphContext => {
+    const state = useProjectStore.getState();
+    return { anchorNodeId: nodeId, nodes: state.nodes, edges: state.edges };
+  }, [nodeId]);
   const updateNodeInternals = useUpdateNodeInternals();
   const popRef = useRef<HTMLDivElement>(null);
   const leftZoneRef = useRef<HTMLDivElement>(null);
@@ -283,10 +281,14 @@ export function CanvasNodeAnchors({ nodeId, nodeType }: CanvasNodeAnchorsProps) 
     [openAtCursor, connectionInProgress],
   );
 
+  // 仅在菜单打开时懒计算上下文，避免每帧都依赖全量 nodes/edges
+  const menuCtx = open !== null ? getMenuCtx() : undefined;
   const menuItems: AnchorMenuRow[] =
-    open?.side === "incoming"
+    open?.side === "incoming" && menuCtx
       ? getIncomingMenuRows(nodeType, menuCtx)
-      : getOutgoingMenuRows(nodeType, menuCtx);
+      : open?.side === "outgoing" && menuCtx
+        ? getOutgoingMenuRows(nodeType, menuCtx)
+        : [];
   const menuTitle = open?.side ? anchorMenuTitle(open.side) : "";
 
   return (

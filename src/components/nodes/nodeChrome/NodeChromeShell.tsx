@@ -1,5 +1,5 @@
+import { memo, type CSSProperties, type ReactNode, type RefObject } from "react";
 import type React from "react";
-import { type CSSProperties, type ReactNode, type RefObject } from "react";
 
 type Props = {
   selected: boolean;
@@ -13,7 +13,7 @@ type Props = {
   afterPreview?: ReactNode;
 };
 
-export function NodeChromeShell({
+function NodeChromeShell({
   selected,
   width,
   height,
@@ -53,3 +53,6 @@ export function NodeChromeShell({
     </div>
   );
 }
+
+export { NodeChromeShell };
+export const NodeChromeShellMemo = memo(NodeChromeShell);

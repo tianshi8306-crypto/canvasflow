@@ -77,6 +77,16 @@ export function parseVideoGenError(raw: string): ParsedVideoGenError {
       technicalDetail: original,
     };
   }
+  if (
+    s.includes("post-TNS") ||
+    s.includes("TNS check")
+  ) {
+    return {
+      summary:
+        "生成的视频未通过云端安全审核（TNS 信任与安全检查）。可能是输出内容触发了安全拦截规则。请尝试修改提示词、更换参考图，或调整画面内容后重新生成",
+      technicalDetail: original,
+    };
+  }
 
   const looksTechnical =
     /logid=/i.test(s) ||

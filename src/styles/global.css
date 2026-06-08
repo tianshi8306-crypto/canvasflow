@@ -893,8 +893,26 @@ body .zoomMenu {
 .canvasWrap .react-flow__node.draggable:not(.dragging) {
   cursor: default;
 }
+
+/* GPU 加速：拖拽节点使用 will-change 提前创建合成层 */
 .canvasWrap .react-flow__node.draggable.dragging {
   cursor: grabbing;
+  will-change: transform;
+}
+
+/* 拖拽结束后释放 GPU 合成的内存 */
+.canvasWrap .react-flow__node.draggable:not(.dragging) {
+  will-change: auto;
+}
+
+/* 节点 contain 优化：隔离布局/绘制作用域，避免重排级联 */
+.canvasWrap .react-flow__node {
+  contain: layout style;
+}
+
+/* GPU 节约：拖拽时非选中节点关闭 backdrop-filter，减少合成层数量 */
+.canvasWrap--node-dragging .react-flow__node:not(.selected) {
+  backdrop-filter: none !important;
 }
 
 /* 多选后仍为箭头（避免 selectable 的手型） */

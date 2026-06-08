@@ -1,4 +1,4 @@
-import type { CSSProperties } from "react";
+import { memo, type CSSProperties } from "react";
 import { NodeResizer, type Node, type NodeProps } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
 import { countGroupMembers, GROUP_MIN_HEIGHT, GROUP_MIN_WIDTH } from "@/lib/canvasGroup";
@@ -17,7 +17,7 @@ import { useProjectStore } from "@/store/projectStore";
 const RIM = 10;
 
 /** 打组底板：标题外置 + 边框拖动手柄，拖动时 React Flow 连带子节点一体平移 */
-export function GroupNode({ id, data, selected }: NodeProps<Node<FlowNodeData>>) {
+function _GroupNode({ id, data, selected }: NodeProps<Node<FlowNodeData>>) {
   const nodes = useProjectStore((s) => s.nodes);
   const nodeRunStateById = useProjectStore((s) => s.nodeRunStateById);
   const memberCount = countGroupMembers(nodes, id);
@@ -123,3 +123,5 @@ export function GroupNode({ id, data, selected }: NodeProps<Node<FlowNodeData>>)
     </>
   );
 }
+
+export const GroupNode = memo(_GroupNode);

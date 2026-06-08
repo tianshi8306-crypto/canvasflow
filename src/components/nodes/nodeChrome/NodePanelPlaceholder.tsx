@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { memo, type ReactNode } from "react";
 import {
   IconMenuAudio,
   IconMenuFfmpeg,
@@ -29,7 +29,7 @@ const ICON_BY_KIND: Record<NodePanelPlaceholderKind, (props: { size?: number }) 
 };
 
 /** 节点主面板空态占位图（与添加节点菜单图标一致） */
-export function NodePanelPlaceholder({ kind }: { kind: NodePanelPlaceholderKind }) {
+function NodePanelPlaceholder({ kind }: { kind: NodePanelPlaceholderKind }) {
   const Icon = ICON_BY_KIND[kind];
   return (
     <div className="nodePanelPlaceholderIcon" aria-hidden>
@@ -37,3 +37,6 @@ export function NodePanelPlaceholder({ kind }: { kind: NodePanelPlaceholderKind 
     </div>
   );
 }
+
+export { NodePanelPlaceholder };
+export const NodePanelPlaceholderMemo = memo(NodePanelPlaceholder);
