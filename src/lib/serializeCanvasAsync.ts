@@ -7,6 +7,7 @@ import {
   type CanvasProjectMeta,
   type SerializeCanvasOptions,
 } from "@/lib/serialization";
+import { incrementalSerializeCanvas } from "@/lib/incrementalSerialize";
 
 /** 去掉 RF 运行时字段，减小序列化体积与耗时 */
 function stripNodeForPersist(node: Node<FlowNodeData>): Node<FlowNodeData> {
@@ -72,6 +73,19 @@ export function serializeCanvasToBytesAsync(
       }
     });
   });
+}
+
+/** 增量版：仅重新序列化脏节点/边，其余复用缓存，大幅减少 JSON.stringify 开销 */
+export function serializeCanvasToBytesIncremental(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  viewport: Viewport,
+  meta?: CanvasProjectMeta,
+  options?: SerializeCanvasOptions,
+): Uint8Array {
+  const prepared = prepareCanvasForPersist(nodes, edges);
+  const json = incrementalSerializeCanvas(prepared.nodes, prepared.edges, viewport, meta, options);
+  return new TextEncoder().encode(json);
 }
 
 /** @deprecated 使用 serializeCanvasToBytesAsync */

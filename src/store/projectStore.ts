@@ -11,6 +11,12 @@ import { create } from "zustand";
 import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
 import { formatUserError } from "@/lib/errors";
 import { DESKTOP_SHELL_HINT } from "@/lib/tauriEnv";
+import { clearDirtyTracking, markAllDirty, markEdgeDirty, markNodeDirty } from "@/lib/incrementalSerialize";
+import {
+  serializeCanvasToBytesAsync,
+  serializeCanvasToBytesIncremental,
+  yieldToMain,
+} from "@/lib/serializeCanvasAsync";
 import { FIRST_LAST_FRAME_EXAMPLE_PROMPT } from "@/lib/firstLastFrameSetup";
 import { FIRST_FRAME_DEFAULT_PROMPT } from "@/lib/videoInputConstraints";
 import { computeNextLeftInputY, leftInputColumnX } from "@/lib/videoInputNodeLayout";
@@ -63,7 +69,6 @@ import {
 import { buildForkDuplicatePaste } from "@/lib/createNodeForkDuplicate";
 import { cloneFlowNodeData } from "@/lib/flowNodeDataClone";
 import { defaultViewport } from "@/lib/serialization";
-import { serializeCanvasToBytesAsync, yieldToMain } from "@/lib/serializeCanvasAsync";
 import { runCoalescedProjectSave } from "@/store/projectSaveRunner";
 import type { FlowNodeData } from "@/lib/types";
 import { importMediaFiles as importMediaFilesApi } from "@/shared/api/assets";
@@ -214,6 +219,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         set(patch);
         resetProjectSaveRevisionBaseline(patch.graphRevision ?? 0);
         rebuildShotNodeRegistry(patch.nodes);
+        markAllDirty(patch.nodes, patch.edges || []);
         if (patch.nodes.length === 0) {
           useCanvasUiStore.getState().resetEmptyGuide();
         } else {
@@ -387,6 +393,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
               projectDirty: true,
             };
           });
+          for (const c of nextChanges) if (c.type === "position") markNodeDirty(c.id);
           markGraphDirtyOnly();
         },
       });
@@ -420,6 +427,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       };
     });
     if (!graphChanged) return;
+    for (const c of nextChanges) if (c.type === "position" || c.type === "dimensions") markNodeDirty(c.id);
     afterGraphEdit();
     });
   },
@@ -439,6 +447,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         projectDirty: true,
       };
     });
+    for (const c of graphChanges) if ("id" in c) markEdgeDirty(c.id);
     afterGraphEdit();
     });
   },
@@ -482,6 +491,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       return { edges, nodes };
     });
     afterGraphEdit();
+    for (const e of get().edges) markEdgeDirty(e.id);
 
     const targetNode = get().nodes.find((n) => n.id === normalized.target);
     if (
@@ -513,6 +523,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
   updateNodeData: (id, patch, opts) => {
     if (!opts?.silent) recordBeforeDiscreteMutation(get);
+    markNodeDirty(id);
     set((s) => ({
       nodes: s.nodes.map((n) => {
         if (n.id !== id) return n;
@@ -660,7 +671,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       }
       try {
         await yieldToMain();
-        const content = await serializeCanvasToBytesAsync(nodes, edges, viewport, {
+        const content = serializeCanvasToBytesIncremental(nodes, edges, viewport, {
           imageNodeCounter,
           videoNodeCounter,
           textNodeCounter,
@@ -672,6 +683,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         await invoke("write_canvasflow_json_bytes", { projectPath, content });
         await useProjectBibleStore.getState().flushSave();
         lastSavedGraphRevision = get().graphRevision;
+        clearDirtyTracking();
         set({ lastSavedAt: Date.now(), projectDirty: false });
         syncActiveTabUnsaved(false);
       } catch (e) {
@@ -763,6 +775,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const clean = stripEphemeralNodeFields([node])[0] ?? node;
     runWithReactFlowGraphSyncLock(() => {
       set((s) => ({ nodes: [...s.nodes, clean] }));
+      markNodeDirty(clean.id);
       afterGraphEdit();
     });
   },
@@ -776,6 +789,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         nodes: [...s.nodes, ...stripEphemeralNodeFields(newNodes)],
         edges: [...s.edges, ...cleanedNew],
       }));
+      for (const n of stripEphemeralNodeFields(newNodes)) markNodeDirty(n.id);
+      for (const e of cleanedNew) markEdgeDirty(e.id);
       afterGraphEdit();
     });
   },
