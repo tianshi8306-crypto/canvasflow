@@ -9,13 +9,15 @@ use std::process::Command;
 pub struct TimelineEncodeOptions {
     pub resolution: Option<String>,
     pub video_bitrate_kbps: Option<u32>,
+    pub fps: Option<String>,
 }
 
 impl TimelineEncodeOptions {
     fn needs_reencode(&self) -> bool {
         let res = self.resolution.as_deref().unwrap_or("source");
         let kbps = self.video_bitrate_kbps.unwrap_or(0);
-        res != "source" || kbps > 0
+        let fps_not_source = self.fps.as_deref().map_or(false, |f| f != "source");
+        res != "source" || kbps > 0 || fps_not_source
     }
 }
 
@@ -94,16 +96,41 @@ fn build_video_filters(profile: &str, encode: Option<&TimelineEncodeOptions>) ->
     let res = encode
         .and_then(|e| e.resolution.as_deref())
         .unwrap_or("source");
+    let fps = encode
+        .and_then(|e| e.fps.as_deref())
+        .filter(|f| *f != "source");
     let scale = resolution_scale_filter(res);
+
+    let mut parts: Vec<String> = Vec::new();
+
+    if let Some(fps_val) = fps {
+        parts.push(format!("fps={fps_val}"));
+    }
+
     match profile {
         "gif" => {
             let scale_expr =
                 scale.unwrap_or_else(|| "scale=-2:480:flags=lanczos".to_string());
-            Some(format!(
-                "fps=12,{scale_expr},split[s0][s1];[s0]palettegen=stats_mode=diff:max_colors=256[p];[s1][p]paletteuse=dither=bayer:bayer_scale=3"
-            ))
+            parts.push(if !parts.is_empty() {
+                scale_expr
+            } else {
+                scale_expr
+            });
+            parts.push("split[s0][s1]".into());
+            parts.push("[s0]palettegen=stats_mode=diff:max_colors=256[p]".into());
+            parts.push("[s1][p]paletteuse=dither=bayer:bayer_scale=3".into());
         }
-        _ => scale,
+        _ => {
+            if let Some(s) = scale {
+                parts.push(s);
+            }
+        }
+    }
+
+    if parts.is_empty() {
+        None
+    } else {
+        Some(parts.join(","))
     }
 }
 

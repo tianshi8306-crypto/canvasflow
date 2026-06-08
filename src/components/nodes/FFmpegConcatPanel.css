@@ -304,3 +304,52 @@
   color: #86efac;
   background: rgba(134, 239, 172, 0.08);
 }
+
+/* 导出到…按钮 */
+.fcp-btn--primary.fcp-btn--running {
+  color: var(--fcp-control-text-muted);
+}
+
+.fcp-open-folder {
+  flex-shrink: 0;
+  color: #93c5fd;
+  border-color: rgba(147, 197, 253, 0.25);
+  background: rgba(147, 197, 253, 0.06);
+}
+
+.fcp-open-folder:hover:not(:disabled) {
+  background: rgba(147, 197, 253, 0.14);
+  border-color: rgba(147, 197, 253, 0.4);
+  color: #bfdbfe;
+}
+
+/* 平台预设快捷入口 */
+.composeEditorExportSettingsPresets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 2px;
+}
+
+.composeEditorExportSettingsPresetChip {
+  padding: 4px 12px;
+  border: 1px solid var(--fcp-control-border);
+  border-radius: 14px;
+  background: var(--fcp-control-bg);
+  color: var(--fcp-control-text-muted);
+  font-size: 11px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.composeEditorExportSettingsPresetChip:hover:not(:disabled) {
+  background: var(--fcp-control-bg-hover);
+  color: var(--fcp-control-text);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.composeEditorExportSettingsPresetChip:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

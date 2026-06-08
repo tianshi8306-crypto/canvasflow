@@ -25,7 +25,8 @@ pub struct AppState {
     pub(crate) video_jobs: Mutex<HashMap<String, VideoMockJob>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct VideoMockJob {
     pub(crate) project_path: String,
     pub(crate) node_id: String,
@@ -93,6 +94,8 @@ pub fn run() {
             commands::assets_cmd::migrate_legacy_assets,
             commands::assets_cmd::backfill_canvas_asset_ids,
             commands::timeline_cmd::render_timeline,
+            commands::timeline_cmd::render_timeline_to_path,
+            commands::timeline_cmd::reveal_in_shell,
             commands::graph_cmd::execute_graph,
             commands::graph_cmd::execute_graph_with_patch,
             commands::graph_cmd::execute_subgraph,

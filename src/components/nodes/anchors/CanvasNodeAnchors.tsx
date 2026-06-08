@@ -214,10 +214,10 @@ function CanvasAnchorSide({
           <PlusGlyph />
         </span>
         {magnetized ? (
-          <span className="simple-anchor-aim" aria-hidden>
+          <>
             <span className="anchor-crosshair-h" />
             <span className="anchor-crosshair-v" />
-          </span>
+          </>
         ) : null}
       </div>
     </div>

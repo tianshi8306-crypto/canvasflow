@@ -3,7 +3,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TtvVideoRefThumb } from "@/components/nodes/TtvVideoRefThumb";
 import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import {
@@ -17,6 +17,7 @@ import {
   TIMELINE_EXPORT_FORMATS,
   patchComposeNodeAfterExport,
   timelineClipsToNodePatch,
+  exportFormatFileExt,
 } from "@/lib/compose";
 import { ComposeEditorExportSettings } from "@/components/compose/ComposeEditorExportSettings";
 import {
@@ -84,6 +85,22 @@ function IconCheck() {
   );
 }
 
+function IconFolder() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6.47a1 1 0 01-.83-.44L10.47 5H5a2 2 0 00-2 2z" stroke="currentColor" strokeWidth="1.5"/>
+    </svg>
+  );
+}
+
+function IconDownload() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M12 3v12M8.5 10.5 12 14l3.5-3.5M5 19h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  );
+}
+
 interface ClipItemProps {
   index: number;
   path: string;
@@ -147,6 +164,7 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
   const [running, setRunning] = useState(false);
   const [outputReady, setOutputReady] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [lastExportedPath, setLastExportedPath] = useState<string | null>(null);
 
   const nodeData = useMemo(() => nodes.find((n) => n.id === nodeId)?.data ?? {}, [nodes, nodeId]);
 
@@ -261,12 +279,61 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
     [nodeId, updateNodeData],
   );
 
+  const handleOpenOutputFolder = useCallback(async () => {
+    const target = lastExportedPath ?? output;
+    if (!target?.trim()) return;
+    try {
+      await invoke("reveal_in_shell", { path: target });
+      setStatus(`已打开：${target}`);
+    } catch {
+      /* ignore */
+    }
+  }, [lastExportedPath, output]);
+
+  /** 导出到自定义路径（弹保存对话框） */
+  const handleExportToPath = useCallback(async () => {
+    if (!projectPath || timelineClips.length === 0) {
+      setStatus("请先添加视频片段");
+      return;
+    }
+
+    setRunning(true);
+    setOutputReady(false);
+    setLastExportedPath(null);
+
+    const defaultName = `final.${exportFormatFileExt(exportFormat)}`;
+
+    try {
+      const destPath = await invoke<string>("render_timeline_to_path", {
+        projectPath,
+        clips: clipsToRenderPayload(timelineClips, {}),
+        defaultName,
+        encodeOptions: exportEncodeToInvokePayload(exportEncode) ?? null,
+        exportFormat,
+      });
+      setLastExportedPath(destPath);
+      setStatus(`已导出到：${destPath}`);
+      setOutputReady(true);
+    } catch (e) {
+      const msg = String(e);
+      if (msg.includes("已取消导出")) {
+        setStatus("");
+      } else {
+        setStatus(`导出失败：${msg}`);
+      }
+    } finally {
+      setRunning(false);
+    }
+  }, [projectPath, timelineClips, exportFormat, exportEncode]);
+
+  /** 导出到工程内 assets/exports/ */
   const handleConcat = useCallback(async () => {
     if (!projectPath || timelineClips.length === 0) return;
 
     setRunning(true);
     setStatus("正在导出成片…");
     setOutputReady(false);
+    setLastExportedPath(null);
 
     try {
       const result = await invoke<string>("render_timeline", {
@@ -280,6 +347,7 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
       setOutputReady(true);
       const patch = await patchComposeNodeAfterExport(projectPath, result);
       updateNodeData(nodeId, patch);
+      setLastExportedPath(result);
     } catch (e) {
       setStatus(`失败：${String(e)}`);
     } finally {
@@ -289,6 +357,28 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
 
   const hasInputs = inputs.length > 0;
   const canConcat = hasInputs && !running && !refreshing && Boolean(projectPath);
+
+  const autoRefreshNodeRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (autoRefreshNodeRef.current === nodeId) return;
+    autoRefreshNodeRef.current = nodeId;
+    if (!projectPath || timelineClips.length > 0) return;
+    const hasIncoming = edges.some(
+      (e) => e.target === nodeId && !(e as { data?: { disabled?: boolean } }).data?.disabled,
+    );
+    if (!hasIncoming) return;
+
+    setRefreshing(true);
+    void collectClipRelPaths(nodeId, nodes, edges, projectPath)
+      .then((paths) => {
+        if (paths.length > 0) {
+          setClipsFromPaths(paths);
+          setStatus(`已自动导入 ${paths.length} 个片段`);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setRefreshing(false));
+  }, [projectPath, nodeId, nodes, edges, timelineClips.length, setClipsFromPaths]);
 
   return (
     <div
@@ -308,7 +398,7 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
       <div className="fcp-clip-list">
         {inputs.length === 0 ? (
           <div className="fcp-clip-empty">
-            <span>连接已出片的视频节点后，点击「从连线刷新」</span>
+            <span>连接已出片的视频节点后会自动导入；也可手动点「从连线刷新」</span>
           </div>
         ) : (
           inputs.map((path, idx) => (
@@ -403,24 +493,41 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
 
         <button
           type="button"
-          className={`fcp-btn fcp-btn--primary ${running ? "fcp-btn--running" : ""}`}
-          onClick={() => void handleConcat()}
+          className="fcp-btn fcp-btn--primary"
+          onClick={() => void handleExportToPath()}
           disabled={!canConcat}
-          title={canConcat ? "导出成片（FFmpeg 拼接）" : "请先添加视频片段"}
+          title="选择文件夹导出成片"
         >
           {running ? (
-            <>
-              <IconRefresh />
-              <span>导出中…</span>
-            </>
+            <><IconRefresh /><span>导出中…</span></>
           ) : (
-            <>
-              <IconCheck />
-              <span>导出成片</span>
-            </>
+            <><IconDownload /><span>导出到…</span></>
           )}
         </button>
+
+        <button
+          type="button"
+          className={`fcp-btn ${running ? "fcp-btn--running" : ""}`}
+          onClick={() => void handleConcat()}
+          disabled={!canConcat}
+          title="导出到工程目录 assets/exports/"
+        >
+          <IconCheck />
+          <span>快速导出</span>
+        </button>
       </div>
+
+      {outputReady && lastExportedPath && (
+        <button
+          type="button"
+          className="fcp-btn fcp-open-folder"
+          onClick={() => void handleOpenOutputFolder()}
+          title="打开导出文件所在目录"
+        >
+          <IconFolder />
+          <span>打开文件夹</span>
+        </button>
+      )}
 
       {status ? (
         <div className={`fcp-status ${outputReady ? "fcp-status--success" : ""}`}>{status}</div>

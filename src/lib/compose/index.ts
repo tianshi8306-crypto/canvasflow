@@ -9,6 +9,13 @@ export {
 } from "./collectClips";
 
 export {
+  applyIncomingComposeClipSync,
+  composeTimelinePatchFromMerge,
+  mergeIncomingSourceIntoComposeTimeline,
+  type SyncIncomingComposeClipResult,
+} from "./syncIncomingComposeClip";
+
+export {
   TIMELINE_EXPORT_FORMATS,
   applyExportFormatToPath,
   defaultExportRelPath,
@@ -27,6 +34,8 @@ export {
   DEFAULT_EXPORT_ENCODE,
   TIMELINE_EXPORT_BITRATE_PRESETS,
   TIMELINE_EXPORT_RESOLUTIONS,
+  TIMELINE_EXPORT_FPS_OPTIONS,
+  PLATFORM_EXPORT_PRESETS,
   bitratePresetIdFromKbps,
   exportEncodeNeedsReencode,
   exportEncodeSummary,
@@ -34,6 +43,8 @@ export {
   normalizeExportEncode,
   type TimelineExportEncodeSettings,
   type TimelineExportResolution,
+  type TimelineExportFps,
+  type PlatformExportPreset,
 } from "./timelineExportEncode";
 
 export {
