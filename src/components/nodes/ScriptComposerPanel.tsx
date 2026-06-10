@@ -99,10 +99,13 @@ export function ScriptComposerPanel({
 
   const node = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
   const prompt = (node?.data.prompt ?? "").slice(0, IMAGE_GENERATION_PROMPT_MAX_CHARS);
-  const params =
-    node?.data.params && typeof node.data.params === "object"
-      ? (node.data.params as Record<string, unknown>)
-      : {};
+  const params = useMemo(
+    () =>
+      node?.data.params && typeof node.data.params === "object"
+        ? (node.data.params as Record<string, unknown>)
+        : {},
+    [node?.data.params],
+  );
   const selectedProviderId = (params.providerId ?? "").toString();
   const beatCount = node?.data.scriptBeats?.length ?? 0;
 
@@ -221,6 +224,7 @@ export function ScriptComposerPanel({
     runNodeSubgraph,
     setStatusText,
     updateNodeData,
+    clearZeroBeatsHint,
   ]);
 
   const handleExpandClick = useCallback(() => {

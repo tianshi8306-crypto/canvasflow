@@ -17,7 +17,7 @@ import { destroyFaceFeatures, type BlurSharpenOptions } from "./blurSharpen";
 
 export type { BlurSharpenOptions };
 
-export interface FaceBypassOptions extends BlurSharpenOptions {}
+export type FaceBypassOptions = BlurSharpenOptions;
 
 export interface FaceBypassResult {
   /** 处理后的 data URL（失败时回退为原值） */

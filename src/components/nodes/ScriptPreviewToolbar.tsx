@@ -151,7 +151,6 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
   }, [
     exportBusy,
     isBusy,
-    isGraphRunning,
     nodeId,
     nodeParams,
     projectPath,
@@ -202,9 +201,7 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
     exportBusy,
     hasBeats,
     isBusy,
-    isGraphRunning,
     llmParams,
-    node,
     nodeId,
     nodeParams,
     projectPath,

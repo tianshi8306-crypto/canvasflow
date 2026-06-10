@@ -25,7 +25,7 @@ import { incomingVideoUpstreamState } from "@/lib/scriptReferenceVideo";
 import { useScriptNodeTaskState } from "@/hooks/useScriptNodeTaskState";
 import "./MinimalScriptNode.css";
 
-function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
+function MinimalScriptNodeInner({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
@@ -178,4 +178,4 @@ function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowN
   );
 }
 
-export const MinimalScriptNode = memo(_MinimalScriptNode);
+export const MinimalScriptNode = memo(MinimalScriptNodeInner);

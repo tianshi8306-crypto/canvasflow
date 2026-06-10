@@ -36,7 +36,7 @@ function LLMDocGlyph() {
   );
 }
 
-function _LLMNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
+function LLMNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const params = useMemo(() => getLLMParams(data), [data.params]);
 
@@ -88,4 +88,4 @@ function _LLMNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
   );
 }
 
-export const LLMNode = memo(_LLMNode);
+export const LLMNode = memo(LLMNodeInner);

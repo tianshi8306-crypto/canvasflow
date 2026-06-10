@@ -387,7 +387,7 @@ export function useComposeNodeEditor(nodeId: string) {
       next.splice(to, 0, item!);
       commitClips(next, { selectedIndex: to, playheadSec });
     },
-    [timelineClips, commitClips],
+    [timelineClips, commitClips, playheadSec],
   );
 
   const handleRefreshFromEdges = useCallback(

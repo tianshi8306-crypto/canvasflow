@@ -64,7 +64,7 @@ function getParams(data: FlowNodeData): TextParams {
 }
 
 /** 文本节点：无「尝试」四入口；占位双击编辑；外置 Composer；连线推断 workflow */
-function _TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
+function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
@@ -548,4 +548,4 @@ function _TextNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) 
   );
 }
 
-export const TextNode = memo(_TextNode);
+export const TextNode = memo(TextNodeInner);

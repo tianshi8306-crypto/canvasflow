@@ -29,7 +29,7 @@ interface MinimalAudioNodeProps {
   selected: boolean;
 }
 
-function _MinimalAudioNode({ id, data, selected = false }: MinimalAudioNodeProps) {
+function MinimalAudioNodeInner({ id, data, selected = false }: MinimalAudioNodeProps) {
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
@@ -207,4 +207,4 @@ function _MinimalAudioNode({ id, data, selected = false }: MinimalAudioNodeProps
   );
 }
 
-export const MinimalAudioNode = memo(_MinimalAudioNode);
+export const MinimalAudioNode = memo(MinimalAudioNodeInner);

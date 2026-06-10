@@ -17,7 +17,7 @@ import { useProjectStore } from "@/store/projectStore";
 const RIM = 10;
 
 /** 打组底板：标题外置 + 边框拖动手柄，拖动时 React Flow 连带子节点一体平移 */
-function _GroupNode({ id, data, selected }: NodeProps<Node<FlowNodeData>>) {
+function GroupNodeInner({ id, data, selected }: NodeProps<Node<FlowNodeData>>) {
   const nodes = useProjectStore((s) => s.nodes);
   const nodeRunStateById = useProjectStore((s) => s.nodeRunStateById);
   const memberCount = countGroupMembers(nodes, id);
@@ -124,4 +124,4 @@ function _GroupNode({ id, data, selected }: NodeProps<Node<FlowNodeData>>) {
   );
 }
 
-export const GroupNode = memo(_GroupNode);
+export const GroupNode = memo(GroupNodeInner);

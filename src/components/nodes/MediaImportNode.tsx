@@ -39,7 +39,7 @@ function MediaImportGlyph() {
   );
 }
 
-function _MediaImportNode({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
+function MediaImportNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData>>) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -128,4 +128,4 @@ function _MediaImportNode({ id, data, selected, type }: NodeProps<Node<FlowNodeD
   );
 }
 
-export const MediaImportNode = memo(_MediaImportNode, (prev, next) => prev.id === next.id && prev.selected === next.selected && prev.data === next.data);
+export const MediaImportNode = memo(MediaImportNodeInner, (prev, next) => prev.id === next.id && prev.selected === next.selected && prev.data === next.data);

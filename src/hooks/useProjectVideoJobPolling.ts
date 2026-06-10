@@ -111,5 +111,6 @@ export function useProjectVideoJobPolling() {
         loops.delete(id);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- activeKey is derived from activeNodeIds, used as stable dep
   }, [projectPath, activeKey]);
 }

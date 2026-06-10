@@ -52,7 +52,7 @@ import { VideoPreviewToolbarPortal } from "./VideoPreviewToolbarPortal";
 
 import "./MinimalVideoNode.css";
 
-function _MinimalVideoNode({
+function MinimalVideoNodeInner({
   id,
 
   data,
@@ -278,4 +278,4 @@ function _MinimalVideoNode({
   );
 }
 
-export const MinimalVideoNode = memo(_MinimalVideoNode);
+export const MinimalVideoNode = memo(MinimalVideoNodeInner);

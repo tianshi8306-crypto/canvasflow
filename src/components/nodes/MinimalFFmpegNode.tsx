@@ -22,7 +22,7 @@ import "./MinimalFFmpegNode.css";
 
 const FFMPEG_FRAME_RATIO = 16 / 9;
 
-function _MinimalFFmpegNode({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
+function MinimalFFmpegNodeInner({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const deleteSelection = useProjectStore((s) => s.deleteSelection);
   const { expandedChrome } = useNodeExpandedChrome(selected);
@@ -137,4 +137,4 @@ function _MinimalFFmpegNode({ id, data, selected = false }: NodeProps<Node<FlowN
   );
 }
 
-export const MinimalFFmpegNode = memo(_MinimalFFmpegNode);
+export const MinimalFFmpegNode = memo(MinimalFFmpegNodeInner);

@@ -74,6 +74,7 @@ export function VideoSubtitleRegionOverlay({
       intrinsicHeight,
     );
     return { container, content };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- layoutTick intentionally triggers recalc on resize
   }, [containerRef, intrinsicHeight, intrinsicWidth, layoutTick]);
 
   const selectionPx = (() => {

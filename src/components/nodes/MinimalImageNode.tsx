@@ -37,7 +37,7 @@ interface MinimalImageNodeProps {
   selected: boolean;
 }
 
-function _MinimalImageNode({ id, data, selected = false }: MinimalImageNodeProps) {
+function MinimalImageNodeInner({ id, data, selected = false }: MinimalImageNodeProps) {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const deleteSelection = useProjectStore((s) => s.deleteSelection);
   const { expandedChrome } = useNodeExpandedChrome(selected);
@@ -208,4 +208,4 @@ function _MinimalImageNode({ id, data, selected = false }: MinimalImageNodeProps
   );
 }
 
-export const MinimalImageNode = memo(_MinimalImageNode);
+export const MinimalImageNode = memo(MinimalImageNodeInner);

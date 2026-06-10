@@ -548,7 +548,7 @@ export const ImagePromptMentionInput = forwardRef<
           clearPickerHoverPreview();
         }
       },
-      [onChange, openDropdown, pickerItems.length, clearPickerHoverPreview, onSlashTrigger],
+      [onChange, openDropdown, pickerItems, clearPickerHoverPreview, onSlashTrigger],
     );
 
     const handleCompositionStart = useCallback(() => {
