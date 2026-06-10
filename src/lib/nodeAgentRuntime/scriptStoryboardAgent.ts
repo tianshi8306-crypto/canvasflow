@@ -3,6 +3,7 @@ import { extractJsonArray } from "@/lib/storyboardParse";
 import { normalizeScriptBeat } from "@/lib/scriptBeatHelpers";
 import type { ScriptBeat, StoryboardShot, StoryboardShotStatus } from "@/lib/types";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
+import { appLogger } from "@/lib/appLogger";
 
 const SB_SYSTEM = `你是影视分镜助理。用户会给出多条「脚本镜头」JSON，每条含 id、场次、景别、描述等。
 请为**用户列出的每一条镜头**输出一条用于文生图关键帧的画面描述（visualPrompt）。
@@ -62,7 +63,7 @@ function setShotsStatus(
   const targetSet = new Set(targetIds);
   return (shots ?? []).map((s) =>
     targetSet.has(s.scriptBeatId)
-      ? { ...s, status, ...(error ? { error } : {}), ...(status === "generating" ? { retryCount: String((Number(s.retryCount) || 0) + 1) } : {}) }
+      ? { ...s, status, ...(error ? { error } : {}), ...(status === "generating" ? { retryCount: (s.retryCount ?? 0) + 1 } : {}) }
       : s,
   );
 }
@@ -117,6 +118,12 @@ export const scriptStoryboardGenerateAgentRuntime: NodeTaskAgentRuntime<
   execute: async ({ payload, theme, prevShots, llmParams }, ctx) => {
     const targetIds = payload.map((b) => b.id);
     ctx.setStatusText(`正在请求 LLM 生成分镜文案（${payload.length} 条）…`);
+
+    if (ctx.cancelToken?.cancelled) {
+      // 已被取消，不标记 generating，直接抛出
+      throw new Error("任务已取消");
+    }
+
     // Mark targets as generating before LLM call
     ctx.updateNodeData(ctx.nodeId, {
       storyboardShots: setShotsStatus(prevShots, targetIds, "generating"),
@@ -128,12 +135,17 @@ export const scriptStoryboardGenerateAgentRuntime: NodeTaskAgentRuntime<
         userPrompt: user,
         ...llmParams,
       });
-      const parsed = extractJsonArray<ParsedRow>(raw) ?? [];
+      const parsed = extractJsonArray<ParsedRow>(raw);
+      if (!parsed || parsed.length === 0) {
+        appLogger.warn("[scriptStoryboardAgent] LLM 返回无法解析为有效分镜数组", { raw: raw.slice(0, 500) });
+        return { parsed: [], prevShots };
+      }
       return { parsed, prevShots };
     } catch (err) {
-      // Mark targets as failed on error
+      const isCancelled = ctx.cancelToken?.cancelled;
+      // 取消时回退到 idle，而非 marked as failed
       ctx.updateNodeData(ctx.nodeId, {
-        storyboardShots: setShotsStatus(prevShots, targetIds, "failed", String(err)),
+        storyboardShots: setShotsStatus(prevShots, targetIds, isCancelled ? "idle" : "failed", isCancelled ? undefined : String(err)),
       });
       throw err;
     }

@@ -152,6 +152,7 @@ function FlowCanvasInner() {
   const nodeSnapVisual = useCanvasUiStore((s) => s.nodeSnapVisual);
   const pendingAddPanelAt = useCanvasUiStore((s) => s.pendingAddPanelAt);
   const clearPendingAddPanelAt = useCanvasUiStore((s) => s.clearPendingAddPanelAt);
+  const activeTabId = useCanvasUiStore((s) => s.activeTabId);
   const emptyGuideDismissed = useCanvasUiStore((s) => s.emptyGuideDismissed);
   const resetEmptyGuide = useCanvasUiStore((s) => s.resetEmptyGuide);
   const hermesMode = useCanvasUiStore((s) => s.hermesMode);
@@ -212,7 +213,7 @@ function FlowCanvasInner() {
     viewport,
     getViewport,
     setViewport,
-    syncKey: projectPath ?? "no-project",
+    syncKey: projectPath ?? `tab-${activeTabId}`,
   });
 
   const nodesRef = useRef(nodes);
@@ -535,6 +536,15 @@ function FlowCanvasInner() {
     }
   }, [nodes.length, resetEmptyGuide]);
 
+  // ReactFlow 挂载时（标签切换），若画布为空则重置引导
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (nodes.length === 0) resetEmptyGuide();
+    }, 50);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId]);
+
   // ── JSX ─────────────────────────────────────────────────────────────────
 
   return (
@@ -567,7 +577,8 @@ function FlowCanvasInner() {
       }}
     >
       <ReactFlow
-        key={projectPath ?? "no-project"}
+        key={projectPath ?? `tab-${activeTabId}`}
+        defaultViewport={viewport}
         nodes={nodesView}
         edges={edgeView}
         onNodesChange={onNodesChange}
@@ -890,7 +901,7 @@ function FlowCanvasInner() {
 export function FlowCanvas() {
   return (
     <ReactFlowProvider>
-      <ErrorBoundary name="画布" onRecover={() => {}} fallback={<div className="canvasErrorFallback" />}>
+      <ErrorBoundary name="画布">
         <FlowCanvasInner />
       </ErrorBoundary>
     </ReactFlowProvider>

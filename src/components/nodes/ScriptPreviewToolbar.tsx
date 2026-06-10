@@ -1,6 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
 import { useScriptNodeTaskState } from "@/hooks/useScriptNodeTaskState";
-import { scriptParseCompleteStatus } from "@/lib/scriptNodeFeedback";
 import { normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
 import {
   SCRIPT_AI_PARSE_BUSY_LABEL,
@@ -21,13 +20,7 @@ import {
 } from "@/lib/scriptStoryboardScope";
 import {
   openScriptNodeFullscreen,
-  openScriptThemeEditor,
-  SCRIPT_ENTRY_FULLSCREEN_LABEL,
-  SCRIPT_ENTRY_FULLSCREEN_TITLE,
-  SCRIPT_ENTRY_THEME_LABEL,
-  SCRIPT_ENTRY_THEME_TITLE,
 } from "@/lib/scriptNodeCanvasEntries";
-import { ScriptDocumentImportButton } from "@/components/script/ScriptDocumentImportButton";
 import { useProjectStore } from "@/store/projectStore";
 
 type Props = {
@@ -82,20 +75,6 @@ function IconFullscreen() {
         strokeLinecap="round"
         d="M4 6V4h2M10 4h2v2M12 10v2h-2M6 12H4v-2M4 4l2.5 2.5M12 4 9.5 6.5M12 12 9.5 9.5M4 12 6.5 9.5"
       />
-    </svg>
-  );
-}
-
-function IconTheme() {
-  return (
-    <svg viewBox="0 0 16 16" width={14} height={14} fill="none" aria-hidden>
-      <path
-        d="M3.5 12.5l1.2-3.2 3.2-1.2-1.2-3.2-3.2 1.2 1.2 3.2-3.2 1.2 1.2 3.2 3.2-1.2-1.2-3.2z"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinejoin="round"
-      />
-      <circle cx="11.5" cy="4.5" r="1.25" fill="currentColor" />
     </svg>
   );
 }
@@ -165,9 +144,6 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
           { prompt: promptText, dispatch: runNodeSubgraph },
           { nodeId, projectPath, updateNodeData, setStatusText },
         );
-        const latest = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
-        const count = normalizeScriptBeats(latest?.data.scriptBeats ?? []).length;
-        setStatusText(scriptParseCompleteStatus(count));
       } catch {
         /* runNodeTaskAgent 已写入状态 */
       }
@@ -206,12 +182,14 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
     void (async () => {
       try {
         if (!(await preflightScriptNodeLlm(nodeParams, setStatusText))) return;
+        const latestNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
+        const latestShots = latestNode?.data.storyboardShots;
         await runNodeTaskAgent(
           scriptStoryboardGenerateAgentRuntime,
           {
             targetBeats,
             themePrompt,
-            prevShots: node?.data.storyboardShots,
+            prevShots: latestShots,
             llmParams,
           },
           { nodeId, projectPath, updateNodeData, setStatusText },
@@ -238,13 +216,7 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
 
   const onFullscreen = useCallback(() => {
     openScriptNodeFullscreen(nodeId);
-    setStatusText("已打开全屏表格（Esc 关闭）");
-  }, [nodeId, setStatusText]);
-
-  const onEditTheme = useCallback(() => {
-    openScriptThemeEditor(nodeId);
-    setStatusText("已打开主题编辑（Esc 关闭）");
-  }, [nodeId, setStatusText]);
+  }, [nodeId]);
 
   const onDownload = useCallback(() => {
     if (!hasBeats) {
@@ -326,40 +298,6 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
           <span className="scriptPreviewToolbar-btnLabel">{storyboardLabel}</span>
         </button>
 
-        <ScriptDocumentImportButton
-          scriptNodeId={nodeId}
-          disabled={disabled}
-          className="scriptPreviewToolbar-labeledBtn scriptPreviewToolbar-uploadBtn"
-        />
-
-        <div className="scriptPreviewToolbar-divider" aria-hidden />
-
-        <button
-          type="button"
-          className="scriptPreviewToolbar-iconBtn"
-          title={SCRIPT_ENTRY_FULLSCREEN_TITLE}
-          aria-label={SCRIPT_ENTRY_FULLSCREEN_LABEL}
-          disabled={disabled}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={onFullscreen}
-        >
-          <IconFullscreen />
-        </button>
-
-        <button
-          type="button"
-          className="scriptPreviewToolbar-iconBtn"
-          title={SCRIPT_ENTRY_THEME_TITLE}
-          aria-label={SCRIPT_ENTRY_THEME_LABEL}
-          disabled={disabled}
-          onMouseDown={(e) => e.preventDefault()}
-          onClick={onEditTheme}
-        >
-          <IconTheme />
-        </button>
-
-        <div className="scriptPreviewToolbar-divider" aria-hidden />
-
         <button
           type="button"
           className="scriptPreviewToolbar-iconBtn"
@@ -370,6 +308,18 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
           onClick={onDownload}
         >
           <IconDownload />
+        </button>
+
+        <button
+          type="button"
+          className="scriptPreviewToolbar-iconBtn"
+          title="全屏展开"
+          aria-label="全屏展开脚本表格"
+          disabled={disabled}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onFullscreen}
+        >
+          <IconFullscreen />
         </button>
       </div>
     </div>

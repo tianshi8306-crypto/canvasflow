@@ -98,7 +98,6 @@ export function ScriptCreativeViewGrid({
         const shotNo = (beat.shotNumber || "").trim() || String(i + 1);
         const dur = (beat.durationHint || "").trim() || "—";
         const sceneLabel = beat.scene.trim() ? `场景 ${beat.scene.trim()}` : `场景 ${i + 1}`;
-        const shotLabel = (beat.shotSize || "").trim();
         const status = shot?.status ?? "idle";
         const isGenerating = status === "generating";
         const isFailed = status === "failed";
@@ -168,7 +167,6 @@ export function ScriptCreativeViewGrid({
               </div>
             ) : null}
             <p className="scriptCreativeDesc">{clip(desc, 160)}</p>
-            {shotLabel ? <div className="scriptCreativeTech mono">{shotLabel}</div> : null}
             <div className="scriptCreativeSceneFoot">{sceneLabel}</div>
             <div className="scriptCreativeCardActions">
               {onFocusStoryboardBeat ? (

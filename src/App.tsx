@@ -4,9 +4,10 @@ import { useEffect, useState } from "react";
 import { FlowCanvas } from "@/components/FlowCanvas";
 import { AppTopBar } from "@/components/AppTopBar";
 import { SettingsPanel } from "@/components/SettingsPanel";
-import StyleLibraryPanel from "@/components/styleLibrary/StyleLibraryPanel";
 import { ScriptNodeFullscreenOverlay } from "@/components/ScriptNodeFullscreenOverlay";
 import { ComposeEditorOverlay } from "@/components/compose/ComposeEditorOverlay";
+import { OnboardingGuide, shouldShowOnboarding } from "@/components/OnboardingGuide";
+import "@/components/OnboardingGuide.css";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { HermesScriptVersionDiffOverlay } from "@/components/hermes/HermesScriptVersionDiffOverlay";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
@@ -349,6 +350,16 @@ export default function App() {
   // 初始化节点状态监听器
   useNodeStatusListener();
 
+  // 首次安装引导：检测是否需要展示
+  useEffect(() => {
+    if (!shouldShowOnboarding()) return;
+    // 等待启动画面完全淡出后再展示引导
+    const timer = window.setTimeout(() => {
+      useCanvasUiStore.getState().openOnboardingGuide();
+    }, 2800);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
     <div className="appShell">
       <AppTopBar />
@@ -358,6 +369,7 @@ export default function App() {
       </div>
       <HermesOrbSuggestionBridge />
 
+      <OnboardingGuide />
       <SettingsPanel
         open={settingsOpen}
         onClose={() => setSettingsOpen(false)}
@@ -369,7 +381,6 @@ export default function App() {
           toggleShortcutsOverlay();
         }}
       />
-      <StyleLibraryPanel />
       {scriptFullscreenNodeId ? <ScriptNodeFullscreenOverlay /> : null}
       {composeEditorNodeId ? <ComposeEditorOverlay /> : null}
       <ConfirmDialog />

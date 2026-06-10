@@ -19,6 +19,68 @@
       #root {
         height: 100%;
       }
+      /* ── 启动动画 CSS（内联确保 JS 加载前立即可见）── */
+      #app-boot-splash {
+        position: fixed;
+        inset: 0;
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #121212;
+        color: #e8e6e3;
+        transition: opacity 0.42s ease, visibility 0.42s ease;
+      }
+      #app-boot-splash.app-boot-splash--exiting {
+        opacity: 0;
+        visibility: hidden;
+        pointer-events: none;
+      }
+      .app-boot-splash__inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        user-select: none;
+      }
+      .app-boot-splash__mark {
+        position: relative;
+        width: 56px;
+        height: 56px;
+      }
+      .app-boot-splash__ring {
+        position: absolute;
+        inset: 0;
+        border-radius: 50%;
+        border: 2px solid rgba(255, 255, 255, 0.08);
+        border-top-color: #38bdf8;
+        animation: app-boot-spin 0.9s linear infinite;
+      }
+      .app-boot-splash__core {
+        position: absolute;
+        inset: 14px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 30%, rgba(56, 189, 248, 0.35), rgba(18, 18, 18, 0.2) 68%);
+        box-shadow: 0 0 28px rgba(56, 189, 248, 0.22);
+        animation: app-boot-pulse 1.6s ease-in-out infinite;
+      }
+      @keyframes app-boot-spin {
+        to { transform: rotate(360deg); }
+      }
+      @keyframes app-boot-pulse {
+        0%, 100% { opacity: 0.72; transform: scale(0.96); }
+        50% { opacity: 1; transform: scale(1); }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .app-boot-splash__ring,
+        .app-boot-splash__core {
+          animation: none;
+        }
+        #app-boot-splash {
+          transition-duration: 0.15s;
+        }
+      }
     </style>
   </head>
   <body>
@@ -31,15 +93,8 @@
     >
       <div class="app-boot-splash__inner">
         <div class="app-boot-splash__mark" aria-hidden="true">
-          <svg class="app-boot-splash__icon" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <rect width="512" height="512" rx="112" fill="#121212"/>
-            <path d="M148 228 C188 228, 204 268, 244 268" stroke="#22d3ee" stroke-width="10" stroke-linecap="round" fill="none"/>
-            <path d="M268 308 C308 308, 324 228, 364 228" stroke="#38bdf8" stroke-width="10" stroke-linecap="round" fill="none"/>
-            <rect x="88" y="188" width="96" height="72" rx="18" fill="#1e1e1e" stroke="#22d3ee" stroke-width="6"/>
-            <rect x="208" y="268" width="96" height="72" rx="18" fill="#1e1e1e" stroke="#22d3ee" stroke-width="6"/>
-            <rect x="328" y="188" width="96" height="72" rx="18" fill="#242424" stroke="#38bdf8" stroke-width="6"/>
-            <circle cx="372" cy="372" r="16" fill="#22d3ee" fill-opacity="0.92"/>
-          </svg>
+          <span class="app-boot-splash__ring"></span>
+          <span class="app-boot-splash__core"></span>
         </div>
       </div>
     </div>

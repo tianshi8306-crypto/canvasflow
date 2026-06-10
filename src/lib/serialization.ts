@@ -35,7 +35,6 @@ export type CanvasProjectMeta = {
   textNodeCounter?: number;
   audioNodeCounter?: number;
   scriptNodeCounter?: number;
-  activeStyleId?: string | null;
 };
 
 /** v2 canvas（统一图片节点：imageAsset → imageNode） */
@@ -62,37 +61,10 @@ type MigrationFn<TFrom, TTo> = (data: TFrom) => TTo;
 function migrateV0ToV1(data: CanvasV0): CanvasV1 {
   const rawNodes = Array.isArray(data.nodes) ? data.nodes : [];
 
-  // v0 迁移：清理废弃字段
-  const migratedNodes = rawNodes.map((node) => {
-    if (node && typeof node === "object" && !Array.isArray(node)) {
-      const n = node as Record<string, unknown>;
-      if (n.type === "scriptNode" && n.data && typeof n.data === "object") {
-        const data = n.data as Record<string, unknown>;
-        if (Array.isArray(data.scriptBeats)) {
-          const migratedBeats = (data.scriptBeats as Array<Record<string, unknown>>).map((beat) => {
-            // v0: shotSize 存在时覆盖 scene（旧版 shot 字段迁移到 shotSize）
-            if (beat.shotSize && !beat.scene) {
-              return { ...beat, scene: beat.shotSize };
-            }
-            return beat;
-          });
-          return {
-            ...n,
-            data: {
-              ...data,
-              scriptBeats: migratedBeats,
-            },
-          };
-        }
-      }
-    }
-    return node;
-  });
-
   return {
     version: 1,
     viewport: data.viewport,
-    nodes: migratedNodes,
+    nodes: rawNodes,
     edges: data.edges,
   };
 }
@@ -237,15 +209,12 @@ function parseCanvasMeta(raw: unknown): CanvasProjectMeta | undefined {
     typeof m.scriptNodeCounter === "number" && Number.isFinite(m.scriptNodeCounter)
       ? Math.max(0, Math.floor(m.scriptNodeCounter))
       : undefined;
-  const activeStyleId =
-    m.activeStyleId == null || typeof m.activeStyleId === "string" ? (m.activeStyleId as string | null) : undefined;
   if (
     imageNodeCounter == null &&
     videoNodeCounter == null &&
     textNodeCounter == null &&
     audioNodeCounter == null &&
-    scriptNodeCounter == null &&
-    activeStyleId === undefined
+    scriptNodeCounter == null
   ) {
     return undefined;
   }
@@ -255,7 +224,6 @@ function parseCanvasMeta(raw: unknown): CanvasProjectMeta | undefined {
     textNodeCounter,
     audioNodeCounter,
     scriptNodeCounter,
-    activeStyleId,
   };
 }
 
@@ -283,8 +251,7 @@ export function serializeCanvas(
       meta.videoNodeCounter != null ||
       meta.textNodeCounter != null ||
       meta.audioNodeCounter != null ||
-      meta.scriptNodeCounter != null ||
-      meta.activeStyleId !== undefined)
+      meta.scriptNodeCounter != null)
   ) {
     payload.meta = meta;
   }

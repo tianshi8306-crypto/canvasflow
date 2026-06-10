@@ -1,4 +1,3 @@
-import type { Viewport } from "@xyflow/react";
 import type { CanvasTab } from "@/store/canvasUiStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
@@ -66,8 +65,4 @@ export function restoreProjectFromTab(tab: CanvasTab): void {
     projectDirty: tab.unsaved,
     statusText: tab.projectPath ? `工程：${tab.projectPath}` : "未打开工程",
   });
-}
-
-export function defaultTabViewport(): Viewport {
-  return { x: 0, y: 0, zoom: 1 };
 }

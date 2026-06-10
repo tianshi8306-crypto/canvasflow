@@ -5,7 +5,6 @@ import {
   CAMERA_MOVE_OPTIONS,
   EMOTION_OPTIONS,
   patchRow,
-  SHOT_TYPE_OPTIONS,
   TEXTAREA_KEYS,
   type ScriptBeatStringKey,
   type ScriptBeatsTableVariant,
@@ -22,6 +21,8 @@ type Props = {
   projectPath?: string | null;
   onStatusText?: (msg: string) => void;
   onPersistRows: (next: ScriptBeat[]) => void;
+  /** 只读模式：所有字段展示为纯文本；图片字段保留选图功能 */
+  readOnly?: boolean;
 };
 
 export function ScriptBeatsScalarFieldCell({
@@ -34,9 +35,36 @@ export function ScriptBeatsScalarFieldCell({
   projectPath,
   onStatusText,
   onPersistRows,
+  readOnly = false,
 }: Props) {
   const fieldKey = colKey as ScriptBeatStringKey;
   const value = (beat[fieldKey] ?? "") as string;
+
+  const canImportMedia = variant === "fullscreen" && String(fieldKey).endsWith("Image");
+
+  const importForCell = () => {
+    if (!canImportMedia) return;
+    void (async () => {
+      const relPath = await importSingleProjectMedia(projectPath, "image", onStatusText);
+      if (!relPath) return;
+      onPersistRows(patchRow(normRows, rowIndex, fieldKey, relPath));
+    })();
+  };
+
+  // 只读模式：全部展示为纯文本（参考图上传除外）
+  if (readOnly) {
+    if (canImportMedia) {
+      return (
+        <div className="scriptTableMediaCell">
+          <input className="mono" value={value} readOnly />
+          <button type="button" className="btn" onClick={importForCell} title="选择文件并自动导入到 assets">
+            选图
+          </button>
+        </div>
+      );
+    }
+    return <span className="scriptTableCellReadonly">{value || "—"}</span>;
+  }
 
   if (TEXTAREA_KEYS.has(fieldKey)) {
     return (
@@ -45,19 +73,6 @@ export function ScriptBeatsScalarFieldCell({
         value={value}
         onChange={(e) => onPersistRows(patchRow(normRows, rowIndex, fieldKey, e.target.value))}
       />
-    );
-  }
-
-  if (fieldKey === "shotSize") {
-    return (
-      <select value={value} onChange={(e) => onPersistRows(patchRow(normRows, rowIndex, fieldKey, e.target.value))}>
-        <option value="">选择景别</option>
-        {SHOT_TYPE_OPTIONS.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
-        ))}
-      </select>
     );
   }
 
@@ -93,20 +108,7 @@ export function ScriptBeatsScalarFieldCell({
   const mono =
     fieldKey === "shotNumber" ||
     fieldKey === "durationHint" ||
-    String(fieldKey).endsWith("Image") ||
-    fieldKey === "reference";
-  const canImportMedia = variant === "fullscreen" && (String(fieldKey).endsWith("Image") || fieldKey === "reference");
-  const importLabel = String(fieldKey).endsWith("Image") ? "选图" : "选视频";
-  const importKind = String(fieldKey).endsWith("Image") ? "image" : "video";
-
-  const importForCell = () => {
-    if (!canImportMedia) return;
-    void (async () => {
-      const relPath = await importSingleProjectMedia(projectPath, importKind, onStatusText);
-      if (!relPath) return;
-      onPersistRows(patchRow(normRows, rowIndex, fieldKey, relPath));
-    })();
-  };
+    String(fieldKey).endsWith("Image");
 
   if (canImportMedia) {
     return (
@@ -117,7 +119,7 @@ export function ScriptBeatsScalarFieldCell({
           onChange={(e) => onPersistRows(patchRow(normRows, rowIndex, fieldKey, e.target.value))}
         />
         <button type="button" className="btn" onClick={importForCell} title="选择文件并自动导入到 assets">
-          {importLabel}
+          选图
         </button>
       </div>
     );

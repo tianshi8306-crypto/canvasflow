@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { Viewport } from "@xyflow/react";
 import { viewportNearlyEqual } from "@/store/projectHistory";
+import { appLogger } from "@/lib/appLogger";
 
 interface UseViewportSyncOptions {
   viewport: Viewport;
@@ -31,6 +32,8 @@ export function useViewportSync({
     void (async () => {
       try {
         await setViewport(target);
+      } catch (err) {
+        appLogger.error("[useViewportSync] setViewport 失败", err);
       } finally {
         window.setTimeout(() => {
           if (!cancelled) viewportProgrammaticSyncRef.current = false;

@@ -123,8 +123,7 @@ export function incrementalSerializeCanvas(
       meta.videoNodeCounter != null ||
       meta.textNodeCounter != null ||
       meta.audioNodeCounter != null ||
-      meta.scriptNodeCounter != null ||
-      meta.activeStyleId !== undefined)
+      meta.scriptNodeCounter != null)
   ) {
     parts.push(sep);
     parts.push(pad + '"meta":' + JSON.stringify(meta));

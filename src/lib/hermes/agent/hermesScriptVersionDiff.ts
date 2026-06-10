@@ -38,7 +38,6 @@ const BEAT_FIELDS: Array<{ key: keyof ScriptBeat; label: string }> = [
   { key: "durationHint", label: "时长" },
   { key: "storyboardPrompt", label: "分镜提示" },
   { key: "videoMotionPrompt", label: "运动提示" },
-  { key: "shotSize", label: "景别" },
 ];
 
 const SHOT_FIELDS: Array<{ key: keyof StoryboardShot; label: string }> = [

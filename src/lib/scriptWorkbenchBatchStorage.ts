@@ -12,20 +12,19 @@ function normalizeFavList(raw: unknown): string[] {
 
 export function loadBatchPresetsV1(): BatchPresetsStored {
   if (typeof window === "undefined" || !window.localStorage) {
-    return { shotSize: [], cameraMove: [] };
+    return { cameraMove: [] };
   }
   try {
     const raw = window.localStorage.getItem(BATCH_PRESETS_STORAGE_KEY);
-    if (!raw) return { shotSize: [], cameraMove: [] };
+    if (!raw) return { cameraMove: [] };
     const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object") return { shotSize: [], cameraMove: [] };
+    if (!parsed || typeof parsed !== "object") return { cameraMove: [] };
     const o = parsed as Record<string, unknown>;
     return {
-      shotSize: normalizeFavList(o.shotSize),
       cameraMove: normalizeFavList(o.cameraMove),
     };
   } catch {
-    return { shotSize: [], cameraMove: [] };
+    return { cameraMove: [] };
   }
 }
 
@@ -33,7 +32,6 @@ export function saveBatchPresetsV1(next: BatchPresetsStored) {
   if (typeof window === "undefined" || !window.localStorage) return;
   try {
     const payload: BatchPresetsStored = {
-      shotSize: normalizeFavList(next.shotSize),
       cameraMove: normalizeFavList(next.cameraMove),
     };
     window.localStorage.setItem(BATCH_PRESETS_STORAGE_KEY, JSON.stringify(payload));

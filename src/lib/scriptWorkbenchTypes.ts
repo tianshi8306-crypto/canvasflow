@@ -3,12 +3,12 @@ import type { ScriptBeat } from "@/lib/types";
 export type BatchLogReplay =
   | {
       kind: "fill";
-      field: "shotSize" | "cameraMove";
+      field: "cameraMove";
       value: string;
     }
   | {
       kind: "clear";
-      field: "shotSize" | "cameraMove";
+      field: "cameraMove";
     }
   | {
       kind: "sortShotNumber";
@@ -26,7 +26,7 @@ export type BatchLogEntry = {
   replay?: BatchLogReplay;
 };
 
-export type BatchPresetsStored = { shotSize: string[]; cameraMove: string[] };
+export type BatchPresetsStored = { cameraMove: string[] };
 
 export type ScriptTemplateItem = {
   id: string;

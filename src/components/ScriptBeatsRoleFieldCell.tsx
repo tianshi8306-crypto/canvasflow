@@ -17,6 +17,8 @@ type Props = {
   projectPath?: string | null;
   onStatusText?: (msg: string) => void;
   onPersistRows: (next: ScriptBeat[]) => void;
+  /** 只读模式：角色名/描述纯文本展示；参考图上传除外 */
+  readOnly?: boolean;
 };
 
 export function ScriptBeatsRoleFieldCell({
@@ -27,6 +29,7 @@ export function ScriptBeatsRoleFieldCell({
   projectPath,
   onStatusText,
   onPersistRows,
+  readOnly = false,
 }: Props) {
   const [kind, rawIdx] = colKey.split(":");
   const roleIdx = Number(rawIdx);
@@ -43,24 +46,7 @@ export function ScriptBeatsRoleFieldCell({
     }
   };
 
-  if (kind === "roleDesc") {
-    return (
-      <textarea
-        rows={5}
-        placeholder={"主体身份/类别\n视觉特征与属性\n服饰与配饰\n材质与特殊状态\n风格与场景约束"}
-        value={roleDescDisplayText(value)}
-        onChange={(e) => apply(roleDescFromDisplayText(e.target.value))}
-        onBlur={(e) => {
-          const normalized = normalizeRoleDescDisplayText(e.target.value);
-          if (normalized !== e.target.value) {
-            apply(roleDescFromDisplayText(normalized));
-          }
-        }}
-        title="按 5 行填写：身份、特征、服饰、材质状态、风格场景"
-      />
-    );
-  }
-
+  // roleImage（参考图）：只读模式下仍保留上传功能
   if (kind === "roleImage") {
     const previewSrc = resolveProjectAssetSrc(projectPath, value);
     return (
@@ -79,6 +65,29 @@ export function ScriptBeatsRoleFieldCell({
       >
         {!previewSrc ? <span className="scriptImageTilePlus" aria-hidden>+</span> : null}
       </button>
+    );
+  }
+
+  // 只读模式：纯文本展示
+  if (readOnly) {
+    return <span className="scriptTableCellReadonly">{value || "—"}</span>;
+  }
+
+  if (kind === "roleDesc") {
+    return (
+      <textarea
+        rows={5}
+        placeholder={"主体身份/类别\n视觉特征与属性\n服饰与配饰\n材质与特殊状态\n风格与场景约束"}
+        value={roleDescDisplayText(value)}
+        onChange={(e) => apply(roleDescFromDisplayText(e.target.value))}
+        onBlur={(e) => {
+          const normalized = normalizeRoleDescDisplayText(e.target.value);
+          if (normalized !== e.target.value) {
+            apply(roleDescFromDisplayText(normalized));
+          }
+        }}
+        title="按 5 行填写：身份、特征、服饰、材质状态、风格场景"
+      />
     );
   }
 

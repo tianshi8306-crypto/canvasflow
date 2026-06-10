@@ -1,44 +1,35 @@
-import type { KeyboardEvent, MouseEvent } from "react";
 import type { ScriptBeat } from "@/lib/types";
-import { SCRIPT_MINI_PREVIEW_MAX_ROWS } from "@/lib/scriptNodeChrome";
-import { SCRIPT_MINI_PREVIEW_OPEN_HINT } from "@/lib/scriptNodeCanvasEntries";
 
 type Props = {
   beats: ScriptBeat[];
   themePrompt: string;
-  onOpenFullscreen: () => void;
+  generating?: boolean;
+  progress?: number | null;
 };
 
-/** 脚本节点壳内紧凑镜头表（真源在全屏表格；点击预览或顶栏进全屏） */
-export function ScriptNodeMiniPreview({ beats, themePrompt, onOpenFullscreen }: Props) {
-  const rows = beats.slice(0, SCRIPT_MINI_PREVIEW_MAX_ROWS);
-  const extra = beats.length - rows.length;
+function generationLabel(progress: number | null): string {
+  if (progress != null) return `正在解析脚本 ${progress}%…`;
+  return "正在解析脚本…";
+}
 
-  const openFromPreview = (e: MouseEvent | KeyboardEvent) => {
-    e.stopPropagation();
-    onOpenFullscreen();
-  };
-
+/** 脚本节点壳内紧凑镜头表：全部行渲染，网格内自然滚动 */
+export function ScriptNodeMiniPreview({ beats, themePrompt, generating = false, progress }: Props) {
   return (
-    <div
-      className="scriptChrome-previewInner scriptChrome-previewInner--openFullscreen"
-      role="button"
-      tabIndex={0}
-      title={SCRIPT_MINI_PREVIEW_OPEN_HINT}
-      aria-label={SCRIPT_MINI_PREVIEW_OPEN_HINT}
-      onClick={openFromPreview}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          openFromPreview(e);
-        }
-      }}
-    >
+    <div className="scriptChrome-previewInner">
+      {generating ? (
+        <div className="scriptGenCenterCapsuleOverlay" aria-live="polite">
+          <div className="scriptGenCenterCapsule">
+            <span className="scriptGenCenterCapsule-label">
+              {generationLabel(progress ?? null)}
+            </span>
+          </div>
+        </div>
+      ) : null}
       <span className="scriptNodeViewTag">脚本预览</span>
       {themePrompt.trim() ? (
         <p className="scriptChrome-themeSnippet" title={themePrompt}>
-          {themePrompt.trim().slice(0, 72)}
-          {themePrompt.trim().length > 72 ? "…" : ""}
+          {themePrompt.trim().slice(0, 80)}
+          {themePrompt.trim().length > 80 ? "…" : ""}
         </p>
       ) : null}
       <div className="scriptNodeMiniGrid">
@@ -46,20 +37,18 @@ export function ScriptNodeMiniPreview({ beats, themePrompt, onOpenFullscreen }: 
           <span>#</span>
           <span>画面</span>
         </div>
-        {rows.map((beat, i) => (
+        {beats.map((beat, i) => (
           <div key={beat.id} className="scriptNodeMiniRow">
             <span className="scriptNodeMiniIdx">{beat.shotNumber || i + 1}</span>
             <span className="scriptNodeMiniDesc">
-              {(beat.description || "—").slice(0, 80)}
+              {(beat.description || "—").slice(0, 120)}
             </span>
           </div>
         ))}
       </div>
-      {extra > 0 ? (
-        <p className="scriptNodeMiniFoot">另有 {extra} 条镜头 · {SCRIPT_MINI_PREVIEW_OPEN_HINT}</p>
-      ) : (
-        <p className="scriptNodeMiniFoot">{SCRIPT_MINI_PREVIEW_OPEN_HINT}</p>
-      )}
+      <p className="scriptNodeMiniFoot">
+        {beats.length} 条镜头
+      </p>
     </div>
   );
 }

@@ -216,9 +216,27 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     runWithReactFlowGraphSyncLock(() => {
       runIgnoringReactFlowSelectionEcho(() => {
         const patch = applyProjectSnapshot(snapshot);
-        set(patch);
+        let cleaned = false;
+        const nodes = patch.nodes.map((n) => {
+          if (n.type !== "scriptNode") return n;
+          const shots = n.data.storyboardShots;
+          if (!shots || shots.length === 0) return n;
+          const hasStale = shots.some((s) => s.status === "generating");
+          if (!hasStale) return n;
+          cleaned = true;
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              storyboardShots: shots.map((s) =>
+                s.status === "generating" ? { ...s, status: "idle" as const } : s,
+              ),
+            },
+          };
+        });
+        set(cleaned ? { ...patch, nodes } : patch);
         resetProjectSaveRevisionBaseline(patch.graphRevision ?? 0);
-        rebuildShotNodeRegistry(patch.nodes);
+        rebuildShotNodeRegistry(cleaned ? nodes : patch.nodes);
         markAllDirty(patch.nodes, patch.edges || []);
         if (patch.nodes.length === 0) {
           useCanvasUiStore.getState().resetEmptyGuide();
@@ -269,7 +287,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   statusText: "未打开工程",
   flowClipboardCount: 0,
   scriptFullscreenNodeId: null,
-  activeStyleId: null,
   /** 图片节点序号计数器，每个工程独立（用于 "图片 1", "图片 2" ...） */
   imageNodeCounter: 0,
   videoNodeCounter: 0,
@@ -305,8 +322,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
 
   nextScriptNodeLabel: () => {
     const n = get().scriptNodeCounter + 1;
-    set({ scriptNodeCounter: n });
     return `分镜脚本 ${n}`;
+  },
+
+  commitScriptNodeCounter: () => {
+    set({ scriptNodeCounter: get().scriptNodeCounter + 1 });
   },
 
   setProjectPath: (p) => set({ projectPath: p }),
@@ -326,11 +346,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   setViewport: (v) => set({ viewport: v }),
   openScriptFullscreen: (nodeId) => set({ scriptFullscreenNodeId: nodeId }),
   closeScriptFullscreen: () => set({ scriptFullscreenNodeId: null }),
-  setActiveStyleId: (id) => {
-    set({ activeStyleId: id });
-    markGraphDirtyOnly();
-    if (get().projectPath) scheduleSave(get);
-  },
   setLastRunId: (runId: string) => set({ lastRunId: runId }),
 
   onNodesChange: (changes) => {
@@ -624,7 +639,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         textNodeCounter: 0,
         audioNodeCounter: 0,
         scriptNodeCounter: 0,
-        activeStyleId: null,
       });
       useCanvasUiStore.getState().resetEmptyGuide();
       bindActiveTabToProject();
@@ -659,7 +673,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         textNodeCounter,
         audioNodeCounter,
         scriptNodeCounter,
-        activeStyleId,
       } = get();
       if (!projectPath) return;
       const { projectDirty, graphRevision } = get();
@@ -677,7 +690,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           textNodeCounter,
           audioNodeCounter,
           scriptNodeCounter,
-          activeStyleId,
         });
         await yieldToMain();
         await invoke("write_canvasflow_json_bytes", { projectPath, content });
@@ -706,7 +718,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       textNodeCounter,
       audioNodeCounter,
       scriptNodeCounter,
-      activeStyleId,
     } = get();
     try {
       const folder = await pickProjectFolder(get().projectPath);
@@ -719,7 +730,6 @@ export const useProjectStore = create<ProjectState>((set, get) => {
         textNodeCounter,
         audioNodeCounter,
         scriptNodeCounter,
-        activeStyleId,
       });
       await invoke("write_canvasflow_json_bytes", { projectPath: folder, content });
       await useProjectBibleStore.getState().loadForProject(folder);
@@ -778,6 +788,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       markNodeDirty(clean.id);
       afterGraphEdit();
     });
+    if (clean.type === "scriptNode") {
+      get().commitScriptNodeCounter();
+    }
   },
 
   addNodesWithEdges: (newNodes, newEdges) => {
@@ -793,6 +806,11 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       for (const e of cleanedNew) markEdgeDirty(e.id);
       afterGraphEdit();
     });
+    for (const n of newNodes) {
+      if (n.type === "scriptNode") {
+        get().commitScriptNodeCounter();
+      }
+    }
   },
 
   spawnAnchoredPartner: ({ anchorNodeId, direction, partnerType }) => {

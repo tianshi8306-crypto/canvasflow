@@ -2,10 +2,8 @@ import type { ScriptBeat } from "@/lib/types";
 import scriptEnums from "@/shared/config/script-enums.json";
 import type { ScriptTemplateItem } from "./scriptWorkbenchTypes";
 
-export const SHOT_TYPE_OPTIONS = scriptEnums.shotType;
 export const EMOTION_OPTIONS = scriptEnums.emotion;
 export const CAMERA_MOVE_OPTIONS = scriptEnums.cameraMove;
-export const SHOT_TYPE_PRESETS = ["全景", "中景", "近景", "特写"];
 export const CAMERA_MOVE_PRESETS = ["固定机位", "推镜", "拉镜", "摇镜", "跟拍"];
 
 export const BATCH_PRESETS_STORAGE_KEY = "scriptWorkbench.batchPresets.v1";
@@ -31,45 +29,45 @@ export const PRESET_TEMPLATE_PACK: Array<{
     name: "预置-短剧爆款-冲突反转",
     styleTag: "shortDrama",
     beats: [
-      { shotNumber: "1", durationHint: "2s", shotSize: "近景", description: "女主在走廊停步，收到匿名消息，表情骤变。", dialogue: "这不可能…" },
-      { shotNumber: "2", durationHint: "3s", shotSize: "中景", description: "男主从阴影处走出，压低声音逼问，气氛紧绷。", dialogue: "你早就知道真相，对吗？" },
-      { shotNumber: "3", durationHint: "2s", shotSize: "特写", description: "手机屏幕特写，关键证据弹出，形成反转钩子。", dialogue: "" },
+      { shotNumber: "1", durationHint: "2s", description: "女主在走廊停步，收到匿名消息，表情骤变。", dialogue: "这不可能…" },
+      { shotNumber: "2", durationHint: "3s", description: "男主从阴影处走出，压低声音逼问，气氛紧绷。", dialogue: "你早就知道真相，对吗？" },
+      { shotNumber: "3", durationHint: "2s", description: "手机屏幕特写，关键证据弹出，形成反转钩子。", dialogue: "" },
     ],
   },
   {
     name: "预置-电影叙事-情绪推进",
     styleTag: "film",
     beats: [
-      { shotNumber: "1", durationHint: "4s", shotSize: "全景", description: "傍晚街道长镜头，人物独行，环境声铺陈孤独感。", dialogue: "" },
-      { shotNumber: "2", durationHint: "5s", shotSize: "中景", description: "人物在橱窗前停下，倒影与本人同框，情绪内化。", dialogue: "如果当时我没离开…" },
-      { shotNumber: "3", durationHint: "4s", shotSize: "近景", description: "人物抬眼看向远处灯光，呼吸放缓，情绪进入下一段。", dialogue: "" },
+      { shotNumber: "1", durationHint: "4s", description: "傍晚街道长镜头，人物独行，环境声铺陈孤独感。", dialogue: "" },
+      { shotNumber: "2", durationHint: "5s", description: "人物在橱窗前停下，倒影与本人同框，情绪内化。", dialogue: "如果当时我没离开…" },
+      { shotNumber: "3", durationHint: "4s", description: "人物抬眼看向远处灯光，呼吸放缓，情绪进入下一段。", dialogue: "" },
     ],
   },
   {
     name: "预置-动漫分镜-动作强化",
     styleTag: "anime",
     beats: [
-      { shotNumber: "1", durationHint: "2s", shotSize: "中景", description: "主角跃起拔刀，残影拉出速度线，背景高对比。", dialogue: "接招吧！" },
-      { shotNumber: "2", durationHint: "2s", shotSize: "特写", description: "眼神特写，瞳孔高光增强，情绪由冷静转为决绝。", dialogue: "" },
-      { shotNumber: "3", durationHint: "3s", shotSize: "全景", description: "技能爆发，能量波扩散，镜头跟随冲击方向推进。", dialogue: "" },
+      { shotNumber: "1", durationHint: "2s", description: "主角跃起拔刀，残影拉出速度线，背景高对比。", dialogue: "接招吧！" },
+      { shotNumber: "2", durationHint: "2s", description: "眼神特写，瞳孔高光增强，情绪由冷静转为决绝。", dialogue: "" },
+      { shotNumber: "3", durationHint: "3s", description: "技能爆发，能量波扩散，镜头跟随冲击方向推进。", dialogue: "" },
     ],
   },
   {
     name: "预置-广告转化-产品卖点",
     styleTag: "ad",
     beats: [
-      { shotNumber: "1", durationHint: "2s", shotSize: "特写", description: "产品开箱特写，材质细节与品牌标识清晰可见。", dialogue: "" },
-      { shotNumber: "2", durationHint: "3s", shotSize: "中景", description: "用户在真实场景使用产品，痛点被快速解决。", dialogue: "原来这么简单。" },
-      { shotNumber: "3", durationHint: "2s", shotSize: "近景", description: "产品与核心卖点字幕同屏，出现行动引导。", dialogue: "现在就试试。" },
+      { shotNumber: "1", durationHint: "2s", description: "产品开箱特写，材质细节与品牌标识清晰可见。", dialogue: "" },
+      { shotNumber: "2", durationHint: "3s", description: "用户在真实场景使用产品，痛点被快速解决。", dialogue: "原来这么简单。" },
+      { shotNumber: "3", durationHint: "2s", description: "产品与核心卖点字幕同屏，出现行动引导。", dialogue: "现在就试试。" },
     ],
   },
   {
     name: "预置-通用商用-稳定出片",
     styleTag: "general",
     beats: [
-      { shotNumber: "1", durationHint: "3s", shotSize: "全景", description: "交代场景与人物关系，画面干净，信息明确。", dialogue: "" },
-      { shotNumber: "2", durationHint: "3s", shotSize: "中景", description: "推进事件核心动作，主体与道具关系清晰。", dialogue: "" },
-      { shotNumber: "3", durationHint: "3s", shotSize: "近景", description: "收束情绪与结果，给下一个镜头留出承接点。", dialogue: "" },
+      { shotNumber: "1", durationHint: "3s", description: "交代场景与人物关系，画面干净，信息明确。", dialogue: "" },
+      { shotNumber: "2", durationHint: "3s", description: "推进事件核心动作，主体与道具关系清晰。", dialogue: "" },
+      { shotNumber: "3", durationHint: "3s", description: "收束情绪与结果，给下一个镜头留出承接点。", dialogue: "" },
     ],
   },
 ];

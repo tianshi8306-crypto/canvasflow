@@ -20,18 +20,15 @@ import { NodeAnchors } from "@/components/nodes/anchors";
 import { ScriptNodeMiniPreview } from "@/components/nodes/ScriptNodeMiniPreview";
 import { ScriptComposerPanelPortal } from "@/components/nodes/ScriptComposerPanelPortal";
 import { ScriptPreviewToolbarPortal } from "@/components/nodes/ScriptPreviewToolbarPortal";
-import { ScriptNodeUpstreamTextFloat } from "@/components/nodes/ScriptNodeUpstreamTextFloat";
 import { ScriptNodeReferenceVideoFloat } from "@/components/nodes/ScriptNodeReferenceVideoFloat";
-import { incomingTextUpstreamState } from "@/lib/incomingScriptBinding";
 import { incomingVideoUpstreamState } from "@/lib/scriptReferenceVideo";
-import { openScriptNodeFullscreen } from "@/lib/scriptNodeCanvasEntries";
+import { useScriptNodeTaskState } from "@/hooks/useScriptNodeTaskState";
 import "./MinimalScriptNode.css";
 
 function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowNodeData>>) {
   const nodes = useProjectStore((s) => s.nodes);
   const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
-  const deleteSelection = useProjectStore((s) => s.deleteSelection);
   const setPinnedGenPanelId = useCanvasUiStore((s) => s.setScriptGenPanelPinnedNodeId);
   const pinnedGenPanelId = useCanvasUiStore((s) => s.scriptGenPanelPinnedNodeId);
   const expandedComposerNodeId = useCanvasUiStore((s) => s.scriptGenPanelExpandedNodeId);
@@ -47,17 +44,11 @@ function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowN
   const showComposerPortal =
     expandedChrome && (!hasBeats || dockedBelow) && expandedComposerNodeId !== id;
   const showPreviewToolbar = expandedChrome && hasBeats;
-  const textUpstream = useMemo(
-    () => incomingTextUpstreamState(nodes, edges, id),
-    [edges, id, nodes],
-  );
-  const showUpstreamTextFloat = expandedChrome && textUpstream !== "none";
   const videoUpstream = useMemo(
     () => incomingVideoUpstreamState(nodes, edges, id),
     [edges, id, nodes],
   );
   const showUpstreamVideoFloat = expandedChrome && videoUpstream !== "none";
-  const showUpstreamFloatRow = showUpstreamTextFloat || showUpstreamVideoFloat;
 
   const previewRef = useRef<HTMLDivElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -68,10 +59,6 @@ function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowN
       setPinnedGenPanelId(null);
     }
   }, [id, pinnedGenPanelId, selected, setPinnedGenPanelId]);
-
-  const handleOpenFullscreen = useCallback(() => {
-    openScriptNodeFullscreen(id);
-  }, [id]);
 
   const label = data.label ?? "";
   const commitLabel = useCallback(
@@ -84,9 +71,9 @@ function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowN
     [beatCount, hasBeats],
   );
 
-  const nodeStatus = data.status;
-  const isGenerating =
-    nodeStatus?.status === "running" || nodeStatus?.status === "pending";
+  const { isBusy, status: nodeStatus } = useScriptNodeTaskState(id);
+
+  const isGenerating = isBusy;
   const genProgress =
     isGenerating &&
     typeof nodeStatus?.progress === "number" &&
@@ -109,13 +96,23 @@ function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowN
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Delete" || e.key === "Backspace") {
-        const t = e.target;
-        if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
-        if ((t as HTMLElement).isContentEditable) return;
-        e.preventDefault();
-        deleteSelection();
-      }
+      if (e.key !== "Delete" && e.key !== "Backspace") return;
+      const t = e.target;
+      if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+      if ((t as HTMLElement).isContentEditable) return;
+      // 仅当焦点在脚本节点的 Portal 面板内时才拦截删除（只删当前节点）
+      const inPanel = panelRef.current?.contains(t as globalThis.Node);
+      const inToolbar = previewToolbarRef.current?.contains(t as globalThis.Node);
+      if (!inPanel && !inToolbar) return;
+      e.preventDefault();
+      // 只删除当前脚本节点，不波及画布上其他选区
+      useProjectStore.setState((s) => ({
+        nodes: s.nodes.filter((n) => n.id !== id),
+        edges: s.edges.filter((e) => e.source !== id && e.target !== id),
+        selectedNodeIds: s.selectedNodeIds.filter((nid) => nid !== id),
+        selectedNodeId: s.selectedNodeId === id ? null : s.selectedNodeId,
+        projectDirty: true,
+      }));
     };
     document.addEventListener("pointerdown", handlePointerDown);
     document.addEventListener("keydown", handleKeyDown);
@@ -123,21 +120,16 @@ function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowN
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [deleteSelection, selected]);
+  }, [id, selected]);
 
   return (
     <NodeChromeProvider>
-      {!showPreviewToolbar ? (
-        <>
-          <NodeMetaLabel label={label} defaultLabel="分镜脚本" onCommit={commitLabel} />
-          <NodeMetaStatus dimsText={dimsText} generating={isGenerating} progress={genProgress} />
-        </>
-      ) : null}
+      <NodeMetaLabel label={label} defaultLabel="分镜脚本" onCommit={commitLabel} />
+      <NodeMetaStatus dimsText={dimsText} generating={isGenerating} progress={genProgress} />
 
-      {showUpstreamFloatRow ? (
+      {showUpstreamVideoFloat ? (
         <div className="scriptChrome-floatRow">
-          {showUpstreamTextFloat ? <ScriptNodeUpstreamTextFloat nodeId={id} /> : null}
-          {showUpstreamVideoFloat ? <ScriptNodeReferenceVideoFloat nodeId={id} /> : null}
+          <ScriptNodeReferenceVideoFloat nodeId={id} />
         </div>
       ) : null}
 
@@ -154,7 +146,8 @@ function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowN
           <ScriptNodeMiniPreview
             beats={beats}
             themePrompt={themePrompt}
-            onOpenFullscreen={handleOpenFullscreen}
+            generating={isGenerating}
+            progress={genProgress}
           />
         ) : (
           <div className="nodeChrome-placeholder scriptChrome-placeholder scriptChrome-emptyShell">
@@ -171,8 +164,6 @@ function _MinimalScriptNode({ id, data, selected = false }: NodeProps<Node<FlowN
         label={label}
         onCommitLabel={commitLabel}
         dimsText={dimsText}
-        generating={isGenerating}
-        progress={genProgress}
       />
 
       <ScriptComposerPanelPortal

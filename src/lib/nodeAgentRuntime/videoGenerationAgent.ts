@@ -21,7 +21,6 @@ import { readFileAsDataUrl } from "@/lib/mediaUtils";
 import { joinProjectRelativePath } from "@/lib/paths";
 import { bypassFaceReviewBatch } from "@/lib/seedance/faceBypass";
 import { injectVirtualCharacterPrefix } from "@/lib/seedance/faceBypass/bypassPrompt";
-import { applyActiveStyleToVideoPrompt } from "@/lib/styleLibrary";
 
 type VideoGenerationAgentInput = {
   videoBlock: VideoNodePersisted;
@@ -148,17 +147,13 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
           ? injectVirtualCharacterPrefix(expandedPrompt)
           : expandedPrompt;
 
-      // ★ 风格库注入：当前画布激活的风格预设
-      const { activeStyleId } = useProjectStore.getState();
-      const styledPrompt = await applyActiveStyleToVideoPrompt(activeStyleId, finalPrompt);
-
       const result = await startVideoGenerationViaBridge({
         projectPath: ctx.projectPath,
         nodeId: ctx.nodeId,
         payload: {
           workflow: draft.workflow,
           modelId: draft.modelId,
-          prompt: styledPrompt,
+          prompt: finalPrompt,
           referenceImagePaths:
             (useDreaminaCli ? atImagePaths : imageDataUrls).length > 0
               ? useDreaminaCli

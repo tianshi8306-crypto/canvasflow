@@ -27,7 +27,7 @@ import { formatUserError } from "@/lib/errors";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { ScriptDocumentImportButton } from "@/components/script/ScriptDocumentImportButton";
 
-/** 脚本节点全屏：脚本表格 / 创意分镜缩略图网格 */
+/** 脚本节点全屏：脚本表格（只读） / 创意分镜缩略图网格（保留选图功能） */
 export function ScriptNodeFullscreenOverlay() {
   const nodeId = useProjectStore((s) => s.scriptFullscreenNodeId);
   const nodes = useProjectStore((s) => s.nodes);
@@ -142,10 +142,12 @@ export function ScriptNodeFullscreenOverlay() {
       if (!nodeId || !projectPath?.trim() || filePaths.length === 0) return;
       void (async () => {
         try {
+          const latestNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
+          const latestShots = latestNode?.data.storyboardShots;
           const result = await importStoryboardImageForBeat(
             projectPath,
             filePaths,
-            node?.data.storyboardShots,
+            latestShots,
             beatId,
           );
           if (!result) return;
@@ -156,7 +158,7 @@ export function ScriptNodeFullscreenOverlay() {
         }
       })();
     },
-    [node?.data.storyboardShots, nodeId, projectPath, setStatusText, updateNodeData],
+    [nodeId, projectPath, setStatusText, updateNodeData],
   );
 
   const onPickCreativeImage = useCallback(
@@ -189,7 +191,7 @@ export function ScriptNodeFullscreenOverlay() {
     const beat = rows.find((b) => b.id === beatId);
     setStatusText(
       beat
-        ? `已定位到脚本表：镜号 ${beat.shotNumber || "—"}（可在此修改后重新生成分镜）`
+        ? `已定位到脚本表：镜号 ${beat.shotNumber || "—"}（可参考后重新生成分镜）`
         : "已切换到脚本视图",
     );
   };
@@ -475,6 +477,7 @@ export function ScriptNodeFullscreenOverlay() {
             <div className="scriptTableWrap scriptTableWrapFullscreenInner">
               <ScriptBeatsEditorTable
                 variant="fullscreen"
+                readOnly
                 rows={rows}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}

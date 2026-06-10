@@ -1,5 +1,3 @@
-type BatchField = "shotSize" | "cameraMove";
-
 type Props = {
   moreOpen: boolean;
   setMoreOpen: (updater: (v: boolean) => boolean) => void;
@@ -10,14 +8,10 @@ type Props = {
   selectedIdsLength: number;
   batchFillOpen: boolean;
   setBatchFillOpen: (updater: (v: boolean) => boolean) => void;
-  batchField: BatchField;
-  setBatchField: (value: BatchField) => void;
   batchValue: string;
   setBatchValue: (value: string) => void;
   applyBatchFill: () => void;
-  shotTypeOptions: readonly string[];
   cameraMoveOptions: readonly string[];
-  shotTypePresets: readonly string[];
   cameraMovePresets: readonly string[];
   currentFavorites: string[];
   batchFavMax: number;
@@ -36,14 +30,10 @@ export function ScriptWorkbenchBatchMoreMenu({
   selectedIdsLength,
   batchFillOpen,
   setBatchFillOpen,
-  batchField,
-  setBatchField,
   batchValue,
   setBatchValue,
   applyBatchFill,
-  shotTypeOptions,
   cameraMoveOptions,
-  shotTypePresets,
   cameraMovePresets,
   currentFavorites,
   batchFavMax,
@@ -103,20 +93,6 @@ export function ScriptWorkbenchBatchMoreMenu({
           {batchFillOpen ? (
             <div className="scriptBatchFillPanel">
               <label>
-                字段
-                <select
-                  value={batchField}
-                  onChange={(e) => {
-                    const nextField = e.target.value as BatchField;
-                    setBatchField(nextField);
-                    setBatchValue("");
-                  }}
-                >
-                  <option value="shotSize">景别</option>
-                  <option value="cameraMove">运镜</option>
-                </select>
-              </label>
-              <label>
                 值
                 <input
                   value={batchValue}
@@ -127,11 +103,11 @@ export function ScriptWorkbenchBatchMoreMenu({
                     e.preventDefault();
                     applyBatchFill();
                   }}
-                  list={`script-batch-options-${batchField}`}
-                  placeholder={batchField === "shotSize" ? "输入或选择景别" : "输入或选择运镜"}
+                  list="script-batch-options-cameraMove"
+                  placeholder="输入或选择运镜"
                 />
-                <datalist id={`script-batch-options-${batchField}`}>
-                  {(batchField === "shotSize" ? shotTypeOptions : cameraMoveOptions).map((opt) => (
+                <datalist id="script-batch-options-cameraMove">
+                  {cameraMoveOptions.map((opt) => (
                     <option key={opt} value={opt} />
                   ))}
                 </datalist>
@@ -139,7 +115,7 @@ export function ScriptWorkbenchBatchMoreMenu({
               <div className="scriptBatchPresetRow">
                 <span className="scriptBatchPresetLabel">常用预设</span>
                 <div className="scriptBatchPresetChips">
-                  {(batchField === "shotSize" ? shotTypePresets : cameraMovePresets).map((preset) => (
+                  {cameraMovePresets.map((preset) => (
                     <button
                       key={preset}
                       type="button"

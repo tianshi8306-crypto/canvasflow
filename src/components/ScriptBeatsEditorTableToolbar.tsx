@@ -29,12 +29,9 @@ type Props = {
   setFilterQuery: Dispatch<SetStateAction<string>>;
   displayRowsLength: number;
   normRowsLength: number;
-  selectedCount: number;
-  onDelete: () => void;
-  onSelectAll: () => void;
-  onMove: (direction: "up" | "down" | "top" | "bottom") => void;
 };
 
+/** 脚本镜头表工具栏（只读模式：无删除/移动/全选按钮） */
 export function ScriptBeatsEditorTableToolbar({
   toolsRef,
   fieldsInputRef,
@@ -62,10 +59,6 @@ export function ScriptBeatsEditorTableToolbar({
   setFilterQuery,
   displayRowsLength,
   normRowsLength,
-  selectedCount,
-  onDelete,
-  onSelectAll,
-  onMove,
 }: Props) {
   return (
     <div className="scriptTableFullscreenToolbar" ref={toolsRef}>
@@ -98,43 +91,6 @@ export function ScriptBeatsEditorTableToolbar({
           <FilterIcon />
           筛选
         </button>
-        {selectedCount > 0 ? (
-          <>
-            <button
-              type="button"
-              className="toolbar-delete-btn"
-              onClick={onDelete}
-              title="删除选中行"
-            >
-              🗑️ 删除({selectedCount})
-            </button>
-            <button
-              type="button"
-              className="scriptTableToolBtn"
-              onClick={onSelectAll}
-              title="全选 / 取消全选"
-            >
-              全选
-            </button>
-            <select
-              className="move-to-select"
-              defaultValue=""
-              onChange={(e) => {
-                const val = e.target.value as "up" | "down" | "top" | "bottom";
-                if (val) {
-                  onMove(val);
-                  e.currentTarget.value = "";
-                }
-              }}
-            >
-              <option value="" disabled>移动到</option>
-              <option value="up">↑ 上移一层</option>
-              <option value="down">↓ 下移一层</option>
-              <option value="top">⤒ 置顶</option>
-              <option value="bottom">⤓ 置底</option>
-            </select>
-          </>
-        ) : null}
       </div>
 
       {fieldsOpen ? (

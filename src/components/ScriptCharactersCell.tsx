@@ -16,6 +16,8 @@ type Props = {
   onPersistRows: (next: ScriptBeat[]) => void;
   roleEditorRowId: string | null;
   setRoleEditorRowId: Dispatch<SetStateAction<string | null>>;
+  /** 只读模式：仅展示角色摘要，无编辑入口 */
+  readOnly?: boolean;
 };
 
 export function ScriptCharactersCell({
@@ -29,7 +31,18 @@ export function ScriptCharactersCell({
   onPersistRows,
   roleEditorRowId,
   setRoleEditorRowId,
+  readOnly = false,
 }: Props) {
+  if (readOnly) {
+    const roles = getBeatRoles(beat);
+    return (
+      <div className="scriptCharsCellWrap scriptCharsCellWrap--readonly">
+        <ScriptBeatRoleSummary beat={beat} projectPath={projectPath ?? null} maxAvatars={2} />
+        <span className="scriptCharsCellCount mono">（{roles.length}）</span>
+      </div>
+    );
+  }
+
   if (variant === "fullscreen") {
     const roles = getBeatRoles(beat);
     return (

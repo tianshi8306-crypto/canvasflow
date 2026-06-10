@@ -27,6 +27,8 @@ export { SCRIPT_BEATS_FULLSCREEN_BASE_COLUMNS } from "@/lib/scriptBeatsTableMode
 
 type Props = {
   variant: ScriptBeatsTableVariant;
+  /** 只读模式：禁用编辑、删除、移动、角色编辑；参考图上传除外 */
+  readOnly?: boolean;
   rows: ScriptBeat[];
   selectedIds: string[];
   onToggleSelect: (id: string) => void;
@@ -37,9 +39,10 @@ type Props = {
   onHighlightDone?: () => void;
 };
 
-/** 脚本镜头表格（侧栏内嵌精简列；全屏为完整 Lib 列 + 字段可见性 + 筛选） */
+/** 脚本镜头表格（只读模式：仅展示 + 勾选 + 参考图上传；编辑/删除/移动全部禁用） */
 export function ScriptBeatsEditorTable({
   variant,
+  readOnly = false,
   rows,
   selectedIds,
   onToggleSelect,
@@ -61,19 +64,14 @@ export function ScriptBeatsEditorTable({
   const [jumpFieldKey, setJumpFieldKey] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterQuery, setFilterQuery] = useState(() => loadFilterQueryFromStorage());
-  const [roleEditorRowId, setRoleEditorRowId] = useState<string | null>(null);
   const toolsRef = useRef<HTMLDivElement>(null);
   const inlineRootRef = useRef<HTMLDivElement | null>(null);
   const fieldsInputRef = useRef<HTMLInputElement>(null);
   const filterInputRef = useRef<HTMLInputElement>(null);
   const fieldRowRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const focusedRowIndexRef = useRef<number | null>(null);
   const [inlineContainerWidth, setInlineContainerWidth] = useState(0);
   const [colWidths, setColWidths] = useState<Record<string, number>>({});
   const resizingRef = useRef<{ colKey: string; startX: number; startW: number } | null>(null);
-  const [editingCell, setEditingCell] = useState<{ row: number; col: string } | null>(null);
-  const [editValue, setEditValue] = useState("");
-  const [isAllSelected, setIsAllSelected] = useState(false);
 
   const maxRoleCount = useMemo(() => {
     let n = 0;
@@ -166,16 +164,15 @@ export function ScriptBeatsEditorTable({
   );
 
   useEffect(() => {
-    if (!fieldsOpen && !filterOpen && !roleEditorRowId) return;
+    if (!fieldsOpen && !filterOpen) return;
     const onDoc = (e: MouseEvent) => {
       if (toolsRef.current?.contains(e.target as Node)) return;
       setFieldsOpen(false);
       setFilterOpen(false);
-      setRoleEditorRowId(null);
     };
     document.addEventListener("mousedown", onDoc);
     return () => document.removeEventListener("mousedown", onDoc);
-  }, [fieldsOpen, filterOpen, roleEditorRowId]);
+  }, [fieldsOpen, filterOpen]);
 
   useEffect(() => {
     if (variant !== "fullscreen") return;
@@ -200,7 +197,6 @@ export function ScriptBeatsEditorTable({
 
   const startResize = useCallback((e: React.MouseEvent, colKey: string) => {
     e.preventDefault();
-    // Measure actual DOM width, not from colWidths state
     const thEl = (e.currentTarget as HTMLElement).parentElement as HTMLElement;
     const currentW = thEl.getBoundingClientRect().width;
     resizingRef.current = { colKey, startX: e.clientX, startW: currentW };
@@ -241,7 +237,7 @@ export function ScriptBeatsEditorTable({
 
   useEffect(() => {
     if (variant !== "fullscreen") return;
-    if (!fieldsOpen && !filterOpen && !roleEditorRowId) return;
+    if (!fieldsOpen && !filterOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (filterOpen) {
@@ -253,124 +249,11 @@ export function ScriptBeatsEditorTable({
       if (fieldsOpen) {
         setFieldsOpen(false);
         e.preventDefault();
-        return;
-      }
-      if (roleEditorRowId) {
-        setRoleEditorRowId(null);
-        e.preventDefault();
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [variant, fieldsOpen, filterOpen, roleEditorRowId]);
-
-  const moveRows = useCallback(
-    (direction: "up" | "down" | "top" | "bottom") => {
-      if (selectedIds.length === 0) return;
-      const sorted = [...selectedIds].map(id => normRows.findIndex(r => r.id === id)).filter(i => i >= 0).sort((a, b) => a - b);
-      if (sorted.length === 0) return;
-      let reordered = [...normRows];
-
-      if (direction === "up") {
-        if (sorted[0] === 0) return;
-        for (const idx of sorted) {
-          [reordered[idx - 1], reordered[idx]] = [reordered[idx], reordered[idx - 1]];
-        }
-      } else if (direction === "down") {
-        if (sorted[sorted.length - 1] === normRows.length - 1) return;
-        for (let i = sorted.length - 1; i >= 0; i--) {
-          const idx = sorted[i];
-          [reordered[idx], reordered[idx + 1]] = [reordered[idx + 1], reordered[idx]];
-        }
-      } else if (direction === "top") {
-        const moving = sorted.map(i => reordered[i]);
-        reordered = reordered.filter((_, i) => !sorted.includes(i));
-        reordered.unshift(...moving);
-      } else {
-        const moving = sorted.map(i => reordered[i]);
-        reordered = reordered.filter((_, i) => !sorted.includes(i));
-        reordered.push(...moving);
-      }
-
-      onPersistRows(reordered);
-    },
-    [normRows, selectedIds, onPersistRows]
-  );
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      // Escape — cancel editing/selection (table-level)
-      if (e.key === "Escape") {
-        setIsAllSelected(false);
-        if (editingCell) setEditingCell(null);
-        return;
-      }
-
-      // Ctrl+A — select all / deselect all
-      if ((e.ctrlKey || e.metaKey) && e.key === "a" && !editingCell && !(e.target as HTMLElement).closest(".cell-editor")) {
-        e.preventDefault();
-        if (isAllSelected) {
-          setIsAllSelected(false);
-        } else {
-          setIsAllSelected(true);
-        }
-        return;
-      }
-
-      // Shift+Arrow row move
-      if (e.shiftKey && e.key === "ArrowUp" && selectedIds.length > 0 && !editingCell && !(e.target as HTMLElement).closest(".cell-editor")) {
-        e.preventDefault();
-        moveRows("up");
-        return;
-      }
-      if (e.shiftKey && e.key === "ArrowDown" && selectedIds.length > 0 && !editingCell && !(e.target as HTMLElement).closest(".cell-editor")) {
-        e.preventDefault();
-        moveRows("down");
-        return;
-      }
-
-      if ((e.key === "Delete" || e.key === "Backspace") && !editingCell) return;
-      // Don't fire if user is typing in an input/textarea (outside table)
-      const tag = (e.target as HTMLElement).tagName;
-      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement).isContentEditable) return;
-      // Don't fire if user is editing a cell
-      const isInCellEditor = (e.target as HTMLElement).closest(".cell-editor");
-      if (isInCellEditor) return;
-
-      if (focusedRowIndexRef.current !== null) {
-        e.preventDefault();
-        const idx = focusedRowIndexRef.current;
-        const newRows = normRows.filter((_, i) => i !== idx);
-        onPersistRows(newRows);
-        // Move focus to next row (or previous if deleted last row)
-        const nextIdx = Math.min(idx, newRows.length - 1);
-        focusedRowIndexRef.current = nextIdx >= 0 ? nextIdx : null;
-      }
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
-  }, [normRows, onPersistRows, selectedIds, editingCell, isAllSelected, moveRows]);
-
-  const cols = visibleCols;
-  const colCount = cols.length + 2;
-  const inlineColStyle = (c: TableCol): CSSProperties | undefined => {
-    if (variant === "fullscreen") return c.minW ? { minWidth: c.minW } : undefined;
-    const fixed = inlineFixedWidthByContainer(c.key, inlineContainerWidth);
-    if (fixed) {
-      return {
-        width: fixed,
-        minWidth: fixed,
-        maxWidth: fixed,
-      };
-    }
-    return c.minW ? { minWidth: c.minW } : undefined;
-  };
-  const inlineTableWidth = useMemo(() => {
-    if (variant === "fullscreen") return undefined;
-    const base = 36 + 56 + cols.reduce((sum, c) => sum + getInlineColWidth(c, inlineContainerWidth), 0);
-    const containerBase = inlineContainerWidth > 0 ? inlineContainerWidth + 180 : base;
-    return Math.max(base, containerBase);
-  }, [variant, cols, inlineContainerWidth]);
+  }, [variant, fieldsOpen, filterOpen]);
 
   const toggleColHidden = (key: string) => {
     setHiddenCols((prev) => {
@@ -400,17 +283,26 @@ export function ScriptBeatsEditorTable({
     onStatusText?.("已隐藏大部分字段，保留「镜号」列");
   };
 
-  const allSelected = displayRows.length > 0 && displayRows.every((b) => selectedIds.includes(b.id));
-  const handleSelectAll = useCallback(() => {
-    const selectedIdsSet = new Set(selectedIds);
-    if (allSelected) {
-      selectedIds.forEach((id) => onToggleSelect(id));
-    } else {
-      displayRows.forEach((b) => {
-        if (!selectedIdsSet.has(b.id)) onToggleSelect(b.id);
-      });
+  const cols = visibleCols;
+  const colCount = cols.length + 1;
+  const inlineColStyle = (c: TableCol): CSSProperties | undefined => {
+    if (variant === "fullscreen") return c.minW ? { minWidth: c.minW } : undefined;
+    const fixed = inlineFixedWidthByContainer(c.key, inlineContainerWidth);
+    if (fixed) {
+      return {
+        width: fixed,
+        minWidth: fixed,
+        maxWidth: fixed,
+      };
     }
-  }, [displayRows, selectedIds, onToggleSelect, allSelected]);
+    return c.minW ? { minWidth: c.minW } : undefined;
+  };
+  const inlineTableWidth = useMemo(() => {
+    if (variant === "fullscreen") return undefined;
+    const base = 36 + cols.reduce((sum, c) => sum + getInlineColWidth(c, inlineContainerWidth), 0);
+    const containerBase = inlineContainerWidth > 0 ? inlineContainerWidth + 180 : base;
+    return Math.max(base, containerBase);
+  }, [variant, cols, inlineContainerWidth]);
 
   const tableEl = (
     <table
@@ -432,7 +324,6 @@ export function ScriptBeatsEditorTable({
             const w = colWidths[c.key] ?? getInlineColWidth(c, inlineContainerWidth);
             return <col key={`col-${c.key}`} style={{ width: w, minWidth: w, maxWidth: w }} />;
           })}
-          <col style={{ width: 56, minWidth: 56, maxWidth: 56 }} />
         </colgroup>
       ) : null}
       <thead>
@@ -457,7 +348,6 @@ export function ScriptBeatsEditorTable({
               )}
             </th>
           ))}
-          <th style={{ width: 56 }} />
         </tr>
       </thead>
       <tbody>
@@ -465,8 +355,8 @@ export function ScriptBeatsEditorTable({
           <tr>
             <td colSpan={colCount} style={{ padding: 24, color: "var(--muted)", textAlign: "center" }}>
               {variant === "fullscreen"
-                ? "暂无镜头条目。请在侧栏「脚本工作台」中生成草案或添加镜头。"
-                : "暂无镜头条目。全屏表格可编辑全部列，或在此快速编辑镜号/时长/画面/景别。"}
+                ? "暂无镜头条目。请在画布脚本节点中 AI 解析生成。"
+                : "暂无镜头条目。"}
             </td>
           </tr>
         ) : displayRows.length === 0 ? (
@@ -483,17 +373,9 @@ export function ScriptBeatsEditorTable({
               <tr
                 key={b.id}
                 data-beat-id={b.id}
-                className={[
-                  isAllSelected ? "all-selected" : "",
-                  highlightBeatId === b.id ? "scriptTableRow--highlight" : "",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
+                className={highlightBeatId === b.id ? "scriptTableRow--highlight" : ""}
               >
-                <td
-                  tabIndex={0}
-                  onFocus={() => { focusedRowIndexRef.current = idx; }}
-                >
+                <td tabIndex={0}>
                   <input
                     type="checkbox"
                     checked={selectedIds.includes(b.id)}
@@ -501,119 +383,25 @@ export function ScriptBeatsEditorTable({
                     aria-label={`选择镜头 ${idx + 1}`}
                   />
                 </td>
-                {cols.map((c) => {
-                  const isEditing = editingCell?.row === idx && editingCell?.col === c.key;
-                  return (
-                    <td
-                      key={c.key}
-                      className={[
-                        isEditing ? "cell-editing" : "",
-                        selectedIds.includes(normRows[idx]?.id) && !isEditing ? "cell-selected" : "",
-                        isAllSelected ? "all-selected" : "",
-                      ].filter(Boolean).join(" ")}
-                      onClick={() => {
-                        if (!isEditing) {
-                          setEditingCell(null);
-                          setIsAllSelected(false);
-                        }
-                      }}
-                      onDoubleClick={() => {
-                        const beat = normRows[idx];
-                        const val = (beat[c.key as keyof ScriptBeat] as string) ?? "";
-                        setEditingCell({ row: idx, col: c.key });
-                        setEditValue(val);
-                        setIsAllSelected(false);
-                      }}
-                    >
-                      {isEditing ? (
-                        <textarea
-                          className="cell-editor"
-                          value={editValue}
-                          autoFocus
-                          onChange={(e) => setEditValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && !e.shiftKey) {
-                              e.preventDefault();
-                              // Save and move to next row same column
-                              onPersistRows(
-                                normRows.map((b, i) =>
-                                  i === idx ? { ...b, [c.key]: editValue } : b
-                                )
-                              );
-                              if (idx < normRows.length - 1) {
-                                const nextVal = (normRows[idx + 1][c.key as keyof ScriptBeat] as string) ?? "";
-                                setEditingCell({ row: idx + 1, col: c.key });
-                                setEditValue(nextVal);
-                              } else {
-                                // Add new row
-                                const newRow = normalizeScriptBeat({ id: crypto.randomUUID() });
-                                onPersistRows([...normRows, newRow]);
-                                setEditingCell({ row: normRows.length, col: c.key });
-                                setEditValue("");
-                              }
-                            } else if (e.key === "Tab") {
-                              e.preventDefault();
-                              onPersistRows(
-                                normRows.map((b, i) =>
-                                  i === idx ? { ...b, [c.key]: editValue } : b
-                                )
-                              );
-                              const colIdx = cols.findIndex((col) => col.key === c.key);
-                              if (e.shiftKey) {
-                                if (colIdx > 0) {
-                                  const prevVal = (normRows[idx][cols[colIdx - 1].key as keyof ScriptBeat] as string) ?? "";
-                                  setEditingCell({ row: idx, col: cols[colIdx - 1].key });
-                                  setEditValue(prevVal);
-                                }
-                              } else {
-                                if (colIdx < cols.length - 1) {
-                                  const nextVal = (normRows[idx][cols[colIdx + 1].key as keyof ScriptBeat] as string) ?? "";
-                                  setEditingCell({ row: idx, col: cols[colIdx + 1].key });
-                                  setEditValue(nextVal);
-                                } else {
-                                  // At last column — create new row, stay in same column
-                                  const newRow = normalizeScriptBeat({ id: crypto.randomUUID() });
-                                  onPersistRows([...normRows, newRow]);
-                                  setEditingCell({ row: normRows.length, col: cols[colIdx].key });
-                                  setEditValue("");
-                                }
-                              }
-                            } else if (e.key === "Escape") {
-                              setEditingCell(null);
-                            }
-                          }}
-                        />
-                      ) : (
-                        <ScriptBeatsTableCellRenderer
-                          beat={b}
-                          rowIndex={idx}
-                          colKey={c.key}
-                          variant={variant}
-                          descRows={descRows}
-                          normRows={normRows}
-                          projectPath={projectPath}
-                          onStatusText={onStatusText}
-                          onPersistRows={onPersistRows}
-                          roleEditorRowId={roleEditorRowId}
-                          setRoleEditorRowId={setRoleEditorRowId}
-                        />
-                      )}
-                    </td>
-                  );
-                })}
-                <td
-                  tabIndex={0}
-                  onFocus={() => { focusedRowIndexRef.current = idx; }}
-                >
-                  <button
-                    type="button"
-                    className="btn btnDanger"
-                    style={{ padding: "4px 8px" }}
-                    onClick={() => onPersistRows(normRows.filter((r) => r.id !== b.id))}
+                {cols.map((c) => (
+                  <td
+                    key={c.key}
+                    className={selectedIds.includes(normRows[idx]?.id) ? "cell-selected" : ""}
                   >
-                    删
-                  </button>
-                </td>
+                    <ScriptBeatsTableCellRenderer
+                      beat={b}
+                      rowIndex={idx}
+                      colKey={c.key}
+                      variant={variant}
+                      descRows={descRows}
+                      normRows={normRows}
+                      projectPath={projectPath}
+                      onStatusText={onStatusText}
+                      onPersistRows={onPersistRows}
+                      readOnly={readOnly}
+                    />
+                  </td>
+                ))}
               </tr>
             );
           })
@@ -664,14 +452,6 @@ export function ScriptBeatsEditorTable({
         setFilterQuery={setFilterQuery}
         displayRowsLength={displayRows.length}
         normRowsLength={normRows.length}
-        selectedCount={selectedIds.length}
-        onDelete={() => {
-          const selectedIdsSet = new Set(selectedIds);
-          const kept = normRows.filter((r) => !selectedIdsSet.has(r.id));
-          onPersistRows(kept);
-        }}
-        onSelectAll={handleSelectAll}
-        onMove={moveRows}
       />
 
       <div ref={tableWrapRef} className="scriptTableFullscreenScroll">

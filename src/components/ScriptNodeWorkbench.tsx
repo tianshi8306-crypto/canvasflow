@@ -58,14 +58,12 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
   const projectPath = useProjectStore((s) => s.projectPath);
   const [view, setView] = useState<"table" | "card">("table");
   const [storyboardGenBusy, setStoryboardGenBusy] = useState(false);
-  const [hasBatchUndo, setHasBatchUndo] = useState(false);
-  const [dangerOpen, setDangerOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [batchFillOpen, setBatchFillOpen] = useState(false);
-  const [batchField, setBatchField] = useState<"shotSize" | "cameraMove">("shotSize");
+  const batchField = "cameraMove" as const;
   const [batchValue, setBatchValue] = useState("");
   const [batchFavorites, setBatchFavorites] = useState<BatchPresetsStored>(() => loadBatchPresetsV1());
-  const [batchLogOpen, setBatchLogOpen] = useState(false);
+  const [batchLogOpen] = useState(false);
   const [recentBatchLogs, setRecentBatchLogs] = useState<BatchLogEntry[]>([]);
   const [replayArm, setReplayArm] = useState<{ id: string; left: number } | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; title: string; lines: string[] }>({
@@ -124,7 +122,6 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
       selection: [...selectedIds],
       actionLabel,
     };
-    setHasBatchUndo(true);
   };
 
   const pushBatchLog = (message: string, replay?: BatchLogReplay) => {
@@ -185,63 +182,59 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
     const previewRows = rows.filter((r) => selectedSet.has(r.id)).slice(0, 5);
 
     if (replay.kind === "fill") {
-      const fieldLabel = replay.field === "shotSize" ? "景别" : "运镜";
       const value = replay.value;
       const preview = previewRows
         .map((r) => {
           const key = (r.shotNumber || "未标镜号").trim() || "未标镜号";
-          const before = replay.field === "shotSize" ? r.shotSize?.trim() || "空" : extractCameraMove(r.sceneTags) || "空";
+          const before = extractCameraMove(r.sceneTags) || "空";
           return `${key}: ${before}→${value}`;
         })
         .join("\n");
       openActionConfirm(
-        `复用批量填写${fieldLabel}`,
+        "复用批量填写运镜",
         [
           `将复用历史操作到 ${selectedIds.length} 条。`,
           ...(previewRows.length > 0 ? preview.split("\n") : []),
           ...(selectedIds.length > previewRows.length ? ["（仅展示前 5 条）"] : []),
         ],
         () => {
-          markBatchSnapshot(`复用填写${fieldLabel}`);
+          markBatchSnapshot("复用填写运镜");
           const next = rows.map((r) => {
             if (!selectedSet.has(r.id)) return r;
-            if (replay.field === "shotSize") return { ...r, shotSize: value };
             return { ...r, sceneTags: toSceneTags(value) };
           });
           persistBeats(next);
-          setStatusText(`已复用批量填写${fieldLabel}：${selectedIds.length} 条`);
-          pushBatchLog(`复用填写${fieldLabel}：${selectedIds.length} 条 -> ${value}`, replay);
+          setStatusText(`已复用批量填写运镜：${selectedIds.length} 条`);
+          pushBatchLog(`复用填写运镜：${selectedIds.length} 条 -> ${value}`, replay);
         },
       );
       return;
     }
 
     if (replay.kind === "clear") {
-      const fieldLabel = replay.field === "shotSize" ? "景别" : "运镜";
       const preview = previewRows
         .map((r) => {
           const key = (r.shotNumber || "未标镜号").trim() || "未标镜号";
-          const before = replay.field === "shotSize" ? r.shotSize?.trim() || "空" : extractCameraMove(r.sceneTags) || "空";
+          const before = extractCameraMove(r.sceneTags) || "空";
           return `${key}: ${before}→空`;
         })
         .join("\n");
       openActionConfirm(
-        `复用批量清空${fieldLabel}`,
+        "复用批量清空运镜",
         [
           `将复用历史操作到 ${selectedIds.length} 条。`,
           ...(previewRows.length > 0 ? preview.split("\n") : []),
           ...(selectedIds.length > previewRows.length ? ["（仅展示前 5 条）"] : []),
         ],
         () => {
-          markBatchSnapshot(`复用清空${fieldLabel}`);
+          markBatchSnapshot("复用清空运镜");
           const next = rows.map((r) => {
             if (!selectedSet.has(r.id)) return r;
-            if (replay.field === "shotSize") return { ...r, shotSize: "" };
             return { ...r, sceneTags: "" };
           });
           persistBeats(next);
-          setStatusText(`已复用批量清空${fieldLabel}：${selectedIds.length} 条`);
-          pushBatchLog(`复用清空${fieldLabel}：${selectedIds.length} 条`, replay);
+          setStatusText(`已复用批量清空运镜：${selectedIds.length} 条`);
+          pushBatchLog(`复用清空运镜：${selectedIds.length} 条`, replay);
         },
       );
       return;
@@ -325,50 +318,6 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
     setSelection(next);
   };
 
-  const keepSelectedOnly = () => {
-    if (rows.length === 0) return;
-    if (selectedIds.length === 0) {
-      setStatusText("请先勾选要保留的镜头");
-      return;
-    }
-    if (selectedIds.length === rows.length) {
-      setStatusText("当前已全选，无需清理");
-      return;
-    }
-    const removeCount = rows.length - selectedIds.length;
-    openActionConfirm("仅保留勾选", [`将删除未勾选的 ${removeCount} 条镜头。`, "此操作可通过“撤销批量镜号操作”回退。"], () => {
-      setMoreOpen(false);
-      markBatchSnapshot("仅保留勾选");
-      const selectedSet = new Set(selectedIds);
-      const kept = rows.filter((r) => selectedSet.has(r.id));
-      persistBeats(kept);
-      setStatusText(`已仅保留 ${kept.length} 条勾选镜头`);
-      pushBatchLog(`仅保留勾选：保留 ${kept.length} 条`);
-    });
-  };
-
-  const deleteSelectedRows = () => {
-    if (rows.length === 0) return;
-    if (selectedIds.length === 0) {
-      setStatusText("请先勾选要删除的镜头");
-      return;
-    }
-    const selectedSet = new Set(selectedIds);
-    const removeCount = rows.filter((r) => selectedSet.has(r.id)).length;
-    if (removeCount <= 0) {
-      setStatusText("当前勾选条目无效，请重新勾选");
-      return;
-    }
-    openActionConfirm("删除勾选", [`将删除已勾选的 ${removeCount} 条镜头。`, "此操作可通过“撤销批量镜号操作”回退。"], () => {
-      setMoreOpen(false);
-      markBatchSnapshot("删除勾选");
-      const kept = rows.filter((r) => !selectedSet.has(r.id));
-      persistBeats(kept);
-      setStatusText(`已删除 ${removeCount} 条勾选镜头`);
-      pushBatchLog(`删除勾选：删除 ${removeCount} 条`);
-    });
-  };
-
   const applyBatchFill = () => {
     if (rows.length === 0) return;
     if (selectedIds.length === 0) {
@@ -382,33 +331,31 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
     }
     const selectedSet = new Set(selectedIds);
     const previewRows = rows.filter((r) => selectedSet.has(r.id)).slice(0, 5);
-    const fieldLabel = batchField === "shotSize" ? "景别" : "运镜";
     const preview = previewRows
       .map((r) => {
         const key = (r.shotNumber || "未标镜号").trim() || "未标镜号";
-        const before = batchField === "shotSize" ? r.shotSize?.trim() || "空" : extractCameraMove(r.sceneTags) || "空";
+        const before = extractCameraMove(r.sceneTags) || "空";
         return `${key}: ${before}→${val}`;
       })
       .join("\n");
     openActionConfirm(
-      `批量填写${fieldLabel}`,
+      "批量填写运镜",
       [
         `将批量填写 ${selectedIds.length} 条。`,
         ...(previewRows.length > 0 ? preview.split("\n") : []),
         ...(selectedIds.length > previewRows.length ? ["（仅展示前 5 条）"] : []),
       ],
       () => {
-        markBatchSnapshot(`批量填写${batchField === "shotSize" ? "景别" : "运镜"}`);
+        markBatchSnapshot("批量填写运镜");
         const next = rows.map((r) => {
           if (!selectedSet.has(r.id)) return r;
-          if (batchField === "shotSize") return { ...r, shotSize: val };
           return { ...r, sceneTags: toSceneTags(val) };
         });
         persistBeats(next);
         setMoreOpen(false);
         setBatchFillOpen(false);
-        setStatusText(`已批量填写 ${selectedIds.length} 条${batchField === "shotSize" ? "景别" : "运镜"}`);
-        pushBatchLog(`批量填写${fieldLabel}：${selectedIds.length} 条 -> ${val}`, {
+        setStatusText(`已批量填写 ${selectedIds.length} 条运镜`);
+        pushBatchLog(`批量填写运镜：${selectedIds.length} 条 -> ${val}`, {
           kind: "fill",
           field: batchField,
           value: val,
@@ -423,35 +370,33 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
       setStatusText("请先勾选要清空字段的镜头");
       return;
     }
-    const fieldLabel = batchField === "shotSize" ? "景别" : "运镜";
     const selectedSet = new Set(selectedIds);
     const previewRows = rows.filter((r) => selectedSet.has(r.id)).slice(0, 5);
     const preview = previewRows
       .map((r) => {
         const key = (r.shotNumber || "未标镜号").trim() || "未标镜号";
-        const before = batchField === "shotSize" ? r.shotSize?.trim() || "空" : extractCameraMove(r.sceneTags) || "空";
+        const before = extractCameraMove(r.sceneTags) || "空";
         return `${key}: ${before}→空`;
       })
       .join("\n");
     openActionConfirm(
-      `批量清空${fieldLabel}`,
+      "批量清空运镜",
       [
         `将清空 ${selectedIds.length} 条。`,
         ...(previewRows.length > 0 ? preview.split("\n") : []),
         ...(selectedIds.length > previewRows.length ? ["（仅展示前 5 条）"] : []),
       ],
       () => {
-        markBatchSnapshot(`批量清空${fieldLabel}`);
+        markBatchSnapshot("批量清空运镜");
         const next = rows.map((r) => {
           if (!selectedSet.has(r.id)) return r;
-          if (batchField === "shotSize") return { ...r, shotSize: "" };
           return { ...r, sceneTags: "" };
         });
         persistBeats(next);
         setMoreOpen(false);
         setBatchFillOpen(false);
-        setStatusText(`已清空 ${selectedIds.length} 条${fieldLabel}`);
-        pushBatchLog(`批量清空${fieldLabel}：${selectedIds.length} 条`, {
+        setStatusText(`已清空 ${selectedIds.length} 条运镜`);
+        pushBatchLog(`批量清空运镜：${selectedIds.length} 条`, {
           kind: "clear",
           field: batchField,
         });
@@ -570,22 +515,6 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
     );
   };
 
-  const undoLastBatchOperation = () => {
-    const snapshot = lastBatchSnapshotRef.current;
-    if (!snapshot) {
-      setStatusText("没有可撤销的批量镜号操作");
-      return;
-    }
-    persistBeats(snapshot.rows);
-    const allowed = new Set(snapshot.rows.map((r) => r.id));
-    updateNodeData(nodeId, { scriptBeatSelection: snapshot.selection.filter((id) => allowed.has(id)) });
-    setStatusText(`已撤销「${snapshot.actionLabel}」`);
-    pushBatchLog(`撤销批量操作：${snapshot.actionLabel}`);
-    lastBatchSnapshotRef.current = null;
-    setHasBatchUndo(false);
-    setMoreOpen(false);
-  };
-
   const draftFromTheme = () => {
     void runNodeTaskAgent(
       scriptDraftFromThemeAgentRuntime,
@@ -670,17 +599,16 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
   };
 
   useEffect(() => {
+    if (!moreOpen) return;
     const onPointerDown = (ev: PointerEvent) => {
-      if (!dangerOpen && !moreOpen) return;
       const root = toolbarRef.current;
       const t = ev.target as Node | null;
       if (root && t && root.contains(t)) return;
-      if (dangerOpen) setDangerOpen(false);
-      if (moreOpen) setMoreOpen(false);
+      setMoreOpen(false);
     };
     window.addEventListener("pointerdown", onPointerDown);
     return () => window.removeEventListener("pointerdown", onPointerDown);
-  }, [dangerOpen, moreOpen]);
+  }, [moreOpen]);
 
   useReplayArmCountdown(replayArm, setReplayArm);
 
@@ -959,8 +887,6 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
           padSelectedShotNumbers={padSelectedShotNumbers}
           batchFillOpen={batchFillOpen}
           setBatchFillOpen={setBatchFillOpen}
-          batchField={batchField}
-          setBatchField={setBatchField}
           batchValue={batchValue}
           setBatchValue={setBatchValue}
           applyBatchFill={applyBatchFill}
@@ -968,15 +894,6 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
           removeBatchFavorite={removeBatchFavorite}
           addBatchFavorite={addBatchFavorite}
           clearBatchField={clearBatchField}
-          dangerOpen={dangerOpen}
-          setDangerOpen={setDangerOpen}
-          deleteSelectedRows={deleteSelectedRows}
-          keepSelectedOnly={keepSelectedOnly}
-          undoLastBatchOperation={undoLastBatchOperation}
-          hasBatchUndo={hasBatchUndo}
-          batchLogOpen={batchLogOpen}
-          setBatchLogOpen={setBatchLogOpen}
-          recentBatchLogsLength={recentBatchLogs.length}
         />
       </div>
       {selectedTemplateGuide && selectedTemplate ? (
@@ -1014,8 +931,6 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
             selectedIds={selectedIds}
             projectPath={projectPath}
             onToggleSelect={toggleSelect}
-            onPersistRows={persistBeats}
-            onStatusText={setStatusText}
             onScrollTopChange={(top) => {
               cardScrollTopRef.current = top;
             }}

@@ -26,38 +26,55 @@ export type ScriptBeat = {
   timeOut?: number;
   /** 镜号 */
   shotNumber: string;
-  /** 场次简写（旧版工程可能含此字段；界面已不展示，读入时仍保留） */
-  scene: string;
   /** 时长 */
   durationHint: string;
   /** 画面描述 */
   description: string;
-  /** 角色 1 */
-  character1: string;
-  character1Desc: string;
-  /** 角色图 1（工程相对路径） */
-  character1Image: string;
-  /** 角色图 1 素材 ID（与 character1Image 双写，M3） */
-  character1ImageAssetId?: string;
-  character2: string;
-  character2Desc: string;
-  character2Image: string;
-  /** 角色图 2 素材 ID（与 character2Image 双写，M3） */
-  character2ImageAssetId?: string;
-  /** 新版角色模型（主模型）：支持 1-n 角色。旧字段继续保留用于兼容历史工程与旧 UI。 */
+  /** 新版角色模型（主模型）：支持 1-n 角色 */
   characters?: ScriptRole[];
-  /** 参考 */
-  reference: string;
-  /** 景别（旧版 `shot` 会在加载时并入此项） */
-  shotSize: string;
-  characterAction: string;
+  /** 情绪 */
   emotion: string;
+  /** 镜头标签/叙事目的 */
   sceneTags: string;
-  lightingMood: string;
-  soundEffect: string;
+  /** 对白 */
   dialogue: string;
+  /** Seedance 2.0 正向提示词 */
   storyboardPrompt: string;
+  /** Seedance 2.0 负向提示词 */
   videoMotionPrompt: string;
+  /** Seedance 2.0 正向提示词（新管线生成） */
+  seedancePositive?: string;
+  /** Seedance 2.0 负面提示词（新管线生成） */
+  seedanceNegative?: string;
+  // ── 以下字段已废弃，保留仅用于旧工程兼容 ──
+  /** @deprecated 已弃用 */
+  scene: string;
+  /** @deprecated 已弃用，使用 characters[] */
+  character1: string;
+  /** @deprecated 已弃用 */
+  character1Desc: string;
+  /** @deprecated 已弃用 */
+  character1Image: string;
+  /** @deprecated 已弃用 */
+  character1ImageAssetId?: string;
+  /** @deprecated 已弃用，使用 characters[] */
+  character2: string;
+  /** @deprecated 已弃用 */
+  character2Desc: string;
+  /** @deprecated 已弃用 */
+  character2Image: string;
+  /** @deprecated 已弃用 */
+  character2ImageAssetId?: string;
+  /** @deprecated 已弃用 */
+  reference: string;
+  /** @deprecated 已弃用，景别不再生成 */
+  shotSize: string;
+  /** @deprecated 已弃用，使用 characters[].action */
+  characterAction: string;
+  /** @deprecated 已弃用 */
+  lightingMood: string;
+  /** @deprecated 已弃用，音效不再由 LLM 生成 */
+  soundEffect: string;
 };
 
 /** 由脚本条目生成的分镜文案（R4：文生图/视频前的画面描述，持久化进脚本节点） */
@@ -85,7 +102,7 @@ export type StoryboardShot = {
   /** 失败原因（供 UI 显示） */
   error?: string;
   /** 重试次数 */
-  retryCount?: string;
+  retryCount?: number;
   /** 视频生成状态（R4 联动：videoNode 生成状态） */
   videoStatus?: VideoShotStatus;
   /** 关联的 videoNodeId（Hermes 创建时写入） */

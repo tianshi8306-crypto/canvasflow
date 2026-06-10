@@ -148,7 +148,7 @@ function buildVideoNode(
 
 function buildAudioNode(beat: ScriptBeat, position: { x: number; y: number }): Node<FlowNodeData> {
   const shotNo = (beat.shotNumber || "").trim() || "—";
-  const hint = [beat.dialogue?.trim(), beat.soundEffect?.trim()].filter(Boolean);
+  const hint = [beat.dialogue?.trim()].filter(Boolean);
   const data = newNodeDataByType.audioNode();
   data.label = `镜头 ${shotNo} 音频`;
   if (hint.length) data.prompt = hint.join("\n");

@@ -56,8 +56,6 @@ export type ProjectState = {
   flowClipboardCount: number;
   /** 脚本节点画布内「展开全屏」时对应的节点 id（与侧栏「全屏表格」共用） */
   scriptFullscreenNodeId: string | null;
-  /** 当前激活的风格库预设 ID（null = 无风格约束） */
-  activeStyleId: string | null;
 
   /** 图片节点序号计数器，每个工程独立（用于 "图片 1", "图片 2" ...） */
   imageNodeCounter: number;
@@ -76,6 +74,8 @@ export type ProjectState = {
   /** 脚本节点序号计数器（用于 "分镜脚本 1", "分镜脚本 2" ...） */
   scriptNodeCounter: number;
   nextScriptNodeLabel: () => string;
+  /** 在节点成功创建后调用，确认计数器递增 */
+  commitScriptNodeCounter: () => void;
 
   setProjectPath: (p: string | null) => void;
   setSelectedNodeId: (id: string | null) => void;
@@ -83,7 +83,6 @@ export type ProjectState = {
   setSelectedEdgeIds: (ids: string[]) => void;
   setStatusText: (t: string) => void;
   setViewport: (v: Viewport) => void;
-  setActiveStyleId: (id: string | null) => void;
   openScriptFullscreen: (nodeId: string) => void;
   closeScriptFullscreen: () => void;
   setLastRunId: (runId: string) => void;

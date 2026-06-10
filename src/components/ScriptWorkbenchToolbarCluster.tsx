@@ -1,11 +1,8 @@
 import type { RefObject } from "react";
-import { BATCH_FAV_MAX, CAMERA_MOVE_OPTIONS, CAMERA_MOVE_PRESETS, SHOT_TYPE_OPTIONS, SHOT_TYPE_PRESETS, TEMPLATE_STYLE_OPTIONS } from "@/lib/scriptWorkbenchConstants";
+import { BATCH_FAV_MAX, CAMERA_MOVE_OPTIONS, CAMERA_MOVE_PRESETS, TEMPLATE_STYLE_OPTIONS } from "@/lib/scriptWorkbenchConstants";
 import type { ScriptTemplateItem } from "@/lib/scriptWorkbenchTypes";
 import { ScriptWorkbenchBatchMoreMenu } from "@/components/ScriptWorkbenchBatchMoreMenu";
-import { ScriptWorkbenchDangerBar } from "@/components/ScriptWorkbenchDangerBar";
 import { ScriptWorkbenchTemplateToolbar } from "@/components/ScriptWorkbenchTemplateToolbar";
-
-type BatchField = "shotSize" | "cameraMove";
 
 type Props = {
   templateStyleFilter: string;
@@ -35,8 +32,6 @@ type Props = {
   padSelectedShotNumbers: () => void;
   batchFillOpen: boolean;
   setBatchFillOpen: (updater: (v: boolean) => boolean) => void;
-  batchField: BatchField;
-  setBatchField: (value: BatchField) => void;
   batchValue: string;
   setBatchValue: (value: string) => void;
   applyBatchFill: () => void;
@@ -44,15 +39,6 @@ type Props = {
   removeBatchFavorite: (fav: string) => void;
   addBatchFavorite: () => void;
   clearBatchField: () => void;
-  dangerOpen: boolean;
-  setDangerOpen: (updater: (v: boolean) => boolean) => void;
-  deleteSelectedRows: () => void;
-  keepSelectedOnly: () => void;
-  undoLastBatchOperation: () => void;
-  hasBatchUndo: boolean;
-  batchLogOpen: boolean;
-  setBatchLogOpen: (updater: (v: boolean) => boolean) => void;
-  recentBatchLogsLength: number;
 };
 
 export function ScriptWorkbenchToolbarCluster(props: Props) {
@@ -99,14 +85,10 @@ export function ScriptWorkbenchToolbarCluster(props: Props) {
           selectedIdsLength={props.selectedIdsLength}
           batchFillOpen={props.batchFillOpen}
           setBatchFillOpen={props.setBatchFillOpen}
-          batchField={props.batchField}
-          setBatchField={props.setBatchField}
           batchValue={props.batchValue}
           setBatchValue={props.setBatchValue}
           applyBatchFill={props.applyBatchFill}
-          shotTypeOptions={SHOT_TYPE_OPTIONS}
           cameraMoveOptions={CAMERA_MOVE_OPTIONS}
-          shotTypePresets={SHOT_TYPE_PRESETS}
           cameraMovePresets={CAMERA_MOVE_PRESETS}
           currentFavorites={props.currentFavorites}
           batchFavMax={BATCH_FAV_MAX}
@@ -115,19 +97,9 @@ export function ScriptWorkbenchToolbarCluster(props: Props) {
           clearBatchField={props.clearBatchField}
         />
       </div>
-      <ScriptWorkbenchDangerBar
-        dangerOpen={props.dangerOpen}
-        setDangerOpen={props.setDangerOpen}
-        deleteSelectedRows={props.deleteSelectedRows}
-        keepSelectedOnly={props.keepSelectedOnly}
-        undoLastBatchOperation={props.undoLastBatchOperation}
-        hasBatchUndo={props.hasBatchUndo}
-        selectedIdsLength={props.selectedIdsLength}
-        rowsLength={props.rowsLength}
-        batchLogOpen={props.batchLogOpen}
-        setBatchLogOpen={props.setBatchLogOpen}
-        recentBatchLogsLength={props.recentBatchLogsLength}
-      />
+      <span className="mono" style={{ fontSize: 12, color: "var(--muted)" }}>
+        已勾选 {props.selectedIdsLength}/{props.rowsLength}
+      </span>
     </>
   );
 }

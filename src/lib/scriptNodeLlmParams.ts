@@ -23,7 +23,10 @@ export function resolveScriptProviderId(
   if (fromNode && enabledProviders.some((p) => p.id === fromNode)) {
     return fromNode;
   }
-  const sorted = [...enabledProviders].sort((a, b) => a.priority - b.priority);
+  const sorted = [...enabledProviders].sort((a, b) => {
+    const diff = a.priority - b.priority;
+    return diff !== 0 ? diff : String(a.id).localeCompare(String(b.id));
+  });
   return sorted[0]?.id ?? null;
 }
 

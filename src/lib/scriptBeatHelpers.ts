@@ -3,26 +3,27 @@ import type { ScriptBeat, ScriptRole } from "@/lib/types";
 /** 与持久化 JSON 对齐的默认空字段（不含 id） */
 export const SCRIPT_BEAT_EMPTY_FIELDS: Omit<ScriptBeat, "id"> = {
   shotNumber: "",
-  scene: "",
   durationHint: "",
   description: "",
+  characters: [],
+  emotion: "",
+  sceneTags: "",
+  dialogue: "",
+  storyboardPrompt: "",
+  videoMotionPrompt: "",
+  // ── 以下字段已废弃，保留默认值仅用于旧工程兼容 ──
+  scene: "",
   character1: "",
   character1Desc: "",
   character1Image: "",
   character2: "",
   character2Desc: "",
   character2Image: "",
-  characters: [],
   reference: "",
   shotSize: "",
   characterAction: "",
-  emotion: "",
-  sceneTags: "",
   lightingMood: "",
   soundEffect: "",
-  dialogue: "",
-  storyboardPrompt: "",
-  videoMotionPrompt: "",
 };
 
 export function emptyScriptBeat(): ScriptBeat {
@@ -49,71 +50,29 @@ function normalizeRoles(input: LegacyBeat): ScriptRole[] {
       lines: (r?.lines ?? "").toString(),
     });
   }
-  if (out.length > 0) return out;
-  const c1 = (input.character1 ?? "").toString().trim();
-  const c2 = (input.character2 ?? "").toString().trim();
-  if (c1) {
-    out.push({
-      id: crypto.randomUUID(),
-      name: c1,
-      description: (input.character1Desc ?? "").toString(),
-      imagePath: (input.character1Image ?? "").toString(),
-      reference: "",
-      action: (input.characterAction ?? "").toString(),
-      emotion: (input.emotion ?? "").toString(),
-      lines: (input.dialogue ?? "").toString(),
-    });
-  }
-  if (c2) {
-    out.push({
-      id: crypto.randomUUID(),
-      name: c2,
-      description: (input.character2Desc ?? "").toString(),
-      imagePath: (input.character2Image ?? "").toString(),
-      reference: "",
-      action: "",
-      emotion: "",
-      lines: "",
-    });
-  }
   return out;
 }
 
-/** 合并旧数据：缺省字段补空；旧版 `shot`（景别/运动）并入 `shotSize`，且不写回 `shot` 字段 */
+/** 合并旧数据：仅提取有效字段，废弃字段统一为空 */
 export function normalizeScriptBeat(input: LegacyBeat): ScriptBeat {
-  const { shot: legacyShot, ...inputRest } = input;
-  const shotSize = ((inputRest.shotSize ?? legacyShot) ?? "").toString();
-  const roles = normalizeRoles(input);
-  const r1 = roles[0];
-  const r2 = roles[1];
   return {
     ...SCRIPT_BEAT_EMPTY_FIELDS,
-    ...inputRest,
     id: input.id,
-    shotId: (inputRest.shotId ?? input.id).toString(),
-    timeIn: typeof inputRest.timeIn === "number" ? inputRest.timeIn : undefined,
-    timeOut: typeof inputRest.timeOut === "number" ? inputRest.timeOut : undefined,
+    shotId: (input.shotId ?? input.id).toString(),
+    timeIn: typeof input.timeIn === "number" ? input.timeIn : undefined,
+    timeOut: typeof input.timeOut === "number" ? input.timeOut : undefined,
     shotNumber: (input.shotNumber ?? "").toString(),
-    scene: (input.scene ?? "").toString(),
     durationHint: (input.durationHint ?? "").toString(),
     description: (input.description ?? "").toString(),
-    character1: (r1?.name ?? input.character1 ?? "").toString(),
-    character1Desc: (r1?.description ?? input.character1Desc ?? "").toString(),
-    character1Image: (r1?.imagePath ?? input.character1Image ?? "").toString(),
-    character2: (r2?.name ?? input.character2 ?? "").toString(),
-    character2Desc: (r2?.description ?? input.character2Desc ?? "").toString(),
-    character2Image: (r2?.imagePath ?? input.character2Image ?? "").toString(),
-    characters: roles,
-    reference: (input.reference ?? "").toString(),
-    shotSize,
-    characterAction: (r1?.action ?? input.characterAction ?? "").toString(),
-    emotion: (r1?.emotion ?? input.emotion ?? "").toString(),
+    characters: normalizeRoles(input),
+    emotion: (input.emotion ?? "").toString(),
     sceneTags: (input.sceneTags ?? "").toString(),
-    lightingMood: (input.lightingMood ?? "").toString(),
-    soundEffect: (input.soundEffect ?? "").toString(),
-    dialogue: (r1?.lines ?? input.dialogue ?? "").toString(),
+    dialogue: (input.dialogue ?? "").toString(),
     storyboardPrompt: (input.storyboardPrompt ?? "").toString(),
     videoMotionPrompt: (input.videoMotionPrompt ?? "").toString(),
+    seedancePositive: input.seedancePositive,
+    seedanceNegative: input.seedanceNegative,
+    scene: (input.scene ?? "").toString(),
   };
 }
 

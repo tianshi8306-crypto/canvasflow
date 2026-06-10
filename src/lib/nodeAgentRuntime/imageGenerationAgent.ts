@@ -18,7 +18,6 @@ import { refreshDreaminaAuthOnGenerationFailure } from "@/lib/dreaminaAuthOnFail
 import { startImageGenProgressTicker } from "@/lib/nodeAgentRuntime/imageGenProgress";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
 import { useProjectStore } from "@/store/projectStore";
-import { applyActiveStyleToImagePrompt } from "@/lib/styleLibrary";
 
 type ImageGenerationAgentInput = {
   prompt: string;
@@ -88,11 +87,6 @@ export const imageGenerationAgentRuntime: NodeTaskAgentRuntime<
       throw new Error("无法解析参考图路径，请检查素材是否已导入。");
     }
     const finalPrompt = buildImagePromptWithStyles(sensed.prompt, sensed.styleIds ?? []);
-
-    // ★ 风格库注入：当前画布激活的风格预设
-    const { activeStyleId } = useProjectStore.getState();
-    const { prompt: styledFinalPrompt, negativePrompt: finalNegative } =
-      await applyActiveStyleToImagePrompt(activeStyleId, finalPrompt, sensed.negativePrompt);
     ctx.setStatusText("正在调用图片模型生成…");
     const stopProgress = startImageGenProgressTicker(ctx);
 
@@ -100,7 +94,7 @@ export const imageGenerationAgentRuntime: NodeTaskAgentRuntime<
     try {
       rel = await invoke<string>("generate_image_asset", {
         projectPath: ctx.projectPath,
-        prompt: styledFinalPrompt,
+        prompt: finalPrompt,
         imageModelId: sensed.modelId.startsWith("custom:")
           ? sensed.modelId.slice("custom:".length)
           : null,
@@ -112,7 +106,7 @@ export const imageGenerationAgentRuntime: NodeTaskAgentRuntime<
         aspect: sensed.aspect,
         resolution: sensed.resolution,
         count: sensed.count,
-        negativePrompt: finalNegative || undefined,
+        negativePrompt: sensed.negativePrompt || undefined,
       });
     } catch (err) {
       refreshDreaminaAuthOnGenerationFailure(sensed.modelId);

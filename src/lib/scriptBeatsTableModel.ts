@@ -14,8 +14,6 @@ export type TableCol = { key: TableColKey; label: string; minW?: number };
 
 export const TEXTAREA_KEYS = new Set<ScriptBeatStringKey>([
   "description",
-  "character1Desc",
-  "character2Desc",
   "dialogue",
   "storyboardPrompt",
   "videoMotionPrompt",
@@ -40,52 +38,14 @@ export function createEmptyScriptRole(): ScriptRole {
 
 /** 将 `characters[]` 写回 beat，并同步 character1/2 与对白等 legacy 列（表格角色图列与卡片一致） */
 export function applyCharactersToBeat(beat: ScriptBeat, roles: ScriptRole[]): ScriptBeat {
-  const r1 = roles[0];
-  const r2 = roles[1];
   return {
     ...beat,
     characters: roles,
-    character1: r1?.name ?? "",
-    character1Desc: r1?.description ?? "",
-    character1Image: r1?.imagePath ?? "",
-    character2: r2?.name ?? "",
-    character2Desc: r2?.description ?? "",
-    character2Image: r2?.imagePath ?? "",
-    characterAction: r1?.action ?? "",
-    emotion: r1?.emotion ?? "",
-    dialogue: r1?.lines ?? "",
   };
 }
 
 export function getBeatRoles(beat: ScriptBeat): ScriptRole[] {
-  const fromArray = beat.characters ?? [];
-  if (fromArray.length > 0) return fromArray;
-  const out: ScriptRole[] = [];
-  if ((beat.character1 ?? "").trim() || (beat.character1Desc ?? "").trim()) {
-    out.push({
-      id: crypto.randomUUID(),
-      name: beat.character1 ?? "",
-      description: beat.character1Desc ?? "",
-      imagePath: beat.character1Image ?? "",
-      reference: "",
-      action: beat.characterAction ?? "",
-      emotion: beat.emotion ?? "",
-      lines: beat.dialogue ?? "",
-    });
-  }
-  if ((beat.character2 ?? "").trim() || (beat.character2Desc ?? "").trim()) {
-    out.push({
-      id: crypto.randomUUID(),
-      name: beat.character2 ?? "",
-      description: beat.character2Desc ?? "",
-      imagePath: beat.character2Image ?? "",
-      reference: "",
-      action: "",
-      emotion: "",
-      lines: "",
-    });
-  }
-  return out;
+  return beat.characters ?? [];
 }
 
 export function summarizeScriptRoles(beat: ScriptBeat): string {
@@ -187,21 +147,16 @@ export function normalizeRoleDescDisplayText(input: string): string {
   return roleDescDisplayText(roleDescFromDisplayText(input));
 }
 
-/** 全屏：与 Lib 参考图对齐的列顺序（场镜 `scene` 仅旧数据兼容，不在表内展示） */
+/** 全屏：简化后的列（仅保留新管线实际生成的字段） */
 export const SCRIPT_BEATS_FULLSCREEN_BASE_COLUMNS: TableCol[] = [
   { key: "shotNumber", label: "镜号", minW: 52 },
   { key: "durationHint", label: "时长", minW: 64 },
   { key: "description", label: "画面描述", minW: 200 },
-  { key: "reference", label: "参考", minW: 100 },
-  { key: "shotSize", label: "景别", minW: 88 },
-  { key: "characterAction", label: "角色动作", minW: 120 },
   { key: "emotion", label: "情绪", minW: 80 },
-  { key: "sceneTags", label: "场景标签", minW: 100 },
-  { key: "lightingMood", label: "光影氛围", minW: 100 },
-  { key: "soundEffect", label: "音效", minW: 88 },
+  { key: "sceneTags", label: "叙事目的", minW: 120 },
   { key: "dialogue", label: "对白", minW: 140 },
-  { key: "storyboardPrompt", label: "分镜提示词", minW: 160 },
-  { key: "videoMotionPrompt", label: "视频运动提示词", minW: 160 },
+  { key: "storyboardPrompt", label: "Seedance 正向", minW: 160 },
+  { key: "videoMotionPrompt", label: "Seedance 负向", minW: 160 },
 ];
 
 export const INLINE_COLUMNS_WIDE: TableCol[] = [
@@ -276,7 +231,6 @@ export function getInlineColWidth(c: TableCol, containerW: number): number {
 
 export const DEFAULT_HIDDEN_COLS: string[] = [];
 
-export const SHOT_TYPE_OPTIONS = scriptEnums.shotType;
 export const EMOTION_OPTIONS = scriptEnums.emotion;
 export const CAMERA_MOVE_OPTIONS = scriptEnums.cameraMove;
 
@@ -355,23 +309,11 @@ export function rowMatchesFilter(b: ScriptBeat, q: string): boolean {
     "shotNumber",
     "durationHint",
     "description",
-    "character1",
-    "character1Desc",
-    "character1Image",
-    "character2",
-    "character2Desc",
-    "character2Image",
-    "reference",
-    "shotSize",
-    "characterAction",
     "emotion",
     "sceneTags",
-    "lightingMood",
-    "soundEffect",
     "dialogue",
     "storyboardPrompt",
     "videoMotionPrompt",
-    "scene",
   ];
   const roles = b.characters ?? [];
   if (roles.some((r) => [r.name, r.description, r.action, r.emotion, r.lines].some((x) => (x ?? "").toLowerCase().includes(t)))) {
@@ -408,48 +350,13 @@ export function updateRoleField(
   roles[roleIdx] = { ...roles[roleIdx], ...patch };
   return rowsIn.map((r, i) => {
     if (i !== rowIdx) return r;
-    const next: ScriptBeat = { ...r, characters: roles };
-    if (roleIdx === 0) {
-      next.character1 = roles[0]?.name ?? "";
-      next.character1Desc = roles[0]?.description ?? "";
-      next.character1Image = roles[0]?.imagePath ?? "";
-    }
-    if (roleIdx === 1) {
-      next.character2 = roles[1]?.name ?? "";
-      next.character2Desc = roles[1]?.description ?? "";
-      next.character2Image = roles[1]?.imagePath ?? "";
-    }
-    return next;
+    return { ...r, characters: roles };
   });
 }
 
 export function getRoleCompat(b: ScriptBeat, roleIdx: number): ScriptRole {
   const role = b.characters?.[roleIdx];
   if (role) return role;
-  if (roleIdx === 0) {
-    return {
-      id: crypto.randomUUID(),
-      name: b.character1 ?? "",
-      description: b.character1Desc ?? "",
-      imagePath: b.character1Image ?? "",
-      reference: "",
-      action: "",
-      emotion: "",
-      lines: "",
-    };
-  }
-  if (roleIdx === 1) {
-    return {
-      id: crypto.randomUUID(),
-      name: b.character2 ?? "",
-      description: b.character2Desc ?? "",
-      imagePath: b.character2Image ?? "",
-      reference: "",
-      action: "",
-      emotion: "",
-      lines: "",
-    };
-  }
   return {
     id: crypto.randomUUID(),
     name: "",

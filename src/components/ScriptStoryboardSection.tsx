@@ -636,9 +636,13 @@ export function ScriptStoryboardSection({
     setStatusText(formatChainBuildStatus(result));
     if (
       opts?.submitImageGeneration &&
-      result.created.image > 0 &&
-      projectPath?.trim()
+      result.created.image > 0
     ) {
+      const freshProjectPath = useProjectStore.getState().projectPath?.trim();
+      if (!freshProjectPath) {
+        setStatusText("工程已关闭，无法提交图片生成");
+        return;
+      }
       const scriptNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
       const nodeParams =
         scriptNode?.data.params && typeof scriptNode.data.params === "object"
@@ -653,7 +657,7 @@ export function ScriptStoryboardSection({
         scriptNodeId: nodeId,
         nodes: useProjectStore.getState().nodes,
         edges: useProjectStore.getState().edges,
-        projectPath: projectPath.trim(),
+        projectPath: freshProjectPath,
         updateNodeData,
         setStatusText,
         beatIds: result.scope.beats.map((b) => b.id),
@@ -666,7 +670,7 @@ export function ScriptStoryboardSection({
           beats: beatsNorm,
           shots,
         },
-      });
+      }).catch((e) => setStatusText(`图片批量生成失败：${formatUserError(e)}`));
     }
   };
 
@@ -699,10 +703,12 @@ export function ScriptStoryboardSection({
     const beatId = detail.scriptBeatId;
     void (async () => {
       try {
+        const latestNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
+        const latestShots = latestNode?.data.storyboardShots;
         const result = await importStoryboardImageForBeat(
           projectPath,
           paths,
-          shots,
+          latestShots,
           beatId,
         );
         if (!result) return;

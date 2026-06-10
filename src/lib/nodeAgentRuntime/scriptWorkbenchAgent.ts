@@ -37,7 +37,6 @@ export const scriptDraftFromThemeAgentRuntime: NodeTaskAgentRuntime<
       normalizeScriptBeat({
         id: crypto.randomUUID(),
         shotNumber: "1",
-        shotSize: "广角建立",
         durationHint: "4–6s",
         description: `${theme}：开场环境 Establish，交代空间与氛围`,
       }),
@@ -45,14 +44,12 @@ export const scriptDraftFromThemeAgentRuntime: NodeTaskAgentRuntime<
         id: crypto.randomUUID(),
         shotNumber: "2",
         scene: "1-2",
-        shotSize: "中景推进",
         durationHint: "5–8s",
         description: `${theme}：人物关系与冲突初现`,
       }),
       normalizeScriptBeat({
         id: crypto.randomUUID(),
         shotNumber: "3",
-        shotSize: "特写收束",
         durationHint: "3–5s",
         description: `${theme}：情感或转折钩子，为下一阶段埋笔`,
       }),

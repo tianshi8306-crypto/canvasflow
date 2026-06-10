@@ -3,18 +3,19 @@ use crate::graph::{CanvasGraph, FlowNode};
 use crate::settings::AppSettings;
 use rusqlite::Connection;
 use serde_json::json;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::path::Path;
 
 use super::graph_flow::{
     incoming_reference_video_paths_ordered, incoming_texts_ordered_with_prompt_fallback,
 };
 use crate::media::{probe_media, MediaMeta};
-use super::llm::openai_chat_completion;
 use super::script_parse::{
-    detect_style_from_text, normalize_script_beats, parse_script_beats_from_raw_llm, parse_style_profile,
-    script_enums_config, style_profile_directive, style_profile_name, ScriptBeatOut, ScriptStyleProfile,
+    detect_style_from_text, normalize_script_beats, parse_style_profile,
+    style_profile_name, ScriptBeatOut, ScriptStyleProfile,
 };
+use super::script_pipeline::{analyze_script_structure, design_shots};
+use super::script_shot_agent::{generate_shot_visual, ShotVisualOut};
 
 fn media_meta_suffix(meta: &MediaMeta) -> String {
     let mut parts: Vec<String> = Vec::new();
@@ -81,44 +82,6 @@ pub(crate) async fn run_script_node(
     } else {
         requirement_text.clone()
     };
-
-    let video_supplement_for_upstream = |paths: &[String]| -> String {
-        if paths.is_empty() {
-            return String::new();
-        }
-        let lines = format_reference_video_path_lines(project_root, paths).join("\n");
-        format!(
-            "\n\n【参考视频】（路径 + ffprobe 元信息；非画面理解）\n{}",
-            lines
-        )
-    };
-
-    let user = if has_upstream_text {
-        format!(
-            "【解析要求】\n{}\n\n【待解析剧本文本】\n{}{}\n\n只输出 JSON 数组，字段必须严格匹配。",
-            requirement_text,
-            body_for_parse,
-            video_supplement_for_upstream(&video_paths)
-        )
-    } else if !video_paths.is_empty() {
-        format!(
-            "【解析要求】\n{}\n\n【待解析素材】\n{}\n\n只输出 JSON 数组，字段必须严格匹配。",
-            requirement_text, body_for_parse
-        )
-    } else {
-        format!(
-            "【剧本文本与创作要求（合写为一段）】\n{}\n\n只输出 JSON 数组，字段必须严格匹配。",
-            requirement_text
-        )
-    };
-
-    let source_text_for_output = if has_upstream_text {
-        upstream_joined
-    } else if !video_paths.is_empty() {
-        body_for_parse.clone()
-    } else {
-        requirement_text.clone()
-    };
     let params = node.data.get("params").cloned().unwrap_or(json!({}));
     let style_param = parse_style_profile(&params);
     let style = if style_param == ScriptStyleProfile::Auto {
@@ -126,55 +89,6 @@ pub(crate) async fn run_script_node(
     } else {
         style_param
     };
-
-    let enums = script_enums_config();
-    let shot_type_hint = enums.shot_type.join(",");
-    let emotion_hint = enums.emotion.join(",");
-    let camera_move_hint = enums.camera_move.join(",");
-    let system_template = r#"【身份定位】
-你是从业15年的顶级影视分镜师+AI视频提示词工程师。
-
-【输出目标】
-将输入剧本解析为 JSON 数组。每个元素必须包含以下字段（camelCase）：
-serialNumber:number, actNumber:number, duration:number, shotDesc:string,
-roles:Array<{roleName:string, roleDesc:string, action:string, emotion:string, lines:string}>,
-shotType:string, cameraMove:string, lightAtmosphere:string, soundEffect:string, reference:string,
-storyboardPrompt:string, videoMotionPrompt:string
-
-【枚举约束】
-shotType 仅可取：__SHOT_TYPE_OPTIONS__
-emotion 仅可取：__EMOTION_OPTIONS__
-cameraMove 仅可取：__CAMERA_MOVE_OPTIONS__
-
-【硬性规则】
-1) serialNumber 从 1 递增，不跳号不重复；
-2) duration 单位秒，保留 1 位小数，通常 1~5，最大不超过 8；
-3) 不得新增剧情，不得改写关键台词含义；
-4) 若无人物，roles 传 []；
-5) `roles[].roleDesc` 必须按以下五段结构组织（用于角色一致性与批量生成）；若原文缺失，必须自动分析补全：
-基础身份：一位 [年龄] 的人类女性，[身高]，[身形比例]
-面部特征：[脸型]，[眉形]，[眼型]，[鼻型]，[嘴型]，[肤色质感]，[发型发色]
-服饰装备：身穿 [上装款式，材质质感]，下着 [下装款式，材质质感]，脚踩 [鞋履款式，材质质感]
-姿态与互动：[主体动作]，[与环境/道具互动]，脸上是 [表情与情绪]，手持 [道具或特殊效果，材质质感]
-环境与风格：处于 [背景环境]，[光影氛围]，整体呈现 [艺术风格/参考流派]
-6) storyboardPrompt 必须严格格式：
-第二幕：[画面构图：xxx] + [主体内容：xxx] + [人物空间与互动关系：xxx] + [极具体的微表情与面部特写：xxx] + [明确的场景环境元素与前景/背景道具：xxx] + [光影几何与大气效果：xxx] + [视觉风格/胶片质感：xxx] + [技术参数：xxx]
-7) videoMotionPrompt 必须严格格式：
-[明确的摄影机运镜轨迹与速度：xxx] + [主体极其具体的物理动作细节：xxx] + [角色之间的精确肢体互动过程：xxx] + [环境物理动态：xxx] + [时长：x.x秒]
-
-【绝对禁止】
-- 禁止输出 markdown、注释、解释文字；
-- 禁止输出 JSON 以外内容。
-"#;
-    let system = system_template
-        .replace("__SHOT_TYPE_OPTIONS__", &shot_type_hint)
-        .replace("__EMOTION_OPTIONS__", &emotion_hint)
-        .replace("__CAMERA_MOVE_OPTIONS__", &camera_move_hint);
-    let system = format!("{}\n\n{}", style_profile_directive(style), system);
-    let messages = json!([
-        { "role": "system", "content": system },
-        { "role": "user", "content": user }
-    ]);
     let provider_id = params
         .get("providerId")
         .and_then(|v| v.as_str())
@@ -185,11 +99,9 @@ cameraMove 仅可取：__CAMERA_MOVE_OPTIONS__
         .and_then(|v| v.as_str())
         .map(|s| s.trim())
         .filter(|s| !s.is_empty());
+
     db::log_event(
-        conn,
-        run_id,
-        Some(&node.id),
-        "script_parse_request",
+        conn, run_id, Some(&node.id), "script_parse_request",
         &json!({
             "sourceLen": body_for_parse.len(),
             "styleProfile": style_profile_name(style),
@@ -201,91 +113,152 @@ cameraMove 仅可取：__CAMERA_MOVE_OPTIONS__
         }),
     )?;
 
-    let mut final_parsed: Option<Vec<ScriptBeatOut>> = None;
-    let mut last_err = String::new();
-    for attempt in 1u32..=3u32 {
+    // ═══════════════════════════════════════════
+    // 阶段 1+2：规则引擎（剧本理解 + 分镜头设计）
+    // ═══════════════════════════════════════════
+    let structure = analyze_script_structure(&body_for_parse);
+    let shot_plans = design_shots(&structure, &body_for_parse);
+    if shot_plans.is_empty() {
+        return Err("剧本分析未生成任何镜头，请检查输入文本是否包含有效内容".into());
+    }
+
+    db::log_event(
+        conn, run_id, Some(&node.id), "script_pipeline_stage12",
+        &json!({
+            "characterCount": structure.characters.len(),
+            "paragraphCount": structure.paragraphs.len(),
+            "shotCount": shot_plans.len(),
+            "estimatedDurationSec": structure.estimated_total_duration_sec,
+        }),
+    )?;
+
+    // ═══════════════════════════════════════════
+    // 阶段 3：逐镜 LLM 生成
+    // ═══════════════════════════════════════════
+    let mut beats_out: Vec<ScriptBeatOut> = Vec::with_capacity(shot_plans.len());
+
+    // Fix 4: 构建角色描述线索映射
+    let character_hints: HashMap<String, String> = structure.characters.iter()
+        .filter_map(|(name, info)| {
+            let hints = info.description_hints.join("；");
+            if hints.is_empty() { None } else { Some((name.clone(), hints)) }
+        })
+        .collect();
+
+    for plan in &shot_plans {
         db::log_event(
-            conn,
-            run_id,
-            Some(&node.id),
-            "script_parse_attempt",
-            &json!({ "attempt": attempt }),
+            conn, run_id, Some(&node.id), "script_shot_generate",
+            &json!({
+                "serial": plan.serial,
+                "purpose": plan.narrative_purpose.as_str(),
+                "charCount": plan.text_segment.chars().count(),
+            }),
         )?;
-        let raw = match openai_chat_completion(http, settings, messages.clone(), &params).await {
-            Ok(r) => r,
+
+        let visual: ShotVisualOut = match generate_shot_visual(
+            http, settings, &params, plan, &character_hints,
+        )
+        .await
+        {
+            Ok(v) => v,
             Err(e) => {
-                last_err = e.clone();
                 db::log_event(
-                    conn,
-                    run_id,
-                    Some(&node.id),
-                    "script_parse_retry",
-                    &json!({ "attempt": attempt, "phase": "llm", "error": e }),
+                    conn, run_id, Some(&node.id), "script_shot_failed",
+                    &json!({ "serial": plan.serial, "error": e }),
                 )?;
-                if attempt == 3 {
-                    db::log_event(
-                        conn,
-                        run_id,
-                        Some(&node.id),
-                        "script_parse_failed",
-                        &json!({ "error": last_err }),
-                    )?;
-                    return Err(last_err);
+                // 单镜失败：用原文作为 fallback，不中断整个 pipeline
+                ShotVisualOut {
+                    shot_desc: plan.text_segment.clone(),
+                    dialogue: plan.dialogue_text.clone(),
+                    seedance_positive: String::new(),
+                    seedance_negative: String::new(),
                 }
-                continue;
             }
         };
-        match parse_script_beats_from_raw_llm(&raw) {
-            Ok(p) => {
-                final_parsed = Some(p);
-                break;
-            }
-            Err(e) => {
-                last_err = e;
-                db::log_event(
-                    conn,
-                    run_id,
-                    Some(&node.id),
-                    "script_parse_retry",
-                    &json!({ "attempt": attempt, "phase": "json", "error": last_err }),
-                )?;
-                if attempt == 3 {
-                    db::log_event(
-                        conn,
-                        run_id,
-                        Some(&node.id),
-                        "script_parse_failed",
-                        &json!({ "error": last_err }),
-                    )?;
-                    return Err(last_err);
-                }
-            }
-        }
-    }
-    let parsed = final_parsed.ok_or_else(|| last_err)?;
 
-    let beats = normalize_script_beats(parsed);
-    let selection: Vec<String> = beats
+        // 提取角色名列表（去重）
+        let mut chars = plan.characters_in_shot.clone();
+        chars.sort();
+        chars.dedup();
+
+        // Fix 7: 通过 para_range 直接索引 paragraphs，避免子串误匹配
+        let range_start = plan.para_range.0.min(plan.para_range.1);
+        let range_end = plan.para_range.1.min(structure.paragraphs.len());
+        let emotion = if range_start < range_end {
+            structure.paragraphs[range_start..range_end].iter()
+                .find_map(|p| {
+                    let e = p.emotion.trim();
+                    if e.is_empty() { None } else { Some(e.to_string()) }
+                })
+                .unwrap_or_default()
+        } else {
+            String::new()
+        };
+
+        beats_out.push(ScriptBeatOut {
+            serial_number: plan.serial,
+            duration: plan.estimated_duration_sec,
+            shot_desc: if visual.shot_desc.trim().is_empty() {
+                plan.text_segment.clone()
+            } else {
+                visual.shot_desc
+            },
+            dialogue: if visual.dialogue.trim().is_empty() {
+                plan.dialogue_text.clone()
+            } else {
+                visual.dialogue
+            },
+            seedance_positive: visual.seedance_positive,
+            seedance_negative: visual.seedance_negative,
+            characters_in_shot: chars,
+            emotion,
+            narrative_purpose: plan.narrative_purpose.as_str().to_string(),
+        });
+    }
+
+    db::log_event(
+        conn, run_id, Some(&node.id), "script_parse_response",
+        &json!({ "beatCount": beats_out.len() }),
+    )?;
+
+    let beats = normalize_script_beats(beats_out);
+
+    // Fix 12: 保留已有的有效勾选
+    let existing_selection: Vec<String> = node
+        .data
+        .get("scriptBeatSelection")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|x| x.as_str().map(String::from)).collect())
+        .unwrap_or_default();
+    let new_beat_ids: HashSet<String> = beats
         .iter()
         .filter_map(|v| v.get("id").and_then(|x| x.as_str()).map(|s| s.to_string()))
         .collect();
-    let total_duration = beats
-        .last()
-        .and_then(|v| v.get("timeOut").and_then(|x| x.as_f64()))
-        .unwrap_or(0.0);
-    let shot_count = beats.len();
+    let selection: Vec<String> = if existing_selection.is_empty() {
+        // 之前无勾选：全选新 beats
+        new_beat_ids.into_iter().collect()
+    } else {
+        // 保留之前勾选中的有效 id
+        existing_selection.into_iter().filter(|id| new_beat_ids.contains(id)).collect()
+    };
+
+    // Fix 5: 移除冗余字段 scriptTotalDurationSec/scriptShotCount
     let patch = json!({
         "scriptBeats": beats,
         "scriptBeatSelection": selection,
-        "scriptTotalDurationSec": total_duration,
-        "scriptShotCount": shot_count,
     });
-    db::log_event(
-        conn,
-        run_id,
-        Some(&node.id),
-        "script_parse_response",
-        &json!({ "beatCount": selection.len(), "totalDurationSec": total_duration }),
-    )?;
-    Ok((source_text_for_output, patch))
+
+    // Fix 10: 将结构化结果摘要作为 node_output，供下游节点使用
+    let shot_summary: String = beats.iter().enumerate().map(|(i, v)| {
+        let default_sn = (i + 1).to_string();
+        let sn = v.get("shotNumber").and_then(|x| x.as_str()).unwrap_or(&default_sn);
+        let desc = v.get("description").and_then(|x| x.as_str()).unwrap_or("").trim();
+        format!("镜头 {}: {}", sn, desc)
+    }).collect::<Vec<_>>().join("\n");
+    let output_summary = format!(
+        "[脚本解析结果 - 共 {} 镜头]\n{}",
+        beats.len(),
+        shot_summary,
+    );
+    Ok((output_summary, patch))
 }

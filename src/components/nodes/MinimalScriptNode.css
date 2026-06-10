@@ -109,6 +109,49 @@
   min-width: 0;
 }
 
+.scriptChrome-previewInner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  overflow: hidden;
+}
+
+/* ── 生成中心胶囊 ── */
+.scriptGenCenterCapsuleOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: rgba(14, 14, 14, 0.48);
+  backdrop-filter: blur(1px);
+}
+
+.scriptGenCenterCapsule {
+  display: inline-flex;
+  align-items: center;
+  gap: 20px;
+  padding: 9px 18px 9px 20px;
+  border-radius: 999px;
+  background: rgba(64, 64, 64, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(8px);
+}
+
+.scriptGenCenterCapsule-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: #fff;
+  white-space: nowrap;
+}
+
 .scriptChrome-preview.nodeChrome-preview {
   display: flex;
   flex-direction: column;
@@ -120,29 +163,6 @@
   pointer-events: auto;
 }
 
-.scriptChrome-previewInner {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  flex: 1;
-  min-height: 0;
-  width: 100%;
-  overflow: hidden;
-}
-
-.scriptChrome-previewInner--openFullscreen {
-  cursor: pointer;
-  border-radius: 8px;
-  outline: none;
-}
-
-.scriptChrome-previewInner--openFullscreen:hover {
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.scriptChrome-previewInner--openFullscreen:focus-visible {
-  box-shadow: 0 0 0 2px rgba(94, 234, 212, 0.35);
-}
 
 .scriptChrome-themeSnippet {
   margin: 0;

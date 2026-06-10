@@ -27,7 +27,6 @@ export type ProjectGraphSnapshot = {
   textNodeCounter: number;
   audioNodeCounter: number;
   scriptNodeCounter: number;
-  activeStyleId: string | null;
 };
 
 function maxNumberedLabelIndex(
@@ -134,7 +133,6 @@ export async function loadProjectFolder(
       textNodeCounter: 0,
       audioNodeCounter: 0,
       scriptNodeCounter: 0,
-      activeStyleId: null,
     };
   }
 
@@ -169,7 +167,6 @@ export async function loadProjectFolder(
       textNodeCounter: meta?.textNodeCounter != null ? meta.textNodeCounter : maxTextIdx,
       audioNodeCounter: meta?.audioNodeCounter != null ? meta.audioNodeCounter : maxAudioIdx,
       scriptNodeCounter: meta?.scriptNodeCounter != null ? meta.scriptNodeCounter : maxScriptIdx,
-      activeStyleId: meta?.activeStyleId ?? null,
     };
   } catch {
     const empty = serializeCanvas([], [], defaultViewport);
@@ -186,7 +183,6 @@ export async function loadProjectFolder(
       textNodeCounter: 0,
       audioNodeCounter: 0,
       scriptNodeCounter: 0,
-      activeStyleId: null,
     };
   }
 }
@@ -231,7 +227,6 @@ export function applyProjectSnapshot(
     textNodeCounter: snapshot.textNodeCounter,
     audioNodeCounter: snapshot.audioNodeCounter,
     scriptNodeCounter: snapshot.scriptNodeCounter,
-    activeStyleId: snapshot.activeStyleId,
     lastSavedAt: Date.now(),
     projectDirty: snapshot.projectDirtyFromBackfill === true,
     graphRevision: 0,

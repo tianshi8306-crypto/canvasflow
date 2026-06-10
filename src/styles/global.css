@@ -281,26 +281,6 @@ select {
   cursor: default;
 }
 
-.appTopBadge--style {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 2px 8px 2px 4px; border-radius: 14px;
-  background: rgba(255,255,255,.06); color: var(--cf-soft-white-secondary);
-  font-size: 11px; font-weight: 500; cursor: pointer;
-  border: 1px solid var(--style-color, #888); max-width: 180px;
-  transition: background .15s; flex-shrink: 0;
-}
-.appTopBadge--style:hover { background: rgba(255,255,255,.10); }
-.appTopStyleDot {
-  width: 8px; height: 8px; border-radius: 50%;
-  background: var(--style-color, #888); flex-shrink: 0;
-}
-.appTopStyleClear {
-  margin-left: 2px; width: 14px; height: 14px; border-radius: 7px;
-  background: rgba(255,255,255,.08); font-size: 12px; line-height: 14px;
-  text-align: center; color: var(--cf-soft-white-tertiary); flex-shrink: 0;
-}
-.appTopStyleClear:hover { background: rgba(255,80,80,.2); color: #f66; }
-
 /* 画布 Tab：无胶囊框，选中用下划线 */
 .canvasTabs {
   display: flex;
@@ -375,24 +355,6 @@ select {
 .canvasTabClose:hover {
   background: var(--cf-hover);
   color: var(--text);
-}
-
-.canvasTabAdd {
-  width: 28px;
-  height: 32px;
-  margin-bottom: 2px;
-  border: none;
-  background: transparent;
-  color: var(--cf-soft-white-tertiary);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  flex-shrink: 0;
-  transition: color 0.12s ease;
-}
-
-.canvasTabAdd:hover {
-  color: var(--cf-soft-white);
 }
 
 .appTopWarn {
@@ -6850,6 +6812,44 @@ body .zoomMenu {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+
+/* 只读模式 - 脚本表单元格纯文本展示 */
+.scriptTableCellReadonly {
+  display: inline-block;
+  width: 100%;
+  min-height: 1.4em;
+  padding: 2px 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 只读模式 - 卡片视图字段纯文本 */
+.field-readonly .field-value {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--fg);
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 2px 0;
+}
+
+.field-readonly .field-value.mono {
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+/* 只读模式 - 角色单元格（无编辑按钮） */
+.scriptCharsCellWrap--readonly {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
 }
 
 .storyboardChainScopeHint {

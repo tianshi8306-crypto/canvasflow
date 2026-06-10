@@ -344,9 +344,10 @@ type CanvasUiState = {
   }) => void;
   closeScriptVersionDiff: () => void;
 
-  /** 风格库面板 */
-  styleLibraryPanelOpen: boolean;
-  toggleStyleLibraryPanel: () => void;
+  /** 首次安装引导 */
+  onboardingGuideOpen: boolean;
+  openOnboardingGuide: () => void;
+  closeOnboardingGuide: () => void;
 
   clearTransientUi: () => void;
 };
@@ -647,8 +648,9 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
   closeScriptVersionDiff: () =>
     set({ scriptVersionDiffOpen: false, scriptVersionDiffPreset: null }),
 
-  styleLibraryPanelOpen: false,
-  toggleStyleLibraryPanel: () => set((s) => ({ styleLibraryPanelOpen: !s.styleLibraryPanelOpen })),
+  onboardingGuideOpen: false,
+  openOnboardingGuide: () => set({ onboardingGuideOpen: true }),
+  closeOnboardingGuide: () => set({ onboardingGuideOpen: false }),
 
   clearTransientUi: () =>
     set({

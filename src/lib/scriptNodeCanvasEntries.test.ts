@@ -1,8 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
   SCRIPT_ENTRY_FULLSCREEN_LABEL,
-  SCRIPT_ENTRY_THEME_LABEL,
-  SCRIPT_MINI_PREVIEW_OPEN_HINT,
   SCRIPT_NODE_ENTRY_HINT,
   openInspectorStoryboardBeat,
 } from "@/lib/scriptNodeCanvasEntries";
@@ -12,8 +10,6 @@ import { useProjectStore } from "@/store/projectStore";
 describe("scriptNodeCanvasEntries labels", () => {
   it("exposes stable entry copy for toolbar and preview", () => {
     expect(SCRIPT_ENTRY_FULLSCREEN_LABEL).toBe("全屏表格");
-    expect(SCRIPT_ENTRY_THEME_LABEL).toBe("编辑主题");
-    expect(SCRIPT_MINI_PREVIEW_OPEN_HINT).toContain("全屏");
     expect(SCRIPT_NODE_ENTRY_HINT).not.toContain("Inspector");
     expect(SCRIPT_NODE_ENTRY_HINT).toContain("全屏表格");
   });

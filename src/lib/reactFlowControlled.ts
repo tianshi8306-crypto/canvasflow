@@ -42,9 +42,7 @@ export function runIgnoringReactFlowSelectionEcho(fn: () => void): void {
       selectionEchoSuppressDepth = Math.max(0, selectionEchoSuppressDepth - 1);
     };
     queueMicrotask(() => {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(release);
-      });
+      requestAnimationFrame(release);
     });
   }
 }
@@ -60,9 +58,7 @@ export function runWithReactFlowGraphSyncLock(fn: () => void): void {
   } finally {
     queueMicrotask(() => {
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          graphSyncLockDepth = Math.max(0, graphSyncLockDepth - 1);
-        });
+        graphSyncLockDepth = Math.max(0, graphSyncLockDepth - 1);
       });
     });
   }

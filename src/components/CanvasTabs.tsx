@@ -3,7 +3,6 @@ import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import { useShallow } from "zustand/react/shallow";
 import {
-  defaultTabViewport,
   persistActiveTabSnapshot,
   restoreProjectFromTab,
   syncActiveTabUnsaved,
@@ -17,29 +16,22 @@ function IconClose() {
   );
 }
 
-function IconAdd() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-    </svg>
-  );
-}
-
 type TabProps = {
   tab: { id: string; name: string; unsaved: boolean };
   isActive: boolean;
   onClick: () => void;
   onClose: (e: React.MouseEvent) => void;
+  closable: boolean;
 };
 
-function Tab({ tab, isActive, onClick, onClose }: TabProps) {
+function Tab({ tab, isActive, onClick, onClose, closable }: TabProps) {
   return (
     <div className={`canvasTab${isActive ? " canvasTab--active" : ""}`} onClick={onClick}>
       <span className="canvasTabName">
         {tab.unsaved && <span className="canvasTabUnsavedDot" />}
         {tab.name}
       </span>
-      {!isActive && (
+      {closable && (
         <button
           type="button"
           className="canvasTabClose"
@@ -57,7 +49,6 @@ export function CanvasTabs() {
   const tabs = useCanvasUiStore(useShallow((s) => s.tabs));
   const activeTabId = useCanvasUiStore((s) => s.activeTabId);
   const setActiveTab = useCanvasUiStore((s) => s.setActiveTab);
-  const addTab = useCanvasUiStore((s) => s.addTab);
   const removeTab = useCanvasUiStore((s) => s.removeTab);
   const openConfirmDialog = useCanvasUiStore.getState().openConfirmDialog;
 
@@ -66,8 +57,6 @@ export function CanvasTabs() {
   useEffect(() => {
     syncActiveTabUnsaved(projectDirty);
   }, [projectDirty]);
-
-  const activeTab = tabs.find((t) => t.id === activeTabId);
 
   const handleSwitchTab = useCallback(
     (tabId: string) => {
@@ -82,24 +71,6 @@ export function CanvasTabs() {
     },
     [activeTabId, tabs, setActiveTab],
   );
-
-  const handleNewTab = useCallback(() => {
-    if (tabs.length >= 20) return;
-    persistActiveTabSnapshot();
-    const ok = addTab({
-      name: `画布 ${tabs.length + 1}`,
-      projectPath: null,
-      unsaved: false,
-      nodes: [],
-      edges: [],
-      viewport: defaultTabViewport(),
-    });
-    if (!ok) return;
-    const next = useCanvasUiStore.getState().tabs.find(
-      (t) => t.id === useCanvasUiStore.getState().activeTabId,
-    );
-    if (next) restoreProjectFromTab(next);
-  }, [tabs.length, addTab]);
 
   const handleCloseTab = useCallback(
     (id: string, e: React.MouseEvent) => {
@@ -122,7 +93,7 @@ export function CanvasTabs() {
             unsaved: false,
             nodes: [],
             edges: [],
-            viewport: defaultTabViewport(),
+            viewport: { x: 0, y: 0, zoom: 1 },
           });
         }
       };
@@ -143,32 +114,20 @@ export function CanvasTabs() {
 
   if (tabs.length === 0) return null;
 
+  const canCloseAny = tabs.length > 1;
+
   return (
     <div className="canvasTabs">
-      {activeTab && (
+      {tabs.map((tab) => (
         <Tab
-          tab={activeTab}
-          isActive={true}
-          onClick={() => {}}
-          onClose={() => {}}
+          key={tab.id}
+          tab={tab}
+          isActive={tab.id === activeTabId}
+          onClick={() => handleSwitchTab(tab.id)}
+          onClose={(e) => handleCloseTab(tab.id, e)}
+          closable={canCloseAny}
         />
-      )}
-      {tabs
-        .filter((t) => t.id !== activeTabId)
-        .map((tab) => (
-          <Tab
-            key={tab.id}
-            tab={tab}
-            isActive={false}
-            onClick={() => handleSwitchTab(tab.id)}
-            onClose={(e) => handleCloseTab(tab.id, e)}
-          />
-        ))}
-      {tabs.length < 20 && (
-        <button type="button" className="canvasTabAdd" onClick={handleNewTab} title="新建画布标签">
-          <IconAdd />
-        </button>
-      )}
+      ))}
     </div>
   );
 }

@@ -20,10 +20,13 @@ export function useScriptNodeTaskState(nodeId: string) {
 
   useEffect(() => {
     if (wasGraphRunningRef.current && !isGraphRunning) {
-      const latest = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
-      const count = normalizeScriptBeats(latest?.data.scriptBeats ?? []).length;
-      const hasTheme = Boolean((latest?.data.prompt ?? "").trim());
-      setZeroBeatsAfterParse(hasTheme && count === 0);
+      // 延迟到下一个微任务，确保 DAG 调度回写的 scriptBeats 已 flush 到 store
+      queueMicrotask(() => {
+        const latest = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
+        const count = normalizeScriptBeats(latest?.data.scriptBeats ?? []).length;
+        const hasTheme = Boolean((latest?.data.prompt ?? "").trim());
+        setZeroBeatsAfterParse(hasTheme && count === 0);
+      });
     }
     wasGraphRunningRef.current = isGraphRunning;
   }, [isGraphRunning, nodeId]);

@@ -18,8 +18,10 @@ type Props = {
   projectPath?: string | null;
   onStatusText?: (msg: string) => void;
   onPersistRows: (next: ScriptBeat[]) => void;
-  roleEditorRowId: string | null;
-  setRoleEditorRowId: Dispatch<SetStateAction<string | null>>;
+  roleEditorRowId?: string | null;
+  setRoleEditorRowId?: Dispatch<SetStateAction<string | null>>;
+  /** 只读模式：仅展示；角色参考图上传除外 */
+  readOnly?: boolean;
 };
 
 export function ScriptBeatsTableCellRenderer({
@@ -34,6 +36,7 @@ export function ScriptBeatsTableCellRenderer({
   onPersistRows,
   roleEditorRowId,
   setRoleEditorRowId,
+  readOnly = false,
 }: Props) {
   if (colKey.startsWith("roleName:") || colKey.startsWith("roleDesc:") || colKey.startsWith("roleImage:")) {
     return (
@@ -45,6 +48,7 @@ export function ScriptBeatsTableCellRenderer({
         projectPath={projectPath}
         onStatusText={onStatusText}
         onPersistRows={onPersistRows}
+        readOnly={readOnly}
       />
     );
   }
@@ -60,8 +64,9 @@ export function ScriptBeatsTableCellRenderer({
         projectPath={projectPath}
         onStatusText={onStatusText}
         onPersistRows={onPersistRows}
-        roleEditorRowId={roleEditorRowId}
-        setRoleEditorRowId={setRoleEditorRowId}
+        roleEditorRowId={roleEditorRowId ?? null}
+        setRoleEditorRowId={setRoleEditorRowId ?? (() => {})}
+        readOnly={readOnly}
       />
     );
   }
@@ -77,6 +82,7 @@ export function ScriptBeatsTableCellRenderer({
       projectPath={projectPath}
       onStatusText={onStatusText}
       onPersistRows={onPersistRows}
+      readOnly={readOnly}
     />
   );
 }

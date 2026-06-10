@@ -47,13 +47,6 @@ export function resolveScriptNodePanelFeedback(args: {
   themeFilled: boolean;
   zeroBeatsAfterParse?: boolean;
 }): ScriptNodeFeedback | null {
-  if (args.isGraphRunning) {
-    return {
-      tone: "info",
-      message: "脚本任务执行中… 完成后将更新镜头表与状态栏。",
-    };
-  }
-
   if (args.status?.status === "failed") {
     const err = (args.status.error ?? "").trim() || "脚本或分镜任务失败";
     return {

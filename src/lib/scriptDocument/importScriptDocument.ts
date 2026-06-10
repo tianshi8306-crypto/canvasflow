@@ -20,7 +20,7 @@ export type ScriptDocumentExtract = {
 };
 
 const PARSE_REQUIREMENT_WITH_UPSTREAM =
-  "请按工业分镜规范解析【待解析剧本文本】（已写入上游文本节点），输出结构化镜头 JSON 数组。";
+  "自动提取角色、分镜并逐镜生成 Seedance 2.0 视觉化参数。";
 
 export async function pickScriptDocumentPath(): Promise<string | null> {
   if (!isTauri()) return null;
@@ -116,10 +116,14 @@ export async function applyScriptDocumentImport(opts: {
   );
 
   if (upstreamTextId) {
-    state.updateNodeData(upstreamTextId, { prompt: text });
-    state.updateNodeData(opts.scriptNodeId, {
-      prompt: PARSE_REQUIREMENT_WITH_UPSTREAM,
-    });
+    // 原子性更新：同时写入上游文本和脚本节点，避免部分成功
+    useProjectStore.setState((s) => ({
+      nodes: s.nodes.map((n) => {
+        if (n.id === upstreamTextId) return { ...n, data: { ...n.data, prompt: text } };
+        if (n.id === opts.scriptNodeId) return { ...n, data: { ...n.data, prompt: PARSE_REQUIREMENT_WITH_UPSTREAM } };
+        return n;
+      }),
+    }));
   } else {
     state.updateNodeData(opts.scriptNodeId, { prompt: text });
   }

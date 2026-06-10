@@ -1,6 +1,5 @@
 import type { RefObject } from "react";
 import type { ScriptBeat } from "@/lib/types";
-import { normalizeScriptBeat } from "@/lib/scriptBeatHelpers";
 import { ScriptBeatsEditorTable } from "@/components/ScriptBeatsEditorTable";
 
 type Props = {
@@ -34,6 +33,7 @@ export function ScriptWorkbenchTableView({
     >
       <ScriptBeatsEditorTable
         variant="inline"
+        readOnly
         rows={rows}
         selectedIds={selectedIds}
         onToggleSelect={onToggleSelect}
@@ -41,14 +41,6 @@ export function ScriptWorkbenchTableView({
         projectPath={projectPath}
         onStatusText={onStatusText}
       />
-      <button
-        type="button"
-        className="btn"
-        style={{ marginTop: 8 }}
-        onClick={() => onPersistRows([...rows, normalizeScriptBeat({ id: crypto.randomUUID() })])}
-      >
-        添加一条镜头
-      </button>
     </div>
   );
 }

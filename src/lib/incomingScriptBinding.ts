@@ -201,8 +201,7 @@ export function buildAudioTtsTextFromScriptBeatBinding(
   const beat = beats.find((b) => b.id === beatId);
   if (!beat) return null;
   const dialogue = (beat.dialogue ?? "").trim();
-  const sfx = (beat.soundEffect ?? "").trim();
-  const parts = [dialogue, sfx].filter((s) => s.length > 0);
+  const parts = [dialogue].filter((s) => s.length > 0);
   if (parts.length === 0) return null;
   return parts.join("\n");
 }
