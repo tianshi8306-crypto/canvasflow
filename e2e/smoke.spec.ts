@@ -3,7 +3,12 @@ import { expect, test } from "@playwright/test";
 test.describe("应用壳与画布", () => {
   test("首屏加载并显示顶栏操作", async ({ page }) => {
     await page.goto("/");
-    await expect(page.getByRole("button", { name: "新建工程" })).toBeVisible({ timeout: 30_000 });
+    // WorkspaceMenu trigger is visible when no project is open
+    const trigger = page.locator(".workspaceMenuTrigger");
+    await expect(trigger).toBeVisible({ timeout: 30_000 });
+    // Open the dropdown to reveal menu items
+    await trigger.click();
+    await expect(page.getByRole("button", { name: "新建工程" })).toBeVisible();
     await expect(page.getByRole("button", { name: "打开工程" })).toBeVisible();
   });
 
