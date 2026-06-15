@@ -256,6 +256,20 @@ fn plan_for_rel(
     source: Option<&str>,
     meta_json: Option<&str>,
 ) -> Result<(MigrationPlan, String), String> {
+    if project_asset_store::is_nested_legacy_media_rel(rel) {
+        let file_name = Path::new(rel)
+            .file_name()
+            .and_then(|s| s.to_str())
+            .unwrap_or("");
+        let plan = classify_legacy_asset(file_name, media_type, source, meta_json);
+        let target = match &plan {
+            MigrationPlan::Import { kind, .. } => kind.clone(),
+            MigrationPlan::Gen { ctx, .. } => ctx.kind.clone(),
+            MigrationPlan::Restructure { ctx, .. } => ctx.kind.clone(),
+        };
+        return Ok((plan, target));
+    }
+
     if let Some(new_rel) = restructure_legacy_layout_rel(rel) {
         let ctx = ctx_from_restructured_rel(&new_rel)
             .ok_or_else(|| format!("无法解析旧版路径：{rel}"))?;
@@ -307,6 +321,13 @@ fn resolve_target_paths(
 fn list_non_canonical_asset_files(project_path: &Path) -> Result<Vec<(String, PathBuf)>, String> {
     let mut out = Vec::new();
     project_asset_store::walk_project_assets(project_path, |path, rel| {
+        if project_asset_store::is_flat_media_rel(rel) {
+            return Ok(());
+        }
+        if project_asset_store::is_nested_legacy_media_rel(rel) {
+            out.push((rel.to_string(), path.to_path_buf()));
+            return Ok(());
+        }
         if project_asset_store::is_canonical_asset_rel(rel) {
             return Ok(());
         }
@@ -523,6 +544,7 @@ mod tests {
 
     #[test]
     fn canonical_paths_skip_migration() {
+        assert!(project_asset_store::is_canonical_asset_rel("assets/video/000001.mp4"));
         assert!(project_asset_store::is_canonical_asset_rel(
             "assets/video/import/hero.mp4"
         ));

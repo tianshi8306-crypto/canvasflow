@@ -61,6 +61,7 @@ pub async fn video_gen_start(
     map.insert(
         job_id.clone(),
         VideoMockJob {
+            job_id: job_id.clone(),
             project_path: req.project_path.trim().to_string(),
             node_id: req.node_id.trim().to_string(),
             model_id,

@@ -101,13 +101,25 @@ async function applyAssetIdBackfill(
   }
 }
 
-function countersFromNodes(nodes: Node<FlowNodeData>[]) {
+/** 从节点标签推导计数器下限（保存 Tab 快照等与 store 计数器未同步的场景） */
+export function deriveNodeCountersFromCanvas(nodes: Node<FlowNodeData>[]) {
   return {
-    maxImgIdx: maxNumberedLabelIndex(nodes, "imageNode", "图片"),
-    maxVidIdx: maxNumberedLabelIndex(nodes, "videoNode", "视频"),
-    maxTextIdx: maxNumberedLabelIndex(nodes, "textNode", "文本"),
-    maxAudioIdx: maxNumberedLabelIndex(nodes, "audioNode", "音频"),
-    maxScriptIdx: maxNumberedLabelIndex(nodes, "scriptNode", "分镜脚本"),
+    imageNodeCounter: maxNumberedLabelIndex(nodes, "imageNode", "图片"),
+    videoNodeCounter: maxNumberedLabelIndex(nodes, "videoNode", "视频"),
+    textNodeCounter: maxNumberedLabelIndex(nodes, "textNode", "文本"),
+    audioNodeCounter: maxNumberedLabelIndex(nodes, "audioNode", "音频"),
+    scriptNodeCounter: maxNumberedLabelIndex(nodes, "scriptNode", "分镜脚本"),
+  };
+}
+
+function countersFromNodes(nodes: Node<FlowNodeData>[]) {
+  const c = deriveNodeCountersFromCanvas(nodes);
+  return {
+    maxImgIdx: c.imageNodeCounter,
+    maxVidIdx: c.videoNodeCounter,
+    maxTextIdx: c.textNodeCounter,
+    maxAudioIdx: c.audioNodeCounter,
+    maxScriptIdx: c.scriptNodeCounter,
   };
 }
 

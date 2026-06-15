@@ -7,13 +7,15 @@ import {
 } from "./canvasAssets";
 
 describe("canvasAssets", () => {
-  it("classifies type-first and legacy paths", () => {
+  it("classifies flat and legacy paths", () => {
+    expect(assetStorageCategory("assets/video/000001.mp4")).toBe("gen");
+    expect(assetStorageCategory("assets/image/000042.png")).toBe("gen");
     expect(assetStorageCategory("assets/video/gen/dreamina/foo.mp4")).toBe("gen");
     expect(assetStorageCategory("assets/image/import/hero.png")).toBe("import");
     expect(assetStorageCategory("assets/exports/timeline.mp4")).toBe("export");
     expect(assetStorageCategory("assets/gen/video/dreamina/old.mp4")).toBe("legacy");
     expect(assetStorageCategory("assets/dreamina_vid_old.mp4")).toBe("legacy");
-    expect(assetMediaKind("assets/video/import/a.mp4")).toBe("video");
+    expect(assetMediaKind("assets/video/000001.mp4")).toBe("video");
   });
 
   it("sorts by media type then path", () => {

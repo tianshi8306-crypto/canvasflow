@@ -120,6 +120,13 @@
   --cf-drop-overlay-fill: var(--cf-cyan-fill-08);
   --cf-drop-overlay-fill-import: var(--cf-cyan-fill-12);
 
+  --app-top-chrome-gradient: linear-gradient(
+    180deg,
+    rgba(18, 18, 18, 0.96) 0%,
+    rgba(18, 18, 18, 0.72) 55%,
+    rgba(18, 18, 18, 0) 100%
+  );
+
   font-family:
     ui-sans-serif,
     system-ui,
@@ -170,12 +177,7 @@ select {
   z-index: 25;
   padding: 10px 14px 28px;
   border: none;
-  background: linear-gradient(
-    180deg,
-    rgba(18, 18, 18, 0.96) 0%,
-    rgba(18, 18, 18, 0.72) 55%,
-    rgba(18, 18, 18, 0) 100%
-  );
+  background: var(--app-top-chrome-gradient);
   pointer-events: none;
 }
 
@@ -5469,6 +5471,47 @@ body .zoomMenu {
   color: var(--muted);
 }
 
+.scriptRhythmReport {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--canvas-float-border);
+  border-radius: 10px;
+  background: rgba(18, 22, 32, 0.55);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scriptRhythmReport__title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.scriptRhythmReport__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.scriptRhythmReport__item strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.scriptRhythmReport__hook {
+  margin: 8px 0 0;
+  color: var(--muted);
+}
+
+.scriptRhythmReport__hookLabel {
+  display: inline-block;
+  margin-right: 6px;
+  color: var(--text);
+  font-weight: 500;
+}
+
 .nodeMaxOverlayTitle {
   color: var(--text);
 }
@@ -5939,6 +5982,93 @@ body .zoomMenu {
   align-self: flex-start;
   font-size: 11px;
   padding: 3px 10px;
+}
+
+.confirmDialogOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: rgba(2, 6, 23, 0.6);
+}
+
+.confirmDialog {
+  position: fixed;
+  z-index: 96;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(480px, 92vw);
+  border-radius: 12px;
+  border: 1px solid #334155;
+  background: #0b1018;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+  padding: 16px;
+  display: grid;
+  gap: 12px;
+}
+
+.confirmDialogTitle {
+  font-weight: 700;
+  color: #f8fafc;
+  font-size: 15px;
+}
+
+.confirmDialogMessage {
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.confirmDialogBtns {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.confirmDialogBtn {
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #e2e8f0;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.confirmDialogBtn--cancel:hover {
+  background: #1e293b;
+}
+
+.confirmDialogBtn--primary {
+  border-color: #3b82f6;
+  background: #1d4ed8;
+  color: #f8fafc;
+}
+
+.confirmDialogBtn--primary:hover {
+  background: #2563eb;
+}
+
+.confirmDialogBtn--confirm {
+  border-color: #475569;
+  background: #1e293b;
+  color: #f8fafc;
+}
+
+.confirmDialogBtn--confirm:hover {
+  background: #334155;
+}
+
+.confirmDialogBtn--danger {
+  border-color: #b91c1c;
+  background: #991b1b;
+  color: #fef2f2;
+}
+
+.confirmDialogBtn--danger:hover {
+  background: #b91c1c;
 }
 
 .scriptActionConfirmBackdrop {

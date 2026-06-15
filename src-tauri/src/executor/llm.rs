@@ -267,7 +267,7 @@ pub(crate) async fn run_llm_node(
     outputs: &HashMap<String, String>,
     conn: &mut Connection,
     run_id: &str,
-) -> Result<String, String> {
+) -> Result<(String, Option<serde_json::Value>), String> {
     let provider = pick_provider(settings)?;
 
     let prompt = node
@@ -290,18 +290,33 @@ pub(crate) async fn run_llm_node(
 
     let upstream =
         incoming_texts_ordered_with_prompt_fallback(graph, &node.id, outputs);
-    let merged = if upstream.is_empty() {
-        user_instruction.clone()
+    let has_upstream = !upstream.is_empty();
+
+    let messages = if has_upstream {
+        // 处理模式：有上游文本时，使用系统提示词引导 LLM 按指令处理上游内容
+        let upstream_text = upstream.join("\n\n---\n\n");
+        let system_content = format!(
+            "你是一个专业的文本分析与处理助手。请严格按照用户指令，对「上游文本」进行精准处理。\n\
+             \n\
+             核心规则：\n\
+             - 只返回处理结果，不添加任何解释、前言或客套话\n\
+             - 使用清晰的结构化 Markdown 格式呈现结果\n\
+             - 如果用户要求提取信息，使用分类列表或键值对形式\n\
+             - 如果用户要求生成分镜脚本，按格式：## [场景标题]\n### 镜头 N\n- **时长**：...\n- **景别**：...\n- **画面**：...\n\n\
+             ## 上游文本\n\n\
+             {upstream}",
+            upstream = upstream_text
+        );
+        json!([
+            { "role": "system", "content": system_content },
+            { "role": "user", "content": user_instruction }
+        ])
     } else {
-        format!(
-            "{}\n\n—— 上游上下文 ——\n\n{}",
-            user_instruction,
-            upstream.join("\n\n")
-        )
+        // 普通模式：无上游时保持原有行为
+        json!([{ "role": "user", "content": user_instruction }])
     };
 
     let params = node.data.get("params").cloned().unwrap_or(json!({}));
-    let messages = json!([{ "role": "user", "content": merged }]);
 
     let url = format!(
         "{}/chat/completions",
@@ -329,5 +344,8 @@ pub(crate) async fn run_llm_node(
         }
     };
 
-    Ok(content)
+    // LLM 结果回写到 data.prompt，供节点预览显示及下游文本节点读取
+    let patch = Some(json!({ "prompt": content.clone() }));
+
+    Ok((content, patch))
 }

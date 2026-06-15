@@ -11,6 +11,10 @@ import { normalizeLoadedSettings } from "@/lib/settingsPanelState";
 import { getVideoModelReadinessError } from "@/lib/videoModelReadiness";
 import { listSelectableVideoModelIds } from "@/lib/videoModelMerge";
 import { useProjectStore } from "@/store/projectStore";
+import {
+  isActiveVideoJobInProgress,
+  nodeHasSatisfiedLocalVideo,
+} from "@/lib/videoGeneration/videoNodeLocalSatisfaction";
 
 /**
  * 视频节点：提交生成任务并轮询 `activeJob`，完成后写回 `path`（若有 resultRelPath）。
@@ -19,9 +23,10 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
   const projectPath = useProjectStore((s) => s.projectPath);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const setStatusText = useProjectStore((s) => s.setStatusText);
-  const videoBlock = useProjectStore((s) =>
-    videoNodeId ? s.nodes.find((n) => n.id === videoNodeId)?.data.video : undefined,
+  const nodeData = useProjectStore((s) =>
+    videoNodeId ? s.nodes.find((n) => n.id === videoNodeId)?.data : undefined,
   );
+  const videoBlock = nodeData?.video;
   const activeJob = videoBlock?.activeJob;
 
   // 缓存 Settings 中的有效模型 ID
@@ -230,9 +235,15 @@ export function useVideoNodeGeneration(videoNodeId: string | undefined) {
     [projectPath, setStatusText, updateNodeData, videoNodeId],
   );
 
+  const jobInProgress = isActiveVideoJobInProgress(activeJob);
   const busy =
     submitting ||
-    Boolean(activeJob?.status === "queued" || activeJob?.status === "running");
+    (jobInProgress &&
+      !nodeHasSatisfiedLocalVideo({
+        path: nodeData?.path,
+        assetId: nodeData?.assetId,
+        video: videoBlock ?? undefined,
+      }));
 
   return {
     startGeneration,

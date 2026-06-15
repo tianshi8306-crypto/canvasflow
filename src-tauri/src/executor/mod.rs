@@ -10,6 +10,7 @@ mod hermes_asset;
 mod llm;
 mod script_node;
 mod script_parse;
+mod script_decision;
 mod script_pipeline;
 mod script_shot_agent;
 mod shared;

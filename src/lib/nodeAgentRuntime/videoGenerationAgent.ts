@@ -14,6 +14,7 @@ import {
 } from "@/lib/promptUpstreamTextRefs";
 import { resolveOrderedVideoIncomingRefItems } from "@/hooks/useVideoIncomingReferenceItems";
 import { useProjectStore } from "@/store/projectStore";
+import { flushProjectSave } from "@/store/projectSaveDebounce";
 import { refreshDreaminaAuthOnGenerationFailure } from "@/lib/dreaminaAuthOnFailure";
 import { parseVideoGenError } from "@/lib/video/formatVideoGenError";
 import { isDreaminaModel } from "@/lib/dreamina/model";
@@ -203,11 +204,16 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
     if (!id) throw new Error("视频任务未返回 jobId");
     return { jobId: id, videoBlock };
   },
-  commit: ({ jobId, videoBlock }, ctx) => {
+  commit: async ({ jobId, videoBlock }, ctx) => {
     const modelId = videoBlock.draft.modelId;
+    const node = useProjectStore.getState().nodes.find((n) => n.id === ctx.nodeId);
+    const hasExistingOutput = Boolean(
+      node?.data.path?.trim() || node?.data.assetId?.trim(),
+    );
     ctx.updateNodeData(ctx.nodeId, {
       video: {
         ...videoBlock,
+        awaitingNewResult: hasExistingOutput,
         activeJob: {
           id: jobId,
           status: "queued",
@@ -217,6 +223,7 @@ export const videoGenerationAgentRuntime: NodeTaskAgentRuntime<
       },
     });
     ctx.setStatusText("已提交视频生成任务");
+    await flushProjectSave(() => useProjectStore.getState());
   },
 };
 

@@ -17,10 +17,9 @@ import {
   TEMPLATE_STYLE_OPTIONS,
 } from "@/lib/scriptWorkbenchConstants";
 import {
-  extractCameraMove,
   parseLeadingNumber,
   parseShotNumberRank,
-  toSceneTags,
+  readCameraMove,
 } from "@/lib/scriptWorkbenchSceneTags";
 import { loadScriptTemplatesV1, saveScriptTemplatesV1 } from "@/lib/scriptWorkbenchTemplateStorage";
 import type {
@@ -41,6 +40,7 @@ import { ScriptWorkbenchActionConfirmDialog } from "@/components/ScriptWorkbench
 import { ScriptWorkbenchBatchLogPanel } from "@/components/ScriptWorkbenchBatchLogPanel";
 import { ScriptWorkbenchTableView } from "@/components/ScriptWorkbenchTableView";
 import { ScriptWorkbenchToolbarCluster } from "@/components/ScriptWorkbenchToolbarCluster";
+import { ScriptRhythmReportBanner } from "@/components/ScriptRhythmReportBanner";
 import { useReplayArmCountdown } from "@/hooks/useReplayArmCountdown";
 
 type Props = {
@@ -89,6 +89,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
     actionLabel: string;
   } | null>(null);
 
+  const rhythmReport = useProjectStore((s) => s.nodes.find((n) => n.id === nodeId)?.data.scriptRhythmReport);
   const rows = useMemo(() => normalizeScriptBeats(beats.length ? beats : []), [beats]);
   const selectedIds = useMemo(
     () => (storedSelection ?? []).filter((id) => rows.some((r) => r.id === id)),
@@ -186,7 +187,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
       const preview = previewRows
         .map((r) => {
           const key = (r.shotNumber || "未标镜号").trim() || "未标镜号";
-          const before = extractCameraMove(r.sceneTags) || "空";
+          const before = readCameraMove(r) || "空";
           return `${key}: ${before}→${value}`;
         })
         .join("\n");
@@ -201,7 +202,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
           markBatchSnapshot("复用填写运镜");
           const next = rows.map((r) => {
             if (!selectedSet.has(r.id)) return r;
-            return { ...r, sceneTags: toSceneTags(value) };
+            return { ...r, cameraMove: value };
           });
           persistBeats(next);
           setStatusText(`已复用批量填写运镜：${selectedIds.length} 条`);
@@ -215,7 +216,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
       const preview = previewRows
         .map((r) => {
           const key = (r.shotNumber || "未标镜号").trim() || "未标镜号";
-          const before = extractCameraMove(r.sceneTags) || "空";
+          const before = readCameraMove(r) || "空";
           return `${key}: ${before}→空`;
         })
         .join("\n");
@@ -230,7 +231,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
           markBatchSnapshot("复用清空运镜");
           const next = rows.map((r) => {
             if (!selectedSet.has(r.id)) return r;
-            return { ...r, sceneTags: "" };
+            return { ...r, cameraMove: "" };
           });
           persistBeats(next);
           setStatusText(`已复用批量清空运镜：${selectedIds.length} 条`);
@@ -334,7 +335,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
     const preview = previewRows
       .map((r) => {
         const key = (r.shotNumber || "未标镜号").trim() || "未标镜号";
-        const before = extractCameraMove(r.sceneTags) || "空";
+        const before = readCameraMove(r) || "空";
         return `${key}: ${before}→${val}`;
       })
       .join("\n");
@@ -349,7 +350,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
         markBatchSnapshot("批量填写运镜");
         const next = rows.map((r) => {
           if (!selectedSet.has(r.id)) return r;
-          return { ...r, sceneTags: toSceneTags(val) };
+          return { ...r, cameraMove: val };
         });
         persistBeats(next);
         setMoreOpen(false);
@@ -375,7 +376,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
     const preview = previewRows
       .map((r) => {
         const key = (r.shotNumber || "未标镜号").trim() || "未标镜号";
-        const before = extractCameraMove(r.sceneTags) || "空";
+        const before = readCameraMove(r) || "空";
         return `${key}: ${before}→空`;
       })
       .join("\n");
@@ -390,7 +391,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
         markBatchSnapshot("批量清空运镜");
         const next = rows.map((r) => {
           if (!selectedSet.has(r.id)) return r;
-          return { ...r, sceneTags: "" };
+          return { ...r, cameraMove: "" };
         });
         persistBeats(next);
         setMoreOpen(false);
@@ -849,6 +850,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
 
   return (
     <div className="scriptWorkbench">
+      <ScriptRhythmReportBanner report={rhythmReport} />
       <div ref={toolbarRef} className="scriptToolbar">
         <ScriptWorkbenchPrimaryActions
           view={view}

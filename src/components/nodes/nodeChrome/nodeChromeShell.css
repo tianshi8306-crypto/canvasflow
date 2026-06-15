@@ -26,6 +26,12 @@
   border-color: rgba(255, 255, 255, 0.8);
 }
 
+html[data-theme="light"] .nodeChrome-shell.selected,
+html[data-theme="light"] .minimal-image-node.selected,
+html[data-theme="light"] .minimal-text-node.selected {
+  border-color: var(--node-chrome-selected-border, var(--cf-cyan-deep));
+}
+
 .nodeChrome-preview,
 .minimal-image-preview,
 .minimal-text-preview {

@@ -57,6 +57,7 @@ pub async fn run_graph_with_patch(
         true,
         json!({ "nodeCount": graph.nodes.len() }),
         &mut script_patches,
+        None,
     )
     .await?;
 
@@ -141,6 +142,7 @@ async fn run_subgraph_inner(
             "force": force,
         }),
         &mut script_patches,
+        Some(&_output_before),
     )
     .await?;
 

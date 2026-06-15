@@ -7,6 +7,10 @@ import {
   restoreProjectFromTab,
   syncActiveTabUnsaved,
 } from "@/lib/canvasTabSync";
+import { openCanvasCloseConfirm } from "@/lib/canvasCloseConfirm";
+import { describeCanvasCloseRisk } from "@/lib/canvasCloseGuard";
+import { saveCanvasTabToProjectDisk } from "@/lib/canvasTabSave";
+import { flushProjectSave } from "@/store/projectSaveDebounce";
 
 function IconClose() {
   return (
@@ -50,8 +54,6 @@ export function CanvasTabs() {
   const activeTabId = useCanvasUiStore((s) => s.activeTabId);
   const setActiveTab = useCanvasUiStore((s) => s.setActiveTab);
   const removeTab = useCanvasUiStore((s) => s.removeTab);
-  const openConfirmDialog = useCanvasUiStore.getState().openConfirmDialog;
-
   const projectDirty = useProjectStore((s) => s.projectDirty);
 
   useEffect(() => {
@@ -98,18 +100,50 @@ export function CanvasTabs() {
         }
       };
 
-      if (tab.unsaved) {
-        openConfirmDialog({
-          title: "关闭画布？",
-          message: "该标签页有未保存的改动，关闭后内存中的改动将丢失。",
-          onConfirm: doRemove,
-          onCancel: () => {},
-        });
+      const isActive = id === activeTabId;
+      if (isActive) {
+        persistActiveTabSnapshot();
+      }
+
+      const nodes = isActive ? useProjectStore.getState().nodes : tab.nodes;
+      const dirty = isActive ? useProjectStore.getState().projectDirty : tab.unsaved;
+      const risk = describeCanvasCloseRisk(nodes, dirty);
+
+      if (!risk.shouldConfirm) {
+        doRemove();
         return;
       }
-      doRemove();
+
+      const canSaveToDisk = isActive
+        ? Boolean(useProjectStore.getState().projectPath?.trim())
+        : Boolean(tab.projectPath?.trim());
+
+      const saveAndClose =
+        dirty && canSaveToDisk
+          ? async () => {
+              if (isActive) {
+                await flushProjectSave(() => useProjectStore.getState());
+              } else {
+                const tabToSave = useCanvasUiStore.getState().tabs.find((t) => t.id === id) ?? tab;
+                const ok = await saveCanvasTabToProjectDisk(tabToSave);
+                if (!ok) {
+                  useProjectStore.getState().setStatusText("保存失败，标签页未关闭");
+                  return;
+                }
+              }
+              doRemove();
+            }
+          : undefined;
+
+      openCanvasCloseConfirm({
+        nodes,
+        projectDirty: dirty,
+        title: "关闭画布？",
+        onClose: doRemove,
+        onSaveAndClose: saveAndClose,
+      });
     },
-    [tabs, activeTabId, removeTab, openConfirmDialog],
+    [tabs, activeTabId, removeTab],
   );
 
   if (tabs.length === 0) return null;

@@ -6,8 +6,8 @@
 
 use crate::command_common::{normalize_openai_api_base, resolve_ffmpeg_bin};
 use crate::commands::types::{
-    DreaminaVideoRecoverRequest, VideoGenStartResponse, VideoGenerationStartRequest, VideoJobPollHint,
-    VideoJobSnapshot,
+    DreaminaVideoRecoverRequest, PersistedVideoJobEntry, VideoGenStartResponse,
+    VideoGenerationStartRequest, VideoJobPollHint, VideoJobSnapshot,
 };
 use crate::project_asset_store::{self, AssetWriteContext};
 use crate::dreamina_cli::DreaminaCliState;
@@ -64,6 +64,28 @@ fn load_persisted_video_job(project_path: &str, job_id: &str) -> Result<Option<V
     Ok(Some(job))
 }
 
+fn succeeded_snapshot_from_persisted_job(id: &str, job: &VideoMockJob) -> Option<VideoJobSnapshot> {
+    let rel = job
+        .result_rel_path
+        .as_ref()
+        .map(|s| s.trim())
+        .filter(|s| !s.is_empty())?;
+    Some(VideoJobSnapshot {
+        id: id.to_string(),
+        status: "succeeded".into(),
+        progress: Some(1.0),
+        error: None,
+        model_id: job.model_id.clone(),
+        result_rel_path: Some(rel.to_string()),
+    })
+}
+
+fn restore_video_job_to_memory(state: &AppState, id: &str, job: &VideoMockJob) {
+    if let Ok(mut map) = state.video_jobs.lock() {
+        map.insert(id.to_string(), job.clone());
+    }
+}
+
 fn job_not_found_snapshot(id: &str, model_id: &str) -> VideoJobSnapshot {
     VideoJobSnapshot {
         id: id.to_string(),
@@ -112,6 +134,17 @@ async fn poll_orphaned_video_job(
         "[video_cmd] 恢复孤儿任务 poll: id={id} dreamina={is_dreamina} project={project_path}"
     );
 
+    if let Some(ref d) = disk_job {
+        if let Some(snap) = succeeded_snapshot_from_persisted_job(id, d) {
+            eprintln!(
+                "[video_cmd] 孤儿任务已从磁盘记录取回成片: id={id} rel={:?}",
+                snap.result_rel_path
+            );
+            restore_video_job_to_memory(state, id, d);
+            return Ok(snap);
+        }
+    }
+
     let snap = if is_dreamina {
         dreamina_gen::poll_video_via_cli(
             &state.http,
@@ -143,6 +176,7 @@ async fn poll_orphaned_video_job(
     };
 
     let mut job_record = disk_job.unwrap_or(VideoMockJob {
+        job_id: id.to_string(),
         project_path: project_path.to_string(),
         node_id: node_id.to_string(),
         model_id: model_id.clone(),
@@ -152,6 +186,9 @@ async fn poll_orphaned_video_job(
         is_dreamina,
         dreamina_workflow: Some(workflow),
     });
+    if job_record.job_id.trim().is_empty() {
+        job_record.job_id = id.to_string();
+    }
     job_record.polls = poll_count;
     if snap.status == "succeeded" {
         job_record.result_rel_path = snap.result_rel_path.clone();
@@ -659,6 +696,7 @@ pub async fn video_gen_start(
         .lock()
         .map_err(|_| "video_jobs 锁异常".to_string())?;
     let job_record = VideoMockJob {
+        job_id: job_id.clone(),
         project_path: req.project_path.trim().to_string(),
         node_id: req.node_id.trim().to_string(),
         model_id: model_id.clone(),
@@ -705,6 +743,12 @@ pub async fn video_gen_get_job(
             if let Some(ref h) = hint {
                 if !h.project_path.trim().is_empty() {
                     let disk = load_persisted_video_job(h.project_path.trim(), id).ok().flatten();
+                    if let Some(ref d) = disk {
+                        if let Some(snap) = succeeded_snapshot_from_persisted_job(id, d) {
+                            restore_video_job_to_memory(&state, id, d);
+                            return Ok(snap);
+                        }
+                    }
                     match poll_orphaned_video_job(&app, &state, id, h, disk).await {
                         Ok(snap) => return Ok(snap),
                         Err(e) => eprintln!("[video_cmd] 孤儿任务恢复轮询失败: {e}"),
@@ -775,17 +819,19 @@ pub async fn video_gen_get_job(
             poll_count,
         )
         .await?;
-        if snap.status == "succeeded" {
-            if let Some(ref rel) = snap.result_rel_path {
-                let mut map =
-                    state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
-                if let Some(job) = map.get_mut(id) {
-                    job.result_rel_path = Some(rel.clone());
-                    let job_clone = job.clone();
-                    let project = job_clone.project_path.clone();
-                    drop(map);
-                    let _ = persist_video_job(&project, id, &job_clone);
+        {
+            let mut map =
+                state.video_jobs.lock().map_err(|_| "video_jobs 锁异常".to_string())?;
+            if let Some(job) = map.get_mut(id) {
+                if snap.status == "succeeded" {
+                    if let Some(ref rel) = snap.result_rel_path {
+                        job.result_rel_path = Some(rel.clone());
+                    }
                 }
+                let job_clone = job.clone();
+                let project = job_clone.project_path.clone();
+                drop(map);
+                let _ = persist_video_job(&project, id, &job_clone);
             }
         }
         return Ok(snap);
@@ -968,15 +1014,43 @@ pub async fn video_gen_recover_dreamina(
     if req.submit_id.trim().is_empty() {
         return Err("submitId 不能为空".into());
     }
-    dreamina_gen::recover_dreamina_video_job(
+    let submit_id = req.submit_id.trim();
+    let project_path = req.project_path.trim();
+    let snap = dreamina_gen::recover_dreamina_video_job(
         &state.http,
-        req.submit_id.trim(),
-        req.project_path.trim(),
+        submit_id,
+        project_path,
         req.model_id.trim(),
         req.workflow.as_deref(),
         Some(req.node_id.trim()),
     )
-    .await
+    .await?;
+
+    if snap.status == "succeeded" {
+        if let Some(ref rel) = snap.result_rel_path {
+            let disk = load_persisted_video_job(project_path, submit_id).ok().flatten();
+            let mut job_record = disk.unwrap_or(VideoMockJob {
+                job_id: submit_id.to_string(),
+                project_path: project_path.to_string(),
+                node_id: req.node_id.trim().to_string(),
+                model_id: req.model_id.trim().to_string(),
+                polls: 0,
+                result_rel_path: None,
+                cancelled: false,
+                is_dreamina: true,
+                dreamina_workflow: req.workflow.clone(),
+            });
+            if job_record.job_id.trim().is_empty() {
+                job_record.job_id = submit_id.to_string();
+            }
+            job_record.result_rel_path = Some(rel.clone());
+            job_record.is_dreamina = true;
+            restore_video_job_to_memory(&state, submit_id, &job_record);
+            let _ = persist_video_job(project_path, submit_id, &job_record);
+        }
+    }
+
+    Ok(snap)
 }
 
 #[cfg(test)]
@@ -1003,6 +1077,70 @@ mod poll_parse_tests {
             Some("https://example.com/b.mp4")
         );
     }
+}
+
+fn list_persisted_video_jobs_on_disk(project_path: &str) -> Result<Vec<PersistedVideoJobEntry>, String> {
+    let dir = video_jobs_dir(project_path);
+    if !dir.is_dir() {
+        return Ok(vec![]);
+    }
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+        let stem_job_id = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("")
+            .trim()
+            .to_string();
+        if stem_job_id.is_empty() {
+            continue;
+        }
+        let modified_at_ms = entry
+            .metadata()
+            .ok()
+            .and_then(|m| m.modified().ok())
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as u64)
+            .unwrap_or(0);
+        let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        let job: VideoMockJob = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+        if job.node_id.trim().is_empty() {
+            continue;
+        }
+        let job_id = if job.job_id.trim().is_empty() {
+            stem_job_id.clone()
+        } else {
+            job.job_id.trim().to_string()
+        };
+        out.push(PersistedVideoJobEntry {
+            job_id,
+            project_path: job.project_path,
+            node_id: job.node_id,
+            model_id: job.model_id,
+            polls: job.polls,
+            result_rel_path: job.result_rel_path,
+            cancelled: job.cancelled,
+            is_dreamina: job.is_dreamina,
+            dreamina_workflow: job.dreamina_workflow,
+            modified_at_ms,
+        });
+    }
+    out.sort_by(|a, b| a.job_id.cmp(&b.job_id));
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn video_gen_list_persisted_jobs(project_path: String) -> Result<Vec<PersistedVideoJobEntry>, String> {
+    let path = project_path.trim();
+    if path.is_empty() {
+        return Err("projectPath 不能为空".into());
+    }
+    list_persisted_video_jobs_on_disk(path)
 }
 
 #[tauri::command]

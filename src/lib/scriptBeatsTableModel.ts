@@ -1,4 +1,5 @@
 import type { ScriptBeat, ScriptRole } from "@/lib/types";
+import { SHOT_TYPE_OPTIONS } from "@/lib/scriptBeatFieldNormalize";
 import scriptEnums from "@/shared/config/script-enums.json";
 
 export type ScriptBeatsTableVariant = "inline" | "fullscreen";
@@ -15,6 +16,7 @@ export type TableCol = { key: TableColKey; label: string; minW?: number };
 export const TEXTAREA_KEYS = new Set<ScriptBeatStringKey>([
   "description",
   "dialogue",
+  "storyboardBlock",
   "storyboardPrompt",
   "videoMotionPrompt",
 ]);
@@ -36,16 +38,74 @@ export function createEmptyScriptRole(): ScriptRole {
   };
 }
 
+function legacyRoleFromBeat(beat: ScriptBeat, idx: number): ScriptRole | undefined {
+  if (idx === 0) {
+    const name = (beat.character1 ?? "").trim();
+    const desc = (beat.character1Desc ?? "").trim();
+    const image = (beat.character1Image ?? "").trim();
+    if (!name && !desc && !image) return undefined;
+    return {
+      id: `legacy-role-${idx}`,
+      name: beat.character1 ?? "",
+      description: beat.character1Desc ?? "",
+      imagePath: beat.character1Image ?? "",
+      reference: "",
+      action: beat.characterAction ?? "",
+      emotion: beat.emotion ?? "",
+      lines: beat.dialogue ?? "",
+    };
+  }
+  if (idx === 1) {
+    const name = (beat.character2 ?? "").trim();
+    const desc = (beat.character2Desc ?? "").trim();
+    const image = (beat.character2Image ?? "").trim();
+    if (!name && !desc && !image) return undefined;
+    return {
+      id: `legacy-role-${idx}`,
+      name: beat.character2 ?? "",
+      description: beat.character2Desc ?? "",
+      imagePath: beat.character2Image ?? "",
+      reference: "",
+      action: "",
+      emotion: "",
+      lines: "",
+    };
+  }
+  return undefined;
+}
+
 /** 将 `characters[]` 写回 beat，并同步 character1/2 与对白等 legacy 列（表格角色图列与卡片一致） */
 export function applyCharactersToBeat(beat: ScriptBeat, roles: ScriptRole[]): ScriptBeat {
+  const r0 = roles[0];
+  const r1 = roles[1];
+  const dialogueFromRoles = roles
+    .map((r) => (r.lines ?? "").trim())
+    .filter(Boolean)
+    .join("\n");
   return {
     ...beat,
     characters: roles,
+    character1: r0?.name ?? "",
+    character1Desc: r0?.description ?? "",
+    character1Image: r0?.imagePath ?? "",
+    character2: r1?.name ?? "",
+    character2Desc: r1?.description ?? "",
+    character2Image: r1?.imagePath ?? "",
+    characterAction: r0?.action ?? beat.characterAction ?? "",
+    emotion: r0?.emotion ?? beat.emotion ?? "",
+    dialogue: dialogueFromRoles || (beat.dialogue ?? ""),
   };
 }
 
 export function getBeatRoles(beat: ScriptBeat): ScriptRole[] {
-  return beat.characters ?? [];
+  const roles = beat.characters ?? [];
+  if (roles.length > 0) return roles;
+  const legacy: ScriptRole[] = [];
+  const r0 = legacyRoleFromBeat(beat, 0);
+  const r1 = legacyRoleFromBeat(beat, 1);
+  if (r0) legacy.push(r0);
+  if (r1) legacy.push(r1);
+  return legacy;
 }
 
 export function summarizeScriptRoles(beat: ScriptBeat): string {
@@ -147,16 +207,24 @@ export function normalizeRoleDescDisplayText(input: string): string {
   return roleDescDisplayText(roleDescFromDisplayText(input));
 }
 
-/** 全屏：简化后的列（仅保留新管线实际生成的字段） */
+/** 全屏：结构化分镜字段（P0） */
 export const SCRIPT_BEATS_FULLSCREEN_BASE_COLUMNS: TableCol[] = [
-  { key: "shotNumber", label: "镜号", minW: 52 },
+  { key: "shotNumber", label: "镜号", minW: 72 },
+  { key: "sceneHeading", label: "场景", minW: 120 },
   { key: "durationHint", label: "时长", minW: 64 },
-  { key: "description", label: "画面描述", minW: 200 },
-  { key: "emotion", label: "情绪", minW: 80 },
-  { key: "sceneTags", label: "叙事目的", minW: 120 },
+  { key: "shotSize", label: "景别", minW: 72 },
+  { key: "cameraMove", label: "运镜", minW: 64 },
+  { key: "description", label: "画面描述", minW: 180 },
   { key: "dialogue", label: "对白", minW: 140 },
-  { key: "storyboardPrompt", label: "Seedance 正向", minW: 160 },
-  { key: "videoMotionPrompt", label: "Seedance 负向", minW: 160 },
+  { key: "dialogueType", label: "对白类型", minW: 80 },
+  { key: "performanceNote", label: "表演", minW: 72 },
+  { key: "emotion", label: "情绪", minW: 72 },
+  { key: "bgmHint", label: "BGM", minW: 100 },
+  { key: "rhythmTag", label: "节奏", minW: 88 },
+  { key: "soundHint", label: "声音", minW: 88 },
+  { key: "editFocus", label: "剪辑", minW: 88 },
+  { key: "storyboardPrompt", label: "Seedance 正向", minW: 140 },
+  { key: "videoMotionPrompt", label: "Seedance 负向", minW: 140 },
 ];
 
 export const INLINE_COLUMNS_WIDE: TableCol[] = [
@@ -233,6 +301,9 @@ export const DEFAULT_HIDDEN_COLS: string[] = [];
 
 export const EMOTION_OPTIONS = scriptEnums.emotion;
 export const CAMERA_MOVE_OPTIONS = scriptEnums.cameraMove;
+export const DIALOGUE_TYPE_OPTIONS = scriptEnums.dialogueType;
+export const BGM_MOOD_OPTIONS = scriptEnums.bgmMood;
+export const SHOT_SIZE_OPTIONS = SHOT_TYPE_OPTIONS;
 
 export const SCRIPT_TABLE_HIDDEN_COLS_STORAGE_KEY = "scriptWorkbench.fullscreen.hiddenCols.v1";
 export const SCRIPT_TABLE_FILTER_STORAGE_KEY = "scriptWorkbench.fullscreen.filterQuery.v1";
@@ -307,15 +378,31 @@ export function rowMatchesFilter(b: ScriptBeat, q: string): boolean {
   if (!t) return true;
   const keys: (keyof ScriptBeat)[] = [
     "shotNumber",
+    "episodeSceneShot",
+    "sceneHeading",
     "durationHint",
+    "shotSize",
+    "cameraMove",
+    "cameraAngle",
     "description",
     "emotion",
+    "rhythmTag",
     "sceneTags",
+    "soundHint",
+    "editFocus",
     "dialogue",
+    "dialogueType",
+    "performanceNote",
+    "bgmHint",
+    "storyboardBlock",
     "storyboardPrompt",
     "videoMotionPrompt",
+    "character1",
+    "character1Desc",
+    "character2",
+    "character2Desc",
   ];
-  const roles = b.characters ?? [];
+  const roles = getBeatRoles(b);
   if (roles.some((r) => [r.name, r.description, r.action, r.emotion, r.lines].some((x) => (x ?? "").toLowerCase().includes(t)))) {
     return true;
   }
@@ -350,21 +437,14 @@ export function updateRoleField(
   roles[roleIdx] = { ...roles[roleIdx], ...patch };
   return rowsIn.map((r, i) => {
     if (i !== rowIdx) return r;
-    return { ...r, characters: roles };
+    return applyCharactersToBeat(r, roles);
   });
 }
 
 export function getRoleCompat(b: ScriptBeat, roleIdx: number): ScriptRole {
   const role = b.characters?.[roleIdx];
   if (role) return role;
-  return {
-    id: crypto.randomUUID(),
-    name: "",
-    description: "",
-    imagePath: "",
-    reference: "",
-    action: "",
-    emotion: "",
-    lines: "",
-  };
+  const legacy = legacyRoleFromBeat(b, roleIdx);
+  if (legacy) return legacy;
+  return createEmptyScriptRole();
 }

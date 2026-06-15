@@ -44,3 +44,10 @@ export function cancelScheduledSave() {
   window.clearTimeout(saveTimer);
   saveTimer = undefined;
 }
+
+/** 立即保存（用于视频任务提交、关闭画布前等需要立刻落盘 activeJob 的场景） */
+export async function flushProjectSave(get: () => ProjectState): Promise<void> {
+  cancelScheduledSave();
+  if (!get().projectPath) return;
+  await get().saveProject();
+}

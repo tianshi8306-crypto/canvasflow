@@ -34,7 +34,9 @@ import { useProjectStore } from "@/store/projectStore";
 import { SettingsAboutPane } from "@/components/settings/SettingsAboutPane";
 import { PROJECT_AUTO_SAVE_OPTIONS, normalizeProjectAutoSaveIdleSec } from "@/lib/projectAutoSaveSettings";
 import { applyProjectAutoSaveIdleSec } from "@/store/projectSaveDebounce";
+import { applyAppTheme } from "@/lib/appTheme";
 import { applyAppSettingsToCanvasUi } from "@/lib/canvasSettingsSync";
+import type { AppThemePreset } from "@/lib/settingsPanelTypes";
 
 export function SettingsPanel(props: {
   open: boolean;
@@ -354,6 +356,32 @@ export function SettingsPanel(props: {
                           {opt.label}
                         </option>
                       ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="settingsSection">
+                  <div className="settingsSectionTitle">外观</div>
+                  <div className="settingsField">
+                    <label className="settingsFieldLabel" htmlFor="themePreset">
+                      界面主题
+                    </label>
+                    <span className="settingsFieldHint">
+                      切换画布、节点、侧栏与设置面板的整体明暗风格。强调色保持青蓝。
+                    </span>
+                    <select
+                      id="themePreset"
+                      className="settingsInput"
+                      value={settings.themePreset}
+                      onChange={(e) => {
+                        const theme = e.target.value as AppThemePreset;
+                        applyAppTheme(theme);
+                        useCanvasUiStore.getState().setThemePreset(theme);
+                        setSettings({ ...settings, themePreset: theme });
+                      }}
+                    >
+                      <option value="dark">深色</option>
+                      <option value="light">浅色</option>
                     </select>
                   </div>
                 </div>

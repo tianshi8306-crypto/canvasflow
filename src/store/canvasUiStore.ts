@@ -235,8 +235,8 @@ type CanvasUiState = {
   setTitleFollowsCanvasZoom: (v: boolean) => void;
 
   /** 主题预设 */
-  themePreset: "dark" | "dawn" | "day" | "dusk";
-  setThemePreset: (v: "dark" | "dawn" | "day" | "dusk") => void;
+  themePreset: "dark" | "light";
+  setThemePreset: (v: "dark" | "light") => void;
 
   /** 字号 */
   fontSize: "small" | "medium" | "large";
@@ -323,8 +323,19 @@ type CanvasUiState = {
     message: string;
     onConfirm: () => void;
     onCancel: () => void;
+    confirmLabel?: string;
+    saveLabel?: string;
+    onSave?: () => void | Promise<void>;
   } | null;
-  openConfirmDialog: (opts: { title: string; message: string; onConfirm: () => void; onCancel?: () => void }) => void;
+  openConfirmDialog: (opts: {
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    onCancel?: () => void;
+    confirmLabel?: string;
+    saveLabel?: string;
+    onSave?: () => void | Promise<void>;
+  }) => void;
   closeConfirmDialog: () => void;
 
   /** 保存工作流对话框 */
@@ -626,6 +637,9 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
         message: opts.message,
         onConfirm: opts.onConfirm,
         onCancel: opts.onCancel ?? (() => {}),
+        confirmLabel: opts.confirmLabel,
+        saveLabel: opts.saveLabel,
+        onSave: opts.onSave,
       },
     });
   },

@@ -1,4 +1,3 @@
-import type { FlowNodeData } from "@/lib/types";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
 import {
   buildTextNodeUpstreamTextRefs,
@@ -71,7 +70,10 @@ export const textNodeDispatchAgentRuntime: NodeTaskAgentRuntime<
   sense: ({ prompt, modelInput, dispatch }, ctx) => {
     const nodes = useProjectStore.getState().nodes;
     const edges = useProjectStore.getState().edges;
-    const raw = (modelInput.trim() || prompt.trim()).trim();
+    // 多轮对话：如果既有正文又有新指令，将正文作为上下文包含进来
+    const raw = modelInput.trim() && prompt.trim()
+      ? `${prompt.trim()}\n\n${modelInput.trim()}`
+      : (modelInput.trim() || prompt.trim()).trim();
     const withNodeMentions = resolveMentionNodeTokens(raw, nodes);
     const textRefs = buildTextNodeUpstreamTextRefs(nodes, edges, ctx.nodeId);
     const normalizedPrompt = expandPromptTextAtReferences(withNodeMentions, textRefs);
@@ -81,10 +83,19 @@ export const textNodeDispatchAgentRuntime: NodeTaskAgentRuntime<
     return { normalizedPrompt, dispatch };
   },
   execute: async (sensed, ctx) => {
-    const patch: Partial<FlowNodeData> = { prompt: sensed.normalizedPrompt };
-    // 执行前将归一化后的输入写回节点记忆体，确保 DAG 读取到确定性输入。
-    ctx.updateNodeData(ctx.nodeId, patch);
-    ctx.setStatusText("文本 Agent 已完成输入归一化，正在请求 DAG 调度…");
+    const nodes = useProjectStore.getState().nodes;
+    const edges = useProjectStore.getState().edges;
+    const hasUpstreamText = buildTextNodeUpstreamTextRefs(nodes, edges, ctx.nodeId).length > 0;
+    if (!hasUpstreamText) {
+      // 无上游：将归一化输入写入 prompt，供 DAG 直接作为 LLM 输入
+      ctx.updateNodeData(ctx.nodeId, { prompt: sensed.normalizedPrompt });
+    }
+  // 有上游：保留 prompt 供预览展示 LLM 结果；指令在 params.textModelInput，后端单独读取
+    ctx.setStatusText(
+      hasUpstreamText
+        ? "正在根据上游文本处理…"
+        : "文本 Agent 已完成输入归一化，正在请求 DAG 调度…",
+    );
     await sensed.dispatch(ctx.nodeId, false);
     return sensed;
   },

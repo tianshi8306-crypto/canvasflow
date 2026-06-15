@@ -1,5 +1,5 @@
 import type { ScriptBeat } from "@/lib/types";
-import { extractCameraMove } from "@/lib/scriptWorkbenchSceneTags";
+import { readCameraMove } from "@/lib/scriptWorkbenchSceneTags";
 import { ScriptBeatRoleSummary } from "@/components/script/ScriptBeatRoleSummary";
 
 type Props = {
@@ -26,7 +26,7 @@ export function ScriptWorkbenchCardView({
       }}
     >
       {rows.map((b, idx) => {
-        const cameraMove = extractCameraMove(b.sceneTags);
+        const cameraMove = readCameraMove(b);
 
         return (
           <div
@@ -48,12 +48,32 @@ export function ScriptWorkbenchCardView({
               <span className="field-value mono">{(b.shotNumber || "").trim() || "—"}</span>
             </div>
             <div className="field field-readonly">
+              <label>场景</label>
+              <span className="field-value">{(b.sceneHeading || "").trim() || "—"}</span>
+            </div>
+            <div className="field field-readonly">
               <label>时长建议</label>
               <span className="field-value mono">{(b.durationHint || "").trim() || "—"}</span>
             </div>
             <div className="field field-readonly">
+              <label>景别</label>
+              <span className="field-value">{(b.shotSize || "").trim() || "—"}</span>
+            </div>
+            <div className="field field-readonly">
               <label>运镜</label>
               <span className="field-value">{cameraMove || "—"}</span>
+            </div>
+            <div className="field field-readonly">
+              <label>对白类型</label>
+              <span className="field-value">{(b.dialogueType || "").trim() || "—"}</span>
+            </div>
+            <div className="field field-readonly">
+              <label>表演</label>
+              <span className="field-value">{(b.performanceNote || "").trim() || "—"}</span>
+            </div>
+            <div className="field field-readonly">
+              <label>BGM</label>
+              <span className="field-value">{(b.bgmHint || "").trim() || "—"}</span>
             </div>
             <div className="field field-readonly">
               <label>画面描述</label>

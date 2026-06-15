@@ -121,6 +121,24 @@ pub struct DreaminaVideoRecoverRequest {
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
+pub struct PersistedVideoJobEntry {
+    pub job_id: String,
+    pub project_path: String,
+    pub node_id: String,
+    pub model_id: String,
+    pub polls: u32,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub result_rel_path: Option<String>,
+    pub cancelled: bool,
+    pub is_dreamina: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub dreamina_workflow: Option<String>,
+    /// 磁盘文件修改时间（毫秒），用于同一节点多任务时选最新
+    pub modified_at_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct VideoJobSnapshot {
     pub id: String,
     pub status: String,

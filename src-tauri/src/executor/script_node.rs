@@ -11,9 +11,10 @@ use super::graph_flow::{
 };
 use crate::media::{probe_media, MediaMeta};
 use super::script_parse::{
-    detect_style_from_text, normalize_script_beats, parse_style_profile,
-    style_profile_name, ScriptBeatOut, ScriptStyleProfile,
+    detect_style_from_text, normalize_script_beats, parse_style_profile, scene_key_from_heading,
+    build_script_rhythm_report, style_profile_name, ScriptBeatOut, ScriptStyleProfile,
 };
+use super::script_decision::format_shot_storyboard_block;
 use super::script_pipeline::{analyze_script_structure, design_shots};
 use super::script_shot_agent::{generate_shot_visual, ShotVisualOut};
 
@@ -136,6 +137,7 @@ pub(crate) async fn run_script_node(
     // 阶段 3：逐镜 LLM 生成
     // ═══════════════════════════════════════════
     let mut beats_out: Vec<ScriptBeatOut> = Vec::with_capacity(shot_plans.len());
+    let mut scene_shot_counters: HashMap<usize, usize> = HashMap::new();
 
     // Fix 4: 构建角色描述线索映射
     let character_hints: HashMap<String, String> = structure.characters.iter()
@@ -195,24 +197,51 @@ pub(crate) async fn run_script_node(
             String::new()
         };
 
+        let dialogue_final = if visual.dialogue.trim().is_empty() {
+            plan.dialogue_text.clone()
+        } else {
+            visual.dialogue.clone()
+        };
+        let visual_desc = if visual.shot_desc.trim().is_empty() {
+            plan.text_segment.clone()
+        } else {
+            visual.shot_desc.clone()
+        };
+        let storyboard_block =
+            format_shot_storyboard_block(plan, &visual_desc, &dialogue_final);
+        let scene_key = scene_key_from_heading(&plan.scene_heading);
+        let scene_counter = scene_shot_counters.entry(plan.scene_index).or_insert(0);
+        *scene_counter += 1;
+        let episode_scene_shot = format!("{}-{:02}", scene_key, *scene_counter);
+        let rhythm_tag = if plan.rhythm_function.trim().is_empty() {
+            plan.narrative_purpose.as_str().to_string()
+        } else {
+            plan.rhythm_function.clone()
+        };
+
         beats_out.push(ScriptBeatOut {
             serial_number: plan.serial,
             duration: plan.estimated_duration_sec,
-            shot_desc: if visual.shot_desc.trim().is_empty() {
-                plan.text_segment.clone()
-            } else {
-                visual.shot_desc
-            },
-            dialogue: if visual.dialogue.trim().is_empty() {
-                plan.dialogue_text.clone()
-            } else {
-                visual.dialogue
-            },
+            shot_desc: visual_desc,
+            storyboard_block,
+            dialogue: dialogue_final,
             seedance_positive: visual.seedance_positive,
             seedance_negative: visual.seedance_negative,
             characters_in_shot: chars,
             emotion,
             narrative_purpose: plan.narrative_purpose.as_str().to_string(),
+            scene_heading: plan.scene_heading.clone(),
+            episode_scene_shot,
+            shot_size: plan.shot_size.clone(),
+            camera_move: plan.camera_move.clone(),
+            camera_angle: plan.camera_angle.clone(),
+            sound_hint: plan.sound_hint.clone(),
+            edit_focus: plan.edit_focus.clone(),
+            rhythm_tag,
+            is_reaction_shot: plan.is_reaction_shot,
+            dialogue_type: plan.dialogue_type.clone(),
+            performance_note: plan.performance_note.clone(),
+            bgm_hint: plan.bgm_hint.clone(),
         });
     }
 
@@ -221,6 +250,7 @@ pub(crate) async fn run_script_node(
         &json!({ "beatCount": beats_out.len() }),
     )?;
 
+    let rhythm_report = build_script_rhythm_report(&beats_out);
     let beats = normalize_script_beats(beats_out);
 
     // Fix 12: 保留已有的有效勾选
@@ -242,10 +272,12 @@ pub(crate) async fn run_script_node(
         existing_selection.into_iter().filter(|id| new_beat_ids.contains(id)).collect()
     };
 
-    // Fix 5: 移除冗余字段 scriptTotalDurationSec/scriptShotCount
     let patch = json!({
         "scriptBeats": beats,
         "scriptBeatSelection": selection,
+        "scriptRhythmReport": rhythm_report,
+        "scriptTotalDurationSec": rhythm_report.get("totalDurationSec"),
+        "scriptShotCount": rhythm_report.get("shotCount"),
     });
 
     // Fix 10: 将结构化结果摘要作为 node_output，供下游节点使用

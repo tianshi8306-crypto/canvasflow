@@ -53,6 +53,50 @@ fn default_agent_max_concurrent_media() -> u8 {
     2
 }
 
+fn default_theme_preset() -> String {
+    "dark".into()
+}
+
+fn default_font_size() -> String {
+    "medium".into()
+}
+
+fn default_cursor_style() -> String {
+    "default".into()
+}
+
+fn default_prompt_action_surface() -> String {
+    "themed".into()
+}
+
+fn default_node_spacing() -> u32 {
+    120
+}
+
+fn default_node_direction() -> String {
+    "right".into()
+}
+
+fn default_highlight_color() -> String {
+    "white".into()
+}
+
+fn default_align_trigger_mode() -> String {
+    "click".into()
+}
+
+fn default_align_distribute_gap() -> u32 {
+    40
+}
+
+fn default_upload_quality() -> String {
+    "standard".into()
+}
+
+fn default_project_auto_save_idle_sec() -> u32 {
+    2
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AppSettings {
@@ -95,9 +139,65 @@ pub struct AppSettings {
     /// 长上下文 workstate 摘要用 LLM（关则仅规则压缩）
     #[serde(default = "default_true")]
     pub agent_long_context_llm_summary: bool,
+    /// 任务结束后 LLM 复盘
+    #[serde(default = "default_true")]
+    pub agent_post_job_llm_reflect: bool,
+    /// 灵体对失败/断链建议自动执行
+    #[serde(default = "default_true")]
+    pub agent_proactive_recovery: bool,
     /// 外接 MCP Server（stdio 子进程）
     #[serde(default)]
     pub hermes_mcp_servers: Vec<crate::mcp_stdio::HermesMcpServerConfig>,
+
+    // ── 外观（与前端 AppSettings 对齐，须持久化到 settings.json）──
+    #[serde(default = "default_theme_preset")]
+    pub theme_preset: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: String,
+    #[serde(default = "default_cursor_style")]
+    pub cursor_style: String,
+    #[serde(default = "default_true")]
+    pub grid_dots_visible: bool,
+    #[serde(default = "default_prompt_action_surface")]
+    pub prompt_action_surface: String,
+
+    // ── 节点行为 ──
+    #[serde(default = "default_true")]
+    pub show_video_meta: bool,
+    #[serde(default = "default_true")]
+    pub image_video_node_resize_enabled: bool,
+    #[serde(default = "default_true")]
+    pub prompt_box_resize_enabled: bool,
+    #[serde(default = "default_true")]
+    pub title_follows_canvas_zoom: bool,
+    #[serde(default = "default_node_spacing")]
+    pub node_spacing: u32,
+    #[serde(default = "default_node_direction")]
+    pub node_direction: String,
+    #[serde(default = "default_true")]
+    pub node_avoid_overlap: bool,
+
+    // ── 画布对齐 ──
+    #[serde(default = "default_true")]
+    pub selection_related_highlight_enabled: bool,
+    #[serde(default = "default_highlight_color")]
+    pub selection_related_highlight_color: String,
+    #[serde(default = "default_true")]
+    pub snap_guides_enabled: bool,
+    #[serde(default = "default_true")]
+    pub connection_lines_visible: bool,
+    #[serde(default)]
+    pub snap_grid_enabled: bool,
+    #[serde(default = "default_align_trigger_mode")]
+    pub align_feature_trigger_mode: String,
+    #[serde(default = "default_align_distribute_gap")]
+    pub align_distribute_gap: u32,
+
+    // ── 素材 ──
+    #[serde(default = "default_upload_quality")]
+    pub upload_quality: String,
+    #[serde(default = "default_project_auto_save_idle_sec")]
+    pub project_auto_save_idle_sec: u32,
 }
 
 impl Default for AppSettings {
@@ -125,8 +225,52 @@ impl Default for AppSettings {
             agent_max_concurrent_media: default_agent_max_concurrent_media(),
             agent_loop_enabled: true,
             agent_long_context_llm_summary: true,
+            agent_post_job_llm_reflect: true,
+            agent_proactive_recovery: true,
             hermes_mcp_servers: Vec::new(),
+            theme_preset: default_theme_preset(),
+            font_size: default_font_size(),
+            cursor_style: default_cursor_style(),
+            grid_dots_visible: true,
+            prompt_action_surface: default_prompt_action_surface(),
+            show_video_meta: true,
+            image_video_node_resize_enabled: true,
+            prompt_box_resize_enabled: true,
+            title_follows_canvas_zoom: true,
+            node_spacing: default_node_spacing(),
+            node_direction: default_node_direction(),
+            node_avoid_overlap: true,
+            selection_related_highlight_enabled: true,
+            selection_related_highlight_color: default_highlight_color(),
+            snap_guides_enabled: true,
+            connection_lines_visible: true,
+            snap_grid_enabled: false,
+            align_feature_trigger_mode: default_align_trigger_mode(),
+            align_distribute_gap: default_align_distribute_gap(),
+            upload_quality: default_upload_quality(),
+            project_auto_save_idle_sec: default_project_auto_save_idle_sec(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppSettings;
+
+    #[test]
+    fn round_trip_theme_preset_light() {
+        let json = r#"{
+            "providers": [],
+            "themePreset": "light",
+            "gridDotsVisible": true,
+            "snapGuidesEnabled": true,
+            "connectionLinesVisible": true,
+            "projectAutoSaveIdleSec": 2
+        }"#;
+        let parsed: AppSettings = serde_json::from_str(json).expect("parse");
+        assert_eq!(parsed.theme_preset, "light");
+        let out = serde_json::to_string(&parsed).expect("serialize");
+        assert!(out.contains("\"themePreset\":\"light\""));
     }
 }
 

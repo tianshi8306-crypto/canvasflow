@@ -20,6 +20,10 @@ export function ConfirmDialog() {
 
   if (!confirmDialog?.open) return null;
 
+  const confirmLabel = confirmDialog.confirmLabel ?? "删除";
+  const saveLabel = confirmDialog.saveLabel;
+  const onSave = confirmDialog.onSave;
+
   return (
     <>
       <div className="confirmDialogOverlay" onClick={closeConfirmDialog} />
@@ -37,15 +41,30 @@ export function ConfirmDialog() {
           >
             取消
           </button>
+          {onSave && saveLabel ? (
+            <button
+              type="button"
+              className="confirmDialogBtn confirmDialogBtn--primary"
+              onClick={() => {
+                void Promise.resolve(onSave()).finally(() => closeConfirmDialog());
+              }}
+            >
+              {saveLabel}
+            </button>
+          ) : null}
           <button
             type="button"
-            className="confirmDialogBtn confirmDialogBtn--danger"
+            className={
+              confirmLabel === "关闭"
+                ? "confirmDialogBtn confirmDialogBtn--confirm"
+                : "confirmDialogBtn confirmDialogBtn--danger"
+            }
             onClick={() => {
               confirmDialog.onConfirm();
               closeConfirmDialog();
             }}
           >
-            删除
+            {confirmLabel}
           </button>
         </div>
       </div>

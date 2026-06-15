@@ -40,7 +40,6 @@ function NodeChromeShell({
   const shellStyle: CSSProperties = {
     width,
     height,
-    ...(selected ? { borderColor: "rgba(255, 255, 255, 0.8)" } : {}),
     ...style,
   };
 

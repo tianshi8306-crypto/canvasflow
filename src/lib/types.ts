@@ -15,6 +15,16 @@ export type ScriptRole = {
   lines: string;
 };
 
+/** 脚本节点集级节奏报告 */
+export type ScriptRhythmReport = {
+  totalDurationSec?: number;
+  shotCount?: number;
+  closeUpRatio?: number;
+  closeUpPercent?: number;
+  first30sShotCount?: number;
+  first30sHook?: string;
+};
+
 /** 脚本工作台中的单条镜头/节拍（持久化进画布 JSON） */
 export type ScriptBeat = {
   id: string;
@@ -38,6 +48,32 @@ export type ScriptBeat = {
   sceneTags: string;
   /** 对白 */
   dialogue: string;
+  /** 场号标题（如 1-1 日 外 悬崖） */
+  sceneHeading?: string;
+  /** 集-场-镜号（如 1-1-03） */
+  episodeSceneShot?: string;
+  /** 景别（规则引擎 / 枚举） */
+  shotSize?: string;
+  /** 运镜（枚举：固定/推/拉/摇/移/跟/环绕） */
+  cameraMove?: string;
+  /** 机位角度（平视/仰拍等） */
+  cameraAngle?: string;
+  /** 声音提示 */
+  soundHint?: string;
+  /** 剪辑重点 / 转场 */
+  editFocus?: string;
+  /** 节奏功能（建立空间/推进/转折/反应镜等） */
+  rhythmTag?: string;
+  /** 完整分镜块（导出/预览用，画面描述见 description） */
+  storyboardBlock?: string;
+  /** 是否为反应镜头 */
+  isReactionShot?: boolean;
+  /** 对白类型：对白 / OS / VO / 旁白 / 字幕 */
+  dialogueType?: string;
+  /** 表演备注（兴奋、皱眉等） */
+  performanceNote?: string;
+  /** BGM 氛围提示 */
+  bgmHint?: string;
   /** Seedance 2.0 正向提示词 */
   storyboardPrompt: string;
   /** Seedance 2.0 负向提示词 */
@@ -67,8 +103,8 @@ export type ScriptBeat = {
   character2ImageAssetId?: string;
   /** @deprecated 已弃用 */
   reference: string;
-  /** @deprecated 已弃用，景别不再生成 */
-  shotSize: string;
+  /** @deprecated 旧工程兼容；新管线使用可选 shotSize */
+  shotSizeLegacy?: string;
   /** @deprecated 已弃用，使用 characters[].action */
   characterAction: string;
   /** @deprecated 已弃用 */
@@ -185,6 +221,8 @@ export type FlowNodeData = {
   scriptTotalDurationSec?: number;
   /** 脚本节点：镜头条数，由执行器解析回填 */
   scriptShotCount?: number;
+  /** 集级节奏报告（前 30 秒钩子、特写占比等） */
+  scriptRhythmReport?: ScriptRhythmReport;
   /** 节点运行状态（C.1：节点状态机） */
   status?: NodeStatus;
 };

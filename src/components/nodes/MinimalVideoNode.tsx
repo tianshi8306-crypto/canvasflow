@@ -199,7 +199,10 @@ function MinimalVideoNodeInner({
   }, [selected, deleteSelection]);
 
   const jobStatus = videoBlock.activeJob?.status;
-  const isGenerating = isVideoGenerationInProgress({ status: jobStatus });
+  const showInProgressBadge =
+    !hasPath || Boolean(videoBlock.awaitingNewResult);
+  const isGenerating =
+    showInProgressBadge && isVideoGenerationInProgress({ status: jobStatus });
   const genProgressPercent = isGenerating
     ? getVideoGenerationProgressPercent({
         status: jobStatus,

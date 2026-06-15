@@ -113,7 +113,7 @@ import {
   runRedo,
 } from "./projectHistory";
 export { getUndoRedoAvailability } from "./projectHistory";
-import { scheduleSave } from "./projectSaveDebounce";
+import { flushProjectSave, scheduleSave } from "./projectSaveDebounce";
 import { focusShellAfterNativeDialog } from "./projectShellFocus";
 import type { ProjectState } from "./projectStoreTypes";
 export type { GraphSnapshot, ProjectState } from "./projectStoreTypes";
@@ -137,7 +137,9 @@ import {
   runWorkflowImpl,
 } from "./projectWorkflowRuns";
 import { rebuildShotNodeRegistry } from "@/lib/hermes";
-import { bindActiveTabToProject, syncActiveTabUnsaved } from "@/lib/canvasTabSync";
+import { bindActiveTabToProject, persistActiveTabSnapshot, syncActiveTabUnsaved } from "@/lib/canvasTabSync";
+import { openCanvasCloseConfirm } from "@/lib/canvasCloseConfirm";
+import { reconcileVideoJobsFromDisk } from "@/lib/videoGeneration/reconcileVideoJobsFromDisk";
 import {
   applyProjectSnapshot,
   loadProjectFolder,
@@ -244,6 +246,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           useCanvasUiStore.getState().dismissEmptyGuide();
         }
         bindActiveTabToProject();
+        if (patch.projectPath) {
+          void reconcileVideoJobsFromDisk(patch.projectPath);
+        }
       });
     });
   };
@@ -611,7 +616,8 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   closeProject: async () => {
-    const { projectPath, projectDirty } = get();
+    persistActiveTabSnapshot();
+    const { projectPath, projectDirty, nodes } = get();
     if (!projectPath) return;
 
     const doClose = () => {
@@ -645,16 +651,16 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       resetProjectSaveRevisionBaseline(0);
     };
 
-    if (projectDirty) {
-      useCanvasUiStore.getState().openConfirmDialog({
-        title: "关闭工程？",
-        message: "当前工程有尚未写入磁盘的更改，关闭后将丢弃（若已自动保存可忽略）。确定关闭？",
-        onConfirm: doClose,
-        onCancel: () => {},
-      });
-      return;
-    }
-    doClose();
+    openCanvasCloseConfirm({
+      nodes,
+      projectDirty,
+      title: "关闭工程？",
+      onClose: doClose,
+      onSaveAndClose: async () => {
+        await flushProjectSave(get);
+        doClose();
+      },
+    });
   },
 
   saveProject: async () => {
@@ -1790,6 +1796,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
           statusText,
           flowClipboardCount: getFlowClipboardCount(),
         });
+        if (projectPath) {
+          void reconcileVideoJobsFromDisk(projectPath);
+        }
       });
     });
   },
@@ -2323,9 +2332,14 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   },
 
   deleteSelection: () => {
-    const { selectedNodeIds, selectedEdgeIds } = get();
+    const { selectedNodeIds, selectedEdgeIds, nodes, projectPath } = get();
     if (selectedNodeIds.length === 0 && selectedEdgeIds.length === 0) return;
     recordBeforeDiscreteMutation(get);
+    const deletedNodes = nodes.filter((n) => selectedNodeIds.includes(n.id));
+    const candidateRelPaths = (async () => {
+      const { collectAssetRelPathsFromNodes } = await import("@/lib/canvasAssetRefs");
+      return collectAssetRelPathsFromNodes(deletedNodes);
+    })();
     set((s) => ({
       nodes: s.nodes.filter((n) => !selectedNodeIds.includes(n.id)),
       edges: s.edges.filter(
@@ -2340,6 +2354,24 @@ export const useProjectStore = create<ProjectState>((set, get) => {
       statusText: `已删除 ${selectedNodeIds.length} 个，${selectedEdgeIds.length} 条连线`,
     }));
     afterGraphEdit();
+    void (async () => {
+      const paths = await candidateRelPaths;
+      const root = projectPath?.trim();
+      if (!root || paths.length === 0) return;
+      try {
+        if (!isTauri()) return;
+        const { gcUnreferencedAssets } = await import("@/shared/api/assets");
+        const remainingNodes = get().nodes;
+        const result = await gcUnreferencedAssets(root, remainingNodes, paths);
+        if (result.deletedRelPaths.length > 0) {
+          set({
+            statusText: `已删除 ${selectedNodeIds.length} 个节点，并清理 ${result.deletedRelPaths.length} 个素材文件`,
+          });
+        }
+      } catch {
+        /* GC 失败不阻断删除操作 */
+      }
+    })();
   },
 
   toggleSelectedEdgesDisabled: (disabled) => {

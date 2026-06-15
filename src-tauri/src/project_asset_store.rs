@@ -1,6 +1,6 @@
-//! 工程素材统一落盘（类型优先）：
-//! - 用户导入 → `assets/{kind}/import/`
-//! - AI 生成 → `assets/{kind}/gen/{source}/`
+//! 工程素材统一落盘：
+//! - 图片 / 视频 → 扁平目录 `assets/{kind}/{序号}.{ext}`（按生成顺序编号）
+//! - 音频等 → `assets/{kind}/import/` 或 `assets/{kind}/gen/{source}/`
 
 use crate::command_common::media_type_from_ext;
 use crate::db;
@@ -85,7 +85,89 @@ fn ensure_unique_path(abs_dir: &Path, file_name: &str) -> PathBuf {
     dest
 }
 
-/// 用户导入：保留原文件名，冲突时追加 4 位后缀
+fn uses_flat_media_dir(kind: &str) -> bool {
+    matches!(kind, "image" | "video")
+}
+
+/// `assets/image/000001.png` 或 `assets/video/000042.mp4`
+pub fn is_flat_media_rel(rel: &str) -> bool {
+    let p = rel.replace('\\', "/");
+    let parts: Vec<&str> = p.split('/').collect();
+    parts.len() == 3
+        && parts[0] == "assets"
+        && matches!(parts[1], "image" | "video")
+        && !parts[2].is_empty()
+}
+
+fn parse_flat_seq_from_name(name: &str) -> Option<u64> {
+    let stem = Path::new(name)
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or("");
+    if stem.len() != 6 || !stem.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    stem.parse().ok()
+}
+
+/// 扫描磁盘上已有扁平序号（含旧嵌套目录中的 6 位序号文件名）
+pub fn scan_max_flat_sequence(project_path: &Path, kind: &str) -> u64 {
+    let mut max_seq = 0u64;
+    let kind_dir = project_path.join(format!("assets/{kind}"));
+    if kind_dir.is_dir() {
+        scan_dir_max_seq(&kind_dir, &mut max_seq);
+    }
+    max_seq
+}
+
+fn scan_dir_max_seq(dir: &Path, max_seq: &mut u64) {
+    let entries = fs::read_dir(dir).ok();
+    if entries.is_none() {
+        return;
+    }
+    for entry in entries.unwrap().flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            scan_dir_max_seq(&path, max_seq);
+            continue;
+        }
+        if !path.is_file() {
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().to_string();
+        if let Some(seq) = parse_flat_seq_from_name(&name) {
+            *max_seq = (*max_seq).max(seq);
+        }
+    }
+}
+
+/// 图片/视频：按工程序号分配 `assets/{kind}/{000001}.{ext}`
+pub fn allocate_sequential_media_path(
+    project_path: &Path,
+    kind: &str,
+    ext: &str,
+) -> Result<(String, PathBuf), String> {
+    let kind = kind.trim().to_lowercase();
+    if !uses_flat_media_dir(&kind) {
+        return Err(format!("扁平序号目录仅用于 image/video，收到：{kind}"));
+    }
+    let ext = ext.trim_start_matches('.').to_lowercase();
+    if ext.is_empty() {
+        return Err("扩展名不能为空".into());
+    }
+    let conn = db::open_run_db(project_path)?;
+    let disk_max = scan_max_flat_sequence(project_path, &kind);
+    db::seed_asset_sequence(&conn, &kind, disk_max)?;
+    let seq = db::bump_asset_sequence(&conn, &kind)?;
+    let file_name = format!("{:06}.{}", seq, ext);
+    let rel_dir = format!("assets/{kind}");
+    let abs_dir = project_path.join(&rel_dir);
+    fs::create_dir_all(&abs_dir).map_err(|e| format!("创建素材目录失败：{e}"))?;
+    let rel = format!("{rel_dir}/{file_name}");
+    Ok((rel, abs_dir.join(&file_name)))
+}
+
+/// 用户导入：图片/视频走序号；其余类型保留原文件名
 pub fn allocate_import_asset_paths(
     project_path: &Path,
     kind: &str,
@@ -94,6 +176,13 @@ pub fn allocate_import_asset_paths(
     let kind = kind.trim().to_lowercase();
     if kind != "video" && kind != "image" && kind != "audio" && kind != "file" {
         return Err(format!("不支持的素材 kind：{kind}"));
+    }
+    if uses_flat_media_dir(&kind) {
+        let ext = Path::new(original_file_name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or(if kind == "video" { "mp4" } else { "png" });
+        return allocate_sequential_media_path(project_path, &kind, ext);
     }
     let file_name = sanitize_import_filename(original_file_name);
     let rel_dir = format!("assets/{kind}/import");
@@ -110,7 +199,7 @@ pub fn allocate_import_asset_paths(
     Ok((rel, abs))
 }
 
-/// 分配 AI 生成物工程内相对路径与绝对路径（不写入磁盘）
+/// 分配工程内相对路径与绝对路径（不写入磁盘）
 pub fn allocate_project_asset_paths(
     project_path: &Path,
     ext: &str,
@@ -120,12 +209,15 @@ pub fn allocate_project_asset_paths(
     if kind != "video" && kind != "image" && kind != "audio" && kind != "file" {
         return Err(format!("不支持的素材 kind：{}", kind));
     }
-    let source = sanitize_token(ctx.source, 24).to_lowercase();
     let ext = ext.trim_start_matches('.').to_lowercase();
     if ext.is_empty() {
         return Err("扩展名不能为空".into());
     }
+    if uses_flat_media_dir(&kind) {
+        return allocate_sequential_media_path(project_path, &kind, &ext);
+    }
 
+    let source = sanitize_token(ctx.source, 24).to_lowercase();
     let wf = ctx.workflow.map(workflow_short_code).unwrap_or("gen");
     let date = chrono::Utc::now().format("%Y%m%d");
     let job = short_id(ctx.job_id, 32);
@@ -318,10 +410,45 @@ fn walk_assets_recursive(
 
 const ASSET_KINDS: &[&str] = &["video", "image", "audio", "file"];
 
-/// 是否为类型优先的规范路径（`assets/{kind}/import|gen/...` 或导出目录）
+/// 是否为规范路径（扁平 image/video、音频嵌套目录、导出目录）
 pub fn is_canonical_asset_rel(rel: &str) -> bool {
     let p = rel.replace('\\', "/").to_lowercase();
     if p.starts_with("assets/export/") || p.starts_with("assets/exports/") {
+        return true;
+    }
+    if is_flat_media_rel(rel) {
+        return true;
+    }
+    for kind in ASSET_KINDS {
+        if p.starts_with(&format!("assets/{kind}/import/"))
+            || p.starts_with(&format!("assets/{kind}/gen/"))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// 是否位于嵌套旧目录（import/gen 子文件夹内的图片/视频，整理时需迁入扁平目录）
+pub fn is_nested_legacy_media_rel(rel: &str) -> bool {
+    let p = rel.replace('\\', "/").to_lowercase();
+    for kind in ["image", "video"] {
+        if p.starts_with(&format!("assets/{kind}/import/"))
+            || p.contains(&format!("assets/{kind}/gen/"))
+        {
+            return true;
+        }
+    }
+    false
+}
+
+/// 画布删除后可清理的素材（不含导出成品）
+pub fn is_gc_eligible_asset_rel(rel: &str) -> bool {
+    let p = rel.replace('\\', "/").to_lowercase();
+    if p.starts_with("assets/export/") || p.starts_with("assets/exports/") {
+        return false;
+    }
+    if is_flat_media_rel(rel) || is_nested_legacy_media_rel(rel) {
         return true;
     }
     for kind in ASSET_KINDS {
@@ -345,7 +472,7 @@ mod tests {
     }
 
     #[test]
-    fn allocates_gen_video_path() {
+    fn allocates_gen_video_path_flat() {
         let dir = tempfile::tempdir().expect("tempdir");
         let ctx = AssetWriteContext {
             kind: "video",
@@ -355,27 +482,25 @@ mod tests {
             job_id: Some("f64d4c23-d334-415a-bb2f-0383ee8544aa"),
         };
         let (rel, abs) = allocate_project_asset_paths(dir.path(), "mp4", &ctx).expect("alloc");
-        assert!(rel.contains("assets/video/gen/dreamina/"));
-        assert!(rel.contains("_f64d4c23_"));
-        assert!(abs.to_string_lossy().contains("dreamina"));
+        assert_eq!(rel, "assets/video/000001.mp4");
+        assert!(abs.is_file() || !abs.exists());
+        let (rel2, _) = allocate_project_asset_paths(dir.path(), "mp4", &ctx).expect("alloc2");
+        assert_eq!(rel2, "assets/video/000002.mp4");
     }
 
     #[test]
-    fn allocates_import_path() {
+    fn allocates_import_path_flat() {
         let dir = tempfile::tempdir().expect("tempdir");
         let (rel, _) =
             allocate_import_asset_paths(dir.path(), "video", "My Clip.mp4").expect("alloc");
-        assert_eq!(rel, "assets/video/import/My Clip.mp4");
+        assert_eq!(rel, "assets/video/000001.mp4");
     }
 
     #[test]
-    fn import_avoids_name_collision() {
+    fn allocates_audio_import_keeps_name() {
         let dir = tempfile::tempdir().expect("tempdir");
-        let import_dir = dir.path().join("assets/image/import");
-        fs::create_dir_all(&import_dir).unwrap();
-        fs::write(import_dir.join("hero.png"), b"x").unwrap();
-        let (_, abs) =
-            allocate_import_asset_paths(dir.path(), "image", "hero.png").expect("alloc");
-        assert_ne!(abs.file_name().and_then(|s| s.to_str()), Some("hero.png"));
+        let (rel, _) =
+            allocate_import_asset_paths(dir.path(), "audio", "voice.mp3").expect("alloc");
+        assert_eq!(rel, "assets/audio/import/voice.mp3");
     }
 }

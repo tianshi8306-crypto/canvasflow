@@ -21,6 +21,7 @@ import {
 import { useFocusLinkedPartnerNode } from "@/hooks/canvas/useFocusLinkedPartnerNode";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { getUpstreamImageForTextNode, listTextNodeUpstreamTextSources } from "@/lib/textNodeUpstream";
+import { gatherUpstreamContextForTextProcessing } from "@/lib/textNodeUpstreamProcess";
 import { formatUpstreamTextCharCount } from "@/lib/scriptUpstreamText";
 import { useProjectStore } from "@/store/projectStore";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
@@ -119,7 +120,11 @@ export function TextComposerPanel({
     () => listTextNodeUpstreamTextSources(nodes, edges, nodeId),
     [edges, nodeId, nodes],
   );
-  const upstreamTextChars = upstreamTextSources.reduce((sum, s) => sum + s.charCount, 0);
+  const upstreamContextBlocks = useMemo(
+    () => gatherUpstreamContextForTextProcessing(nodes, edges, nodeId),
+    [edges, nodeId, nodes],
+  );
+  const upstreamTextChars = upstreamContextBlocks.reduce((sum, b) => sum + b.content.length, 0);
 
   const nodeLabels = useMemo(
     () => Object.fromEntries(nodes.map((n) => [n.id, n.data.label ?? n.id])),
@@ -274,16 +279,6 @@ export function TextComposerPanel({
     [modelInput, setModelInput],
   );
 
-  const handleFocusUpstreamText = useCallback(
-    (sourceNodeId: string) => {
-      const source = upstreamTextSources.find((s) => s.nodeId === sourceNodeId);
-      void focusPartnerNode(sourceNodeId, {
-        label: source?.label,
-      });
-    },
-    [focusPartnerNode, upstreamTextSources],
-  );
-
   const textareaClass = isExpandedLayout
     ? "mention-input-wrapper imageGenPanelTextarea imageGenPanelTextarea--expanded"
     : "mention-input-wrapper imageGenPanelTextarea imageGenPanelTextarea--minimal";
@@ -312,8 +307,8 @@ export function TextComposerPanel({
       ? ZONE_A_HINT_IMAGE
       : isTextToMusic
         ? ZONE_A_HINT_MUSIC
-        : upstreamTextSources.length > 0
-          ? `上游 ${formatUpstreamTextCharCount(upstreamTextChars)} 字`
+        : upstreamContextBlocks.length > 0
+          ? `已接入 ${upstreamContextBlocks.map((b) => b.label).join("、")}（${formatUpstreamTextCharCount(upstreamTextChars)} 字）`
           : ZONE_A_HINT_DEFAULT;
 
   const showZoneA = isExpandedLayout || !hideChromeHead || isImageToPrompt || isTextToMusic;
@@ -426,31 +421,36 @@ export function TextComposerPanel({
         {showZoneA ? (
           <div className="tgp-v2-zone-a">
             <div className="tgp-v2-zone-a-start">
-              {upstreamTextSources.length > 0 && !isImageToPrompt && !isTextToMusic ? (
-                <div className="tgp-upstream-text-tags" aria-label="上游文本节点">
-                  {upstreamTextSources.map((source, index) => {
-                    const token = `@文本${index + 1}`;
+              {upstreamContextBlocks.length > 0 && !isImageToPrompt && !isTextToMusic ? (
+                <div className="tgp-upstream-text-tags" aria-label="上游文本/脚本">
+                  {upstreamContextBlocks.map((block) => {
+                    const textIndex = upstreamTextSources.findIndex((s) => s.nodeId === block.nodeId);
+                    const token = textIndex >= 0 ? `@文本${textIndex + 1}` : null;
                     return (
-                    <button
-                      key={source.nodeId}
-                      type="button"
-                      className="tgp-upstream-text-tag"
-                      title={`${token} · Shift+单击插入 · 单击定位「${source.label}」`}
-                      onPointerDown={onPointerDown}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (e.shiftKey) {
-                          insertModelAtToken(token);
-                          return;
+                      <button
+                        key={block.nodeId}
+                        type="button"
+                        className="tgp-upstream-text-tag"
+                        title={
+                          token
+                            ? `${token} · Shift+单击插入 · 单击定位「${block.label}」`
+                            : `单击定位「${block.label}」`
                         }
-                        handleFocusUpstreamText(source.nodeId);
-                      }}
-                    >
-                      <span className="tgp-upstream-text-tagGlyph" aria-hidden>
-                        文
-                      </span>
-                      {token}
-                    </button>
+                        onPointerDown={onPointerDown}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (token && e.shiftKey) {
+                            insertModelAtToken(token);
+                            return;
+                          }
+                          void focusPartnerNode(block.nodeId, { label: block.label });
+                        }}
+                      >
+                        <span className="tgp-upstream-text-tagGlyph" aria-hidden>
+                          {token ? "文" : "剧"}
+                        </span>
+                        {block.label}
+                      </button>
                     );
                   })}
                 </div>

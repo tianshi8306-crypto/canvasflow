@@ -154,6 +154,11 @@ export type VideoNodePersisted = {
   /** 框选去字幕区域（持久化） */
   subtitleRegion?: VideoSubtitleRegion;
   draft: VideoGenerationDraft;
+  /**
+   * 重新生成时已提交新任务，预览仍显示旧成片；为 true 时继续轮询远端。
+   * 本地已有成片且为 false 时，不再连网站取回或显示排队/生成中。
+   */
+  awaitingNewResult?: boolean;
   /** 进行中的远端任务（由 API 返回 jobId） */
   activeJob?: {
     id: string;

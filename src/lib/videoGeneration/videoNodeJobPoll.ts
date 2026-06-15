@@ -11,6 +11,12 @@ import { applyIncomingComposeClipSync } from "@/lib/compose";
 import { commitGeneratedMediaPatchForProject } from "@/lib/nodeMediaRef";
 import { defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
 import { useProjectStore } from "@/store/projectStore";
+import { flushProjectSave } from "@/store/projectSaveDebounce";
+import {
+  isActiveVideoJobInProgress,
+  nodeHasSatisfiedLocalVideo,
+  patchClearStaleActiveJob,
+} from "@/lib/videoGeneration/videoNodeLocalSatisfaction";
 
 export type VideoNodePollResult = "pending" | "succeeded" | "failed" | "cancelled" | "idle";
 
@@ -41,6 +47,15 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
     return "idle";
   }
 
+  if (node && nodeHasSatisfiedLocalVideo(node.data)) {
+    resetStuck(videoNodeId);
+    updateNodeData(videoNodeId, {
+      video: patchClearStaleActiveJob(vb0),
+    });
+    await flushProjectSave(() => useProjectStore.getState());
+    return "succeeded";
+  }
+
   if (job.status !== "queued" && job.status !== "running") {
     resetStuck(videoNodeId);
     if (job.status === "failed") return "failed";
@@ -51,12 +66,20 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
 
   try {
     const draft = vb0.draft;
-    const snap = await getVideoJobViaBridge(job.id, {
+    let snap = await getVideoJobViaBridge(job.id, {
       projectPath: projectPath ?? "",
       nodeId: videoNodeId,
       modelId: job.modelId ?? draft?.modelId ?? "",
       workflow: draft?.workflow,
     });
+
+    if (
+      snap.resultRelPath?.trim() &&
+      snap.status !== "failed" &&
+      snap.status !== "cancelled"
+    ) {
+      snap = { ...snap, status: "succeeded" };
+    }
 
     if (snap.status === "queued" || snap.status === "running") {
       const polledProgress = normalizeVideoJobProgress(snap.progress);
@@ -90,6 +113,7 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
             },
           },
         });
+        await flushProjectSave(() => useProjectStore.getState());
         setStatusText(stuckMsg);
         import("@/lib/systemNotify").then((m) => {
           void m.notifyTaskFailure("视频", stuckMsg);
@@ -97,19 +121,23 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
         return "failed";
       }
 
-      updateNodeData(videoNodeId, {
-        video: {
-          ...vb0,
-          activeJob: {
-            id: snap.id,
-            status: snap.status,
-            ...(polledProgress != null ? { progress: polledProgress } : {}),
-            modelId: snap.modelId,
-            error: snap.error ?? null,
-            startedAt: vb0.activeJob?.startedAt,
+      updateNodeData(
+        videoNodeId,
+        {
+          video: {
+            ...vb0,
+            activeJob: {
+              id: snap.id,
+              status: snap.status,
+              ...(polledProgress != null ? { progress: polledProgress } : {}),
+              modelId: snap.modelId,
+              error: snap.error ?? null,
+              startedAt: vb0.activeJob?.startedAt,
+            },
           },
         },
-      });
+        { silent: true },
+      );
       return "pending";
     }
 
@@ -127,9 +155,11 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
         video: {
           ...vb0,
           source: "generation",
+          awaitingNewResult: false,
           activeJob: undefined,
         },
       });
+      await flushProjectSave(() => useProjectStore.getState());
 
       if (rel && projectPath) {
         const { nodes: graphNodes, edges: graphEdges } = useProjectStore.getState();
@@ -182,6 +212,7 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
                 ...cleanedPatch,
                 status: undefined,
               });
+              await flushProjectSave(() => useProjectStore.getState());
               setStatusText("生成完成，字幕已自动移除");
             } catch {
               setStatusText("生成完成（自动去字幕失败，已保留原视频）");
@@ -209,6 +240,7 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
           },
         },
       });
+      await flushProjectSave(() => useProjectStore.getState());
       setStatusText(snap.error ?? "视频生成失败");
       import("@/lib/systemNotify").then((m) => {
         void m.notifyTaskFailure(
@@ -238,6 +270,7 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
         },
       },
     });
+    await flushProjectSave(() => useProjectStore.getState());
     import("@/lib/systemNotify").then((m) => {
       void m.notifyTaskFailure("视频", `轮询异常：${errMsg}`);
     });
@@ -246,12 +279,23 @@ export async function pollVideoNodeJobOnce(videoNodeId: string): Promise<VideoNo
 }
 
 /** 列出当前需要轮询的视频节点 id */
-export function listVideoNodesWithActiveJobs(nodes: { id: string; type?: string; data: { video?: { activeJob?: { status?: string } } } }[]): string[] {
+export function listVideoNodesWithActiveJobs(
+  nodes: {
+    id: string;
+    type?: string;
+    data: {
+      path?: string;
+      assetId?: string;
+      video?: {
+        awaitingNewResult?: boolean;
+        activeJob?: { status?: string };
+      };
+    };
+  }[],
+): string[] {
   return nodes
     .filter((n) => n.type === "videoNode")
-    .filter((n) => {
-      const st = n.data.video?.activeJob?.status;
-      return st === "queued" || st === "running";
-    })
+    .filter((n) => !nodeHasSatisfiedLocalVideo(n.data))
+    .filter((n) => isActiveVideoJobInProgress(n.data.video?.activeJob))
     .map((n) => n.id);
 }

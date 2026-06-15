@@ -23,21 +23,22 @@ pub(crate) struct ShotVisualOut {
     pub(crate) seedance_negative: String,
 }
 
-const SHOT_SYSTEM_PROMPT: &str = r#"你是专业影视分镜师。根据镜头上下文，为单个镜头生成结构化数据。
+const SHOT_SYSTEM_PROMPT: &str = r#"你是专业竖屏短剧分镜师。规则引擎已给出景别、运镜、时长与剪辑建议，你必须遵循并在画面描述中体现。
 
 【输出格式】纯 JSON 对象（不是数组），字段（camelCase）：
 {
-  "shotDesc": "画面描述 —— 仅基于提供的原文信息，描述该镜头中可见的主体、动作、环境、氛围。不凭空添加原文没有的元素",
-  "dialogue": "台词 —— 原文中的对话，保持原样。若无台词传空字符串",
-  "seedancePositive": "Seedance 2.0 正向提示词 —— 用逗号分隔的英文关键词+括号权重，如 (cinematic lighting:1.3), (close-up:1.2)，涵盖构图景别、光线氛围、风格质感、运镜轨迹、主体动作",
-  "seedanceNegative": "Seedance 2.0 负面提示词 —— 逗号分隔的英文关键词，列出该镜应避免的元素，如 blurry, low quality, distorted face, extra limbs"
+  "shotDesc": "画面描述 —— 仅基于原文，描述可见主体、动作、环境、氛围；须与给定景别/运镜一致",
+  "dialogue": "台词 —— 原文对话，保持原样；无台词传空字符串",
+  "seedancePositive": "Seedance 2.0 正向提示词 —— 英文关键词+(keyword:weight)，涵盖景别、光线、质感、运镜、动作",
+  "seedanceNegative": "Seedance 2.0 负面提示词 —— 画面质量问题 + 该镜应避免的元素"
 }
 
-【规则】
-- shotDesc 只描述原文已有的信息
-- seedancePositive 用英文关键词 + (keyword:weight) 格式，权重范围 0.5~2.0
-- seedanceNegative 列出通用的画面质量问题 + 该镜头特定的违和元素
-- duration 已由拆分引擎确定，无需生成
+【竖屏短剧约束】
+- 双人互动：前后错位站位，前实后虚，避免左右并排
+- 近景/特写占比高；全景仅用于建立空间
+- 避免复杂手指手势；侧重侧脸轮廓与道具遮挡
+- 运镜仅用：固定、推/拉（慢/快）、摇、横移、跟拍（前/后/侧）、手持（微/中/强）
+- 效果类（慢动作、叠化、定格）写在 seedancePositive，不要当作运镜名
 "#;
 
 fn build_shot_user_prompt(plan: &ShotPlan, character_hints: &HashMap<String, String>) -> String {
@@ -68,11 +69,41 @@ fn build_shot_user_prompt(plan: &ShotPlan, character_hints: &HashMap<String, Str
         format!("\n角色特征：\n{}", char_desc_lines.join("\n"))
     };
 
+    let decision_block = if plan.shot_size.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"规则引擎决策（须遵循）：
+- 场景：{}
+- 节奏功能：{}
+- 景别：{}
+- 运镜：{}（{}）
+- 时长：{:.1}秒
+- 声音：{}
+- 剪辑：{}
+- 构图：{}
+- 竖屏：{}
+- 标签：{}"#,
+            plan.scene_heading,
+            plan.rhythm_function,
+            plan.shot_size,
+            plan.camera_move,
+            plan.camera_angle,
+            plan.estimated_duration_sec,
+            plan.sound_hint,
+            plan.edit_focus,
+            plan.composition_note,
+            plan.vertical_note,
+            plan.tags_summary,
+        )
+    };
+
     format!(
         r#"【镜头 #{}】
 叙事目的：{}
 场景上下文：{}
 出场角色：{}{}
+{}
 原始文本：
 {}
 ---
@@ -82,6 +113,11 @@ fn build_shot_user_prompt(plan: &ShotPlan, character_hints: &HashMap<String, Str
         plan.scene_context,
         chars_line,
         char_desc_section,
+        if decision_block.is_empty() {
+            String::new()
+        } else {
+            format!("\n{}\n", decision_block)
+        },
         plan.text_segment,
     )
 }

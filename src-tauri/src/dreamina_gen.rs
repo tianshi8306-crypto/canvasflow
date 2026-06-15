@@ -705,6 +705,35 @@ fn decode_data_url_to_file(data_url: &str, temp_dir: &Path) -> Result<PathBuf, S
     Ok(path)
 }
 
+fn infer_download_ext_from_url(url: &str) -> String {
+    let lower = url.to_lowercase();
+    if let Some(idx) = lower.find("mime_type=") {
+        let mime = lower[idx + 10..].split('&').next().unwrap_or("");
+        if mime.contains("mp4") {
+            return ".mp4".into();
+        }
+        if mime.contains("webm") {
+            return ".webm".into();
+        }
+        if mime.contains("mov") {
+            return ".mov".into();
+        }
+        if mime.contains("png") {
+            return ".png".into();
+        }
+        if mime.contains("jpeg") || mime.contains("jpg") {
+            return ".jpg".into();
+        }
+    }
+    let path_part = url.split('?').next().unwrap_or(url);
+    Path::new(path_part)
+        .extension()
+        .and_then(|e| e.to_str())
+        .filter(|e| !e.is_empty())
+        .map(|e| format!(".{e}"))
+        .unwrap_or_else(|| ".bin".into())
+}
+
 fn block_on_download(http: &reqwest::Client, url: &str, temp_dir: &Path) -> Result<PathBuf, String> {
     let rt = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -721,11 +750,7 @@ fn block_on_download(http: &reqwest::Client, url: &str, temp_dir: &Path) -> Resu
             .bytes()
             .await
             .map_err(|e| e.to_string())?;
-        let ext = Path::new(url)
-            .extension()
-            .and_then(|e| e.to_str())
-            .map(|e| format!(".{e}"))
-            .unwrap_or_else(|| ".bin".into());
+        let ext = infer_download_ext_from_url(url);
         let path = temp_dir.join(format!("dl_{}{}", uuid::Uuid::new_v4(), ext));
         fs::write(&path, &bytes).map_err(|e| e.to_string())?;
         Ok(path)
@@ -1100,7 +1125,7 @@ pub async fn submit_video_via_cli(
 
 fn video_poll_status_for_phase(phase: &str, poll_count: u32) -> &'static str {
     if phase == "pending" {
-        // 首次仍显示排队；之后改 running，前端会加快轮询间隔
+        // 第 2 次起改 running，前端会加快轮询间隔
         if poll_count >= 2 {
             "running"
         } else {
@@ -1182,8 +1207,8 @@ fn snapshot_from_video_query(
                 eprintln!("[dreamina] 视频已就绪但落盘失败 submit_id={submit_id}: {e}");
                 return Ok(VideoJobSnapshot {
                     id,
-                    status: "running".into(),
-                    progress: None,
+                    status: "failed".into(),
+                    progress: Some(1.0),
                     error: Some(format!("视频已生成，下载落盘失败：{e}")),
                     model_id,
                     result_rel_path: None,
@@ -1236,7 +1261,40 @@ pub async fn poll_video_via_cli(
 
     // 1) 轻量查询：不下载，CLI 返回更快
     let q = query_once(&command_path, submit_id, &task_type, false)?;
-    if q.phase == "pending" || q.phase == "failed" {
+
+    if q.phase == "failed" {
+        return snapshot_from_video_query(
+            http,
+            q,
+            id,
+            model_id,
+            project_path,
+            &task_type,
+            submit_id,
+            workflow,
+            node_id,
+            poll_count,
+        );
+    }
+
+    // 轻量查询仍排队时：尽早尝试 download 查询（网页端常已就绪但轻量 query 无 outputs）
+    if q.phase == "pending" && poll_count >= 1 {
+        let q_dl = query_once(&command_path, submit_id, &task_type, true)?;
+        return snapshot_from_video_query(
+            http,
+            q_dl,
+            id,
+            model_id,
+            project_path,
+            &task_type,
+            submit_id,
+            workflow,
+            node_id,
+            poll_count,
+        );
+    }
+
+    if q.phase == "pending" {
         return snapshot_from_video_query(
             http,
             q,

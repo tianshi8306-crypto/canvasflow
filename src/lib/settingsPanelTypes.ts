@@ -27,8 +27,8 @@ export type ImageModelConfig = {
   endpointType?: "images" | "chat";
 };
 
-/** 主题预设 */
-export type AppThemePreset = "dark" | "dawn" | "day" | "dusk";
+/** 界面主题：深色 / 浅色 */
+export type AppThemePreset = "dark" | "light";
 
 /** 光标样式 */
 export type CursorStyle = "default" | "beam" | "crosshair" | "grab" | "text";
@@ -77,7 +77,7 @@ export type AppSettings = {
   hermesMcpServers?: import("@/lib/hermes/agent/hermesExternalMcp").HermesMcpServerConfig[];
 
   // ── 外观 ──
-  /** 主题预设（dark/dawn/day/dusk） */
+  /** 界面主题（深色 / 浅色） */
   themePreset: AppThemePreset;
   /** 字号（small/medium/large） */
   fontSize: "small" | "medium" | "large";

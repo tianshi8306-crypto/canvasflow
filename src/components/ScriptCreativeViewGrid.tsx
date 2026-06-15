@@ -94,10 +94,12 @@ export function ScriptCreativeViewGrid({
           resolveProjectAssetSrc(projectPath, shot?.imagePath) ||
           resolveProjectAssetSrc(projectPath, beat.reference?.trim() || undefined);
         const desc = (shot?.visualPrompt?.trim() || beat.description || "").trim();
-        const tags = parseTags(beat.sceneTags);
+        const tags = parseTags(beat.rhythmTag || beat.sceneTags);
         const shotNo = (beat.shotNumber || "").trim() || String(i + 1);
         const dur = (beat.durationHint || "").trim() || "—";
-        const sceneLabel = beat.scene.trim() ? `场景 ${beat.scene.trim()}` : `场景 ${i + 1}`;
+        const sceneLabel = (beat.sceneHeading || beat.scene || "").trim()
+          ? `场景 ${(beat.sceneHeading || beat.scene).trim()}`
+          : `场景 ${i + 1}`;
         const status = shot?.status ?? "idle";
         const isGenerating = status === "generating";
         const isFailed = status === "failed";

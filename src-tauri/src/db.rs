@@ -41,6 +41,10 @@ fn init_schema(conn: &Connection) -> Result<(), String> {
             meta_json TEXT,
             created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS asset_seq (
+            kind TEXT PRIMARY KEY,
+            next_value INTEGER NOT NULL
+        );
         "#,
         )
         .map_err(|e| e.to_string())?;
@@ -328,6 +332,42 @@ pub fn get_asset_by_rel_path(conn: &Connection, rel_path: &str) -> Result<Option
     }
 }
 
+/// 递增并返回图片/视频扁平目录序号（从 1 起）
+pub fn bump_asset_sequence(conn: &Connection, kind: &str) -> Result<u64, String> {
+    conn.execute(
+        "INSERT INTO asset_seq (kind, next_value) VALUES (?1, 1)
+         ON CONFLICT(kind) DO UPDATE SET next_value = next_value + 1",
+        params![kind],
+    )
+    .map_err(|e| e.to_string())?;
+    conn.query_row(
+        "SELECT next_value FROM asset_seq WHERE kind = ?1",
+        params![kind],
+        |row| row.get::<_, i64>(0).map(|v| v as u64),
+    )
+    .map_err(|e| e.to_string())
+}
+
+/// 将序号种子设为不小于 `min_value`（打开工程 / 迁移时与磁盘扫描对齐）
+pub fn seed_asset_sequence(conn: &Connection, kind: &str, min_value: u64) -> Result<(), String> {
+    let min_i = min_value as i64;
+    conn.execute(
+        "INSERT INTO asset_seq (kind, next_value) VALUES (?1, ?2)
+         ON CONFLICT(kind) DO UPDATE SET next_value = CASE
+           WHEN asset_seq.next_value < ?2 THEN ?2 ELSE asset_seq.next_value END",
+        params![kind, min_i],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+pub fn delete_asset_by_rel_path(conn: &Connection, rel_path: &str) -> Result<bool, String> {
+    let n = conn
+        .execute("DELETE FROM assets WHERE rel_path = ?1", params![rel_path])
+        .map_err(|e| e.to_string())?;
+    Ok(n > 0)
+}
+
 pub fn list_assets(conn: &Connection, limit: i64) -> Result<Vec<AssetSummary>, String> {
     let mut stmt = conn
         .prepare(
@@ -397,7 +437,11 @@ pub fn find_gen_asset_by_job_id(
     // 1) 权威：meta_json.jobId 精确匹配
     let sql_exact = "SELECT rel_path FROM assets
                WHERE media_type = ?1
-                 AND rel_path LIKE 'assets/%/gen/%'
+                 AND (
+                   rel_path LIKE 'assets/%/gen/%'
+                   OR rel_path LIKE 'assets/image/%'
+                   OR rel_path LIKE 'assets/video/%'
+                 )
                  AND json_extract(meta_json, '$.jobId') = ?2
                ORDER BY created_at DESC
                LIMIT 1";
@@ -415,7 +459,11 @@ pub fn find_gen_asset_by_job_id(
     let path_like = format!("%_{full_token}_%");
     let sql_path = "SELECT rel_path FROM assets
                WHERE media_type = ?1
-                 AND rel_path LIKE 'assets/%/gen/%'
+                 AND (
+                   rel_path LIKE 'assets/%/gen/%'
+                   OR rel_path LIKE 'assets/image/%'
+                   OR rel_path LIKE 'assets/video/%'
+                 )
                  AND rel_path LIKE ?2
                  AND (
                    json_extract(meta_json, '$.jobId') IS NULL

@@ -75,6 +75,24 @@ export async function syncAssetsIndex(projectPath: string): Promise<number> {
   return invoke<number>("sync_assets_index", { projectPath });
 }
 
+export type GcAssetsResult = {
+  deletedRelPaths: string[];
+  skippedRelPaths: string[];
+};
+
+/** 删除节点后清理不再被画布引用的素材文件 */
+export async function gcUnreferencedAssets(
+  projectPath: string,
+  nodes: unknown[],
+  candidateRelPaths: string[],
+): Promise<GcAssetsResult> {
+  return invoke<GcAssetsResult>("gc_unreferenced_assets", {
+    projectPath,
+    nodes,
+    candidateRelPaths,
+  });
+}
+
 export type AssetMigrationItem = {
   oldRelPath: string;
   newRelPath: string;

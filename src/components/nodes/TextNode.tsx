@@ -30,6 +30,7 @@ import { TextNodeExpandEditModal } from "@/components/nodes/TextNodeExpandEditMo
 import { TextNodePasteImportModal } from "@/components/nodes/TextNodePasteImportModal";
 import { orderedIncomingScriptNodeIds } from "@/lib/incomingScriptBinding";
 import { isPassiveTextContainer } from "@/lib/textNodeContainerMode";
+import { hasUpstreamForTextProcessing } from "@/lib/textNodeUpstreamProcess";
 import { syncTextPromptFromUpstreamScript } from "@/lib/textScriptSync";
 import {
   downloadTextAsFile,
@@ -239,23 +240,28 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
 
   const composerLayout = "default" as const;
 
-  /** 仅孤立节点：空态用 Composer 起稿，或用户钉住模型对话；连线后仅为文字容器 */
+  const hasScriptUpstream = useMemo(
+    () => orderedIncomingScriptNodeIds(nodes, edges, id).length > 0,
+    [nodes, edges, id],
+  );
+  const hasTextUpstream = useMemo(
+    () => hasUpstreamForTextProcessing(nodes, edges, id),
+    [nodes, edges, id],
+  );
+
+  /** 孤立节点或接入上游文本：空态起稿 / 钉住对话 / 上游处理模式持续对话 */
   const showComposerPortal =
     expandedChrome &&
     uiSelected &&
     !editing &&
     !isPassiveContainer &&
-    (!hasBody || isComposerPinned);
+    (!hasBody || isComposerPinned || hasTextUpstream);
 
   useEffect(() => {
     if (isPassiveContainer && isComposerPinned) {
       setPinnedGenPanelId(null);
     }
   }, [isPassiveContainer, isComposerPinned, setPinnedGenPanelId]);
-  const hasScriptUpstream = useMemo(
-    () => orderedIncomingScriptNodeIds(nodes, edges, id).length > 0,
-    [nodes, edges, id],
-  );
 
   const handleSyncFromScript = useCallback(() => {
     const synced = syncTextPromptFromUpstreamScript(id, nodes, edges);

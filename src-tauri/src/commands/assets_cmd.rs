@@ -1,9 +1,13 @@
 use crate::canvas_asset_backfill::{self, CanvasAssetBackfillResult};
+use crate::canvas_asset_refs;
 use crate::command_common::media_type_from_ext;
 use crate::db;
 use crate::graph::FlowNode;
 use crate::media;
 use crate::project_asset_store;
+use serde::Serialize;
+use serde_json::Value;
+use std::fs;
 use std::path::PathBuf;
 
 #[tauri::command]
@@ -100,6 +104,53 @@ pub fn migrate_legacy_assets(
 ) -> Result<crate::asset_migration::AssetMigrationResult, String> {
     let root = PathBuf::from(&project_path);
     crate::asset_migration::migrate_legacy_assets(&root, dry_run.unwrap_or(false))
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GcAssetsResult {
+    pub deleted_rel_paths: Vec<String>,
+    pub skipped_rel_paths: Vec<String>,
+}
+
+/// 删除画布节点后：若候选路径不再被剩余 nodes 引用，则删磁盘文件并移除索引
+#[tauri::command]
+pub fn gc_unreferenced_assets(
+    project_path: String,
+    nodes: Value,
+    candidate_rel_paths: Vec<String>,
+) -> Result<GcAssetsResult, String> {
+    let root = PathBuf::from(project_path);
+    let referenced = canvas_asset_refs::collect_asset_rel_paths_from_nodes(&nodes);
+    let conn = db::open_run_db(&root)?;
+    let mut deleted = Vec::new();
+    let mut skipped = Vec::new();
+
+    for rel in candidate_rel_paths {
+        let norm = rel.trim().replace('\\', "/");
+        if norm.is_empty() {
+            continue;
+        }
+        if referenced.contains(&norm) {
+            skipped.push(norm);
+            continue;
+        }
+        if !project_asset_store::is_gc_eligible_asset_rel(&norm) {
+            skipped.push(norm);
+            continue;
+        }
+        let abs = root.join(&norm);
+        if abs.is_file() {
+            fs::remove_file(&abs).map_err(|e| format!("删除文件失败 {norm}：{e}"))?;
+        }
+        let _ = db::delete_asset_by_rel_path(&conn, &norm)?;
+        deleted.push(norm);
+    }
+
+    Ok(GcAssetsResult {
+        deleted_rel_paths: deleted,
+        skipped_rel_paths: skipped,
+    })
 }
 
 /// 打开工程时对齐画布资产引用：path→assetId（M2）与 assetId→path（M4），含脚本镜字段。

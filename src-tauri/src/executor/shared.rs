@@ -92,9 +92,12 @@ async fn exec_node(
         }
 
         "llm" | "textNode" => {
-            let res = run_llm_node(http, graph, node, settings, outputs, conn, run_id).await?;
+            let (res, patch) = run_llm_node(http, graph, node, settings, outputs, conn, run_id).await?;
             let _ = db::log_event(conn, run_id, Some(&node.id), "node_output", &json!({ "output": res }));
-            Ok((Some(res), None))
+            if let Some(ref p) = patch {
+                let _ = db::log_event(conn, run_id, Some(&node.id), "node_patch", p);
+            }
+            Ok((Some(res), patch))
         }
 
         "imageNode" | "audioNode" | "videoNode" | "mediaImport" | "imageAsset" => {
@@ -158,8 +161,9 @@ pub(crate) async fn exec_node_loop(
     _collect_patches: bool,
     extra_start_metadata: serde_json::Value,
     script_patches: &mut Vec<(String, serde_json::Value)>,
+    initial_outputs: Option<&HashMap<String, String>>,
 ) -> Result<(HashMap<String, String>, bool), String> {
-    let mut outputs: HashMap<String, String> = HashMap::new();
+    let mut outputs: HashMap<String, String> = initial_outputs.cloned().unwrap_or_default();
     let mut skip: HashSet<String> = HashSet::new();
     let mut any_node_failed = false;
 
@@ -179,9 +183,7 @@ pub(crate) async fn exec_node_loop(
         // 增量运行：已在 succeeded_set 中则复用 output 并跳过
         if let Some(set) = succeeded_set {
             if set.contains(node_id) {
-                if let Some(prev) = outputs.get(node_id).cloned()
-                    .or_else(|| recover_run_outputs(&conn, run_id).ok()?.get(node_id).cloned())
-                {
+                if let Some(prev) = outputs.get(node_id).cloned() {
                     outputs.insert(node_id.clone(), prev);
                 }
                 let _ = db::log_event(

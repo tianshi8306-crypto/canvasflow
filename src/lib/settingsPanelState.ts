@@ -15,6 +15,7 @@ import { normalizeProjectAutoSaveIdleSec } from "@/lib/projectAutoSaveSettings";
 import {
   agentSettingsFromAppSettings,
 } from "@/lib/hermes/agent/hermesAgentSettings";
+import { normalizeAppTheme } from "@/lib/appTheme";
 import { DESKTOP_SHELL_HINT } from "@/lib/tauriEnv";
 
 type HasKeyMaps = {
@@ -36,7 +37,7 @@ export function normalizeLoadedSettings(s: AppSettings): AppSettings {
     abortWorkflowOnFailure: s.abortWorkflowOnFailure ?? false,
     hermesMemoryRoot: s.hermesMemoryRoot?.trim() ? s.hermesMemoryRoot.trim() : null,
     // 外观
-    themePreset: s.themePreset ?? "dark",
+    themePreset: normalizeAppTheme(s.themePreset),
     fontSize: s.fontSize ?? "medium",
     cursorStyle: s.cursorStyle ?? "default",
     gridDotsVisible: s.gridDotsVisible ?? true,
@@ -247,9 +248,11 @@ export async function saveSettingsAndKeys(params: {
   saveKeyPreviews(nextPreview);
 
   const maps = await readHasKeyMaps(settings);
+  const rawAfterSave = await invoke<AppSettings>("load_settings");
+  const persisted = normalizeLoadedSettings(rawAfterSave);
   return {
     ...maps,
-    settings,
+    settings: persisted,
     keyPreviews: nextPreview,
     notice: "保存成功：设置与 API Key 已写入。出于安全考虑，输入框不会回显。",
   };

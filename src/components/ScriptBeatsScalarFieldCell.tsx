@@ -1,10 +1,12 @@
 import type { ScriptBeat } from "@/lib/types";
-import { extractCameraMove, toSceneTags } from "@/lib/scriptWorkbenchSceneTags";
 import { importSingleProjectMedia } from "@/lib/scriptMediaImport";
 import {
   CAMERA_MOVE_OPTIONS,
+  BGM_MOOD_OPTIONS,
+  DIALOGUE_TYPE_OPTIONS,
   EMOTION_OPTIONS,
   patchRow,
+  SHOT_SIZE_OPTIONS,
   TEXTAREA_KEYS,
   type ScriptBeatStringKey,
   type ScriptBeatsTableVariant,
@@ -89,14 +91,62 @@ export function ScriptBeatsScalarFieldCell({
     );
   }
 
-  if (fieldKey === "sceneTags") {
+  if (fieldKey === "shotSize") {
     return (
       <select
-        value={extractCameraMove(value)}
-        onChange={(e) => onPersistRows(patchRow(normRows, rowIndex, fieldKey, toSceneTags(e.target.value)))}
+        value={value}
+        onChange={(e) => onPersistRows(patchRow(normRows, rowIndex, fieldKey, e.target.value))}
+      >
+        <option value="">选择景别</option>
+        {SHOT_SIZE_OPTIONS.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (fieldKey === "cameraMove") {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onPersistRows(patchRow(normRows, rowIndex, fieldKey, e.target.value))}
       >
         <option value="">选择运镜</option>
         {CAMERA_MOVE_OPTIONS.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (fieldKey === "dialogueType") {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onPersistRows(patchRow(normRows, rowIndex, fieldKey, e.target.value))}
+      >
+        <option value="">对白类型</option>
+        {DIALOGUE_TYPE_OPTIONS.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  if (fieldKey === "bgmHint") {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onPersistRows(patchRow(normRows, rowIndex, fieldKey, e.target.value))}
+      >
+        <option value="">BGM 氛围</option>
+        {BGM_MOOD_OPTIONS.map((opt) => (
           <option key={opt} value={opt}>
             {opt}
           </option>

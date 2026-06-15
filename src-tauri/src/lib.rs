@@ -1,5 +1,6 @@
 mod asset_migration;
 mod canvas_asset_backfill;
+mod canvas_asset_refs;
 mod canvas_mcp_bridge;
 mod command_common;
 mod hermes_knowledge;
@@ -28,6 +29,9 @@ pub struct AppState {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct VideoMockJob {
+    /// 供应商返回的原始 jobId（与 video-jobs 文件名可能经 sanitize 不同）
+    #[serde(default)]
+    pub(crate) job_id: String,
     pub(crate) project_path: String,
     pub(crate) node_id: String,
     pub(crate) model_id: String,
@@ -93,6 +97,7 @@ pub fn run() {
             commands::assets_cmd::sync_assets_index,
             commands::assets_cmd::migrate_legacy_assets,
             commands::assets_cmd::backfill_canvas_asset_ids,
+            commands::assets_cmd::gc_unreferenced_assets,
             commands::timeline_cmd::render_timeline,
             commands::timeline_cmd::render_timeline_to_path,
             commands::timeline_cmd::reveal_in_shell,
@@ -131,6 +136,7 @@ pub fn run() {
             commands::video_cmd::video_gen_get_job,
             commands::video_cmd::video_gen_cancel,
             commands::video_cmd::video_gen_recover_dreamina,
+            commands::video_cmd::video_gen_list_persisted_jobs,
             commands::video_cmd::test_video_model_connection,
             commands::project_cmd::open_project_dir,
             commands::project_cmd::write_project_rel_text_file,

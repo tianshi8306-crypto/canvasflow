@@ -53,10 +53,18 @@ export function assetMediaKind(relPath: string): AssetMediaKind | null {
   return null;
 }
 
+/** 扁平图片/视频：`assets/image/000001.png` */
+export function isFlatMediaRelPath(relPath: string): boolean {
+  const p = relPath.replace(/\\/g, "/");
+  const parts = p.split("/");
+  return parts.length === 3 && parts[0] === "assets" && (parts[1] === "image" || parts[1] === "video");
+}
+
 /** 根据 relPath 判断素材在工程内的存储分区 */
 export function assetStorageCategory(relPath: string): AssetStorageCategory {
   const p = relPath.replace(/\\/g, "/").toLowerCase();
   if (p.startsWith("assets/export/") || p.startsWith("assets/exports/")) return "export";
+  if (isFlatMediaRelPath(relPath)) return "gen";
   if (p.startsWith("assets/gen/") || p.startsWith("assets/import/")) return "legacy";
   const rest = p.slice("assets/".length);
   if (rest.length > 0 && !rest.includes("/")) return "legacy";

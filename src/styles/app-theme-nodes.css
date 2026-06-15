@@ -1,0 +1,181 @@
+/**
+ * 浅色主题 · 节点壳 / 生成参数面板
+ * 覆盖各面板内硬编码的深色控件 token（igp / vgp / tgp）
+ */
+
+[data-theme="light"] {
+  --node-bottom-ui-border: 1px solid rgba(0, 0, 0, 0.1);
+  --node-bottom-ui-bg: #ffffff;
+  --node-bottom-ui-hint-color: var(--text-secondary);
+  --node-bottom-ui-meta-color: var(--text-secondary);
+
+  /* 生成面板控件（图 / 视频 / 文本 composer 共用语义） */
+  --gen-panel-control-text: var(--text-primary);
+  --gen-panel-control-text-muted: var(--text-secondary);
+  --gen-panel-cta-disabled-bg: #ececec;
+  --gen-panel-cta-disabled-fg: var(--text-placeholder);
+  --gen-panel-cta-generating-bg: #ffffff;
+  --gen-panel-cta-generating-fg: var(--text-primary);
+  --gen-panel-cta-border-ready: rgba(0, 0, 0, 0.12);
+}
+
+/* ── 图 / 视频 / 文本生成面板：局部变量与正文色 ── */
+[data-theme="light"] .imageGenPanel--minimal,
+[data-theme="light"] .videoGenPanel--chrome.nodeChrome--panel,
+[data-theme="light"] .textGenPanel--chrome {
+  color: var(--text-primary);
+  --igp-control-text: var(--gen-panel-control-text);
+  --igp-control-text-muted: var(--gen-panel-control-text-muted);
+  --igp-cta-bg-disabled: var(--gen-panel-cta-disabled-bg);
+  --igp-cta-fg-disabled: var(--gen-panel-cta-disabled-fg);
+  --igp-cta-bg-generating: var(--gen-panel-cta-generating-bg);
+  --igp-cta-fg-generating: var(--gen-panel-cta-generating-fg);
+  --igp-cta-border-generating: var(--border-button);
+  --vgp-control-text: var(--gen-panel-control-text);
+  --vgp-control-text-muted: var(--gen-panel-control-text-muted);
+  --vgp-cta-bg-disabled: var(--gen-panel-cta-disabled-bg);
+  --vgp-cta-fg-disabled: var(--gen-panel-cta-disabled-fg);
+  --vgp-cta-bg-generating: var(--gen-panel-cta-generating-bg);
+  --vgp-cta-fg-generating: var(--gen-panel-cta-generating-fg);
+  --vgp-cta-border-generating: var(--border-button);
+  --tgp-control-text: var(--gen-panel-control-text);
+  --tgp-control-text-muted: var(--gen-panel-control-text-muted);
+  --tgp-cta-bg-disabled: var(--gen-panel-cta-disabled-bg);
+  --tgp-cta-fg-disabled: var(--gen-panel-cta-disabled-fg);
+  --tgp-cta-bg-generating: var(--gen-panel-cta-generating-bg);
+  --tgp-cta-fg-generating: var(--gen-panel-cta-generating-fg);
+  --tgp-cta-border-generating: var(--border-button);
+  --tgp-cta-border-ready: var(--gen-panel-cta-border-ready);
+}
+
+[data-theme="light"] .videoGenPanel--chrome.nodeChrome--panel {
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .imageGenPanel--minimal .igp-edit-exit-btn {
+  color: var(--cf-cyan-deep);
+}
+
+[data-theme="light"] .imageGenPanel--minimal .igpRefStrip-thumbs {
+  scrollbar-color: rgba(0, 0, 0, 0.22) transparent;
+}
+
+[data-theme="light"] .imageGenPanel--minimal .igpRefStrip-thumbs::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+/* ── 节点壳：白卡片 + 轻阴影，选中青蓝描边 ── */
+[data-theme="light"] .nodeChrome-shell,
+[data-theme="light"] .minimal-image-node,
+[data-theme="light"] .minimal-text-node {
+  box-shadow: var(--gen-panel-shadow);
+}
+
+[data-theme="light"] .nodeChrome-shell:hover,
+[data-theme="light"] .minimal-image-node:hover,
+[data-theme="light"] .minimal-text-node:hover {
+  border-color: rgba(0, 0, 0, 0.16);
+}
+
+[data-theme="light"] .nodeChrome-shell.selected,
+[data-theme="light"] .minimal-image-node.selected,
+[data-theme="light"] .minimal-text-node.selected {
+  border-color: var(--node-chrome-selected-border);
+  box-shadow:
+    var(--gen-panel-shadow),
+    0 0 0 1px rgba(14, 165, 233, 0.2);
+}
+
+[data-theme="light"] .nodeChrome--panel,
+[data-theme="light"] .imageNodeChrome--minimal {
+  background: var(--gen-panel-bg);
+  border-color: var(--border-node);
+  box-shadow: var(--gen-panel-shadow);
+}
+
+[data-theme="light"] .nodeChrome-upload-float,
+[data-theme="light"] .minimal-image-upload-float {
+  background: var(--bg-node);
+  color: var(--text-primary);
+  border-color: var(--border-button);
+  box-shadow: var(--gen-panel-shadow);
+}
+
+[data-theme="light"] .nodeChrome-previewGenOverlay .igpGenCenterCapsuleOverlay,
+[data-theme="light"] .nodeChrome-previewGenOverlay .videoGenCenterCapsuleOverlay {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+/* ── 画布底栏浮层输入壳 ── */
+[data-theme="light"] .nodeFloatingBottomPanel {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 248, 248, 0.96));
+  box-shadow:
+    inset 0 0 0 1px rgba(0, 0, 0, 0.04),
+    0 8px 22px rgba(0, 0, 0, 0.08);
+}
+
+[data-theme="light"] .nodeFloatingBottomPanel :is(.scriptGenSend, .imageGenPanelSend, .audioTtsPanelSend) {
+  background: var(--gen-cta-bg-ready);
+  color: #f5f5f5;
+  border-color: transparent;
+}
+
+[data-theme="light"] .nodeChrome-metaLabel-text,
+[data-theme="light"] .minimal-image-label-text {
+  color: var(--text-meta);
+}
+
+[data-theme="light"] .nodeChrome-metaLabel-text:hover,
+[data-theme="light"] .minimal-image-label-text:hover {
+  color: var(--text-secondary);
+}
+
+[data-theme="light"] .nodeChrome-metaLabel-input,
+[data-theme="light"] .minimal-image-label-input {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--border-button);
+  border-bottom-color: var(--cf-cyan-deep);
+  color: var(--text-primary);
+}
+
+[data-theme="light"] .nodeChrome-metaStatus-dims,
+[data-theme="light"] .minimal-image-res-dims {
+  color: var(--text-meta);
+}
+
+[data-theme="light"] .nodeChrome-metaStatus-progress,
+[data-theme="light"] .minimal-image-gen-progress {
+  color: var(--cf-cyan-deep);
+}
+
+/* 面板内仍写死浅字色的控件：统一拉回深字 */
+[data-theme="light"] .imageGenPanel--minimal .igp-header-icon-btn,
+[data-theme="light"] .imageGenPanel--minimal .igp-expand-trigger,
+[data-theme="light"] .videoGenPanel--chrome .mmTab {
+  color: var(--gen-panel-control-text);
+}
+
+[data-theme="light"] .imageGenPanel--minimal .igpRefStrip-thumb {
+  border-color: rgba(0, 0, 0, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+[data-theme="light"] .imageGenPanel--minimal .igpRefStrip-thumb.is-selected,
+[data-theme="light"] .imageGenPanel--minimal .igpRefStrip-thumb.is-hovered {
+  border-color: var(--cf-cyan-deep);
+}
+
+[data-theme="light"] .imageGenPanel--minimal .mention-textarea,
+[data-theme="light"] .videoGenPanel--chrome .mmPromptInput,
+[data-theme="light"] .textGenPanel--chrome .mention-textarea {
+  color: var(--text-primary);
+  background: var(--bg-button);
+  border-color: var(--border-button);
+}
+
+[data-theme="light"] .imageGenPanel--minimal .mention-textarea::placeholder,
+[data-theme="light"] .videoGenPanel--chrome .mmPromptInput::placeholder,
+[data-theme="light"] .textGenPanel--chrome .mention-textarea::placeholder {
+  color: var(--text-placeholder);
+}

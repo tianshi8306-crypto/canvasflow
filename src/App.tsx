@@ -14,6 +14,7 @@ import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
 import { isCanvasShortcutBlockedTarget, useCanvasShortcutActions } from "@/hooks/canvas/useCanvasShortcutActions";
 import { nudgeDeltaFromArrowKey } from "@/lib/nodeCanvasNudge";
 import { bindActiveTabToProject } from "@/lib/canvasTabSync";
+import { describeWorkspaceCloseRisk } from "@/lib/canvasCloseGuard";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { HermesOrbSuggestionBridge } from "@/components/hermes/HermesOrbSuggestionBridge";
@@ -310,6 +311,17 @@ export default function App() {
   useEffect(() => {
     syncCanvasMcpBridgeContext(projectPath);
   }, [projectPath]);
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      const risk = describeWorkspaceCloseRisk();
+      if (!risk.shouldConfirm) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {

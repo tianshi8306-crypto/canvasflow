@@ -4,6 +4,11 @@
 
 use std::collections::HashMap;
 
+use super::script_decision::{
+    apply_decisions_to_shots, expand_compound_shots, inject_reaction_shots,
+    renumber_shots, smooth_adjacent_shots, split_dialogue_shots, split_overlong_shots,
+};
+
 // ──────────────── 阶段 1 数据结构 ────────────────
 
 #[derive(Debug, Clone)]
@@ -27,6 +32,12 @@ pub(crate) struct Paragraph {
     pub(crate) speakers: Vec<String>,
     pub(crate) emotion: String,
     pub(crate) has_key_action: bool,
+    /// 所属场次（从 1 起；0 表示未识别场号）
+    pub(crate) scene_index: usize,
+    /// 当前场次标题（如 1-1 日 内 客厅）
+    pub(crate) scene_heading: String,
+    /// 本段是否为场号头
+    pub(crate) is_scene_header: bool,
 }
 
 // ──────────────── 阶段 2 数据结构 ────────────────
@@ -42,6 +53,72 @@ pub(crate) struct ShotPlan {
     pub(crate) estimated_duration_sec: f64,
     /// 该镜头包含的段落索引范围 [start, end)
     pub(crate) para_range: (usize, usize),
+    /// 规则引擎决策：景别
+    pub(crate) shot_size: String,
+    /// 规则引擎决策：运镜（标准化词汇）
+    pub(crate) camera_move: String,
+    /// 规则引擎决策：机位角度
+    pub(crate) camera_angle: String,
+    /// 声音提示
+    pub(crate) sound_hint: String,
+    /// 剪辑重点 / 转场
+    pub(crate) edit_focus: String,
+    /// 构图备注（竖屏双人错位等）
+    pub(crate) composition_note: String,
+    /// 竖屏约束备注
+    pub(crate) vertical_note: String,
+    /// 场景标题（场号或地点）
+    pub(crate) scene_heading: String,
+    /// 节奏功能标签
+    pub(crate) rhythm_function: String,
+    /// 标签摘要（供 LLM 参考）
+    pub(crate) tags_summary: String,
+    /// 复合动作拆解子步骤
+    pub(crate) is_compound_step: bool,
+    /// 反应镜头（听者/被击者表情）
+    pub(crate) is_reaction_shot: bool,
+    /// 场次索引（与 Paragraph.scene_index 对齐）
+    pub(crate) scene_index: usize,
+    /// 是否为该场次的空间建立镜
+    pub(crate) is_scene_establishing: bool,
+    /// 对白类型（对白/OS/VO/旁白/字幕）
+    pub(crate) dialogue_type: String,
+    /// 表演备注（兴奋、皱眉等，从对白括号提取）
+    pub(crate) performance_note: String,
+    /// BGM 氛围提示（规则引擎）
+    pub(crate) bgm_hint: String,
+}
+
+impl Default for ShotPlan {
+    fn default() -> Self {
+        Self {
+            serial: 0,
+            text_segment: String::new(),
+            narrative_purpose: NarrativePurpose::Advancing,
+            scene_context: String::new(),
+            characters_in_shot: Vec::new(),
+            dialogue_text: String::new(),
+            estimated_duration_sec: 2.0,
+            para_range: (0, 0),
+            shot_size: String::new(),
+            camera_move: String::new(),
+            camera_angle: String::new(),
+            sound_hint: String::new(),
+            edit_focus: String::new(),
+            composition_note: String::new(),
+            vertical_note: String::new(),
+            scene_heading: String::new(),
+            rhythm_function: String::new(),
+            tags_summary: String::new(),
+            is_compound_step: false,
+            is_reaction_shot: false,
+            scene_index: 0,
+            is_scene_establishing: false,
+            dialogue_type: String::new(),
+            performance_note: String::new(),
+            bgm_hint: String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -82,9 +159,11 @@ const LOCATION_KEYWORDS: &[&str] = &[
 const KEY_ACTION_KEYWORDS: &[&str] = &[
     "推门", "开门", "关门", "进门", "出门", "入座", "坐下", "起身", "站起",
     "转身", "回头", "拿取", "拿起", "放下", "递给", "接过",
-    "挥拳", "出拳", "推搡", "拥抱", "握手", "拍桌", "摔",
-    "推倒", "拔出", "抽出", "打开", "合上",
-    "走进", "走出", "跑进", "跑出", "冲进",
+    "挥拳", "出拳", "出掌", "推搡", "拥抱", "握手", "拍桌", "摔", "掀桌",
+    "推倒", "拔出", "抽出", "打开", "合上", "下跪", "跪地", "磕头", "壁咚",
+    "泼水", "接吻", "亲吻", "摔倒", "打电话", "拨号",
+    "走进", "走出", "跑进", "跑出", "冲进", "追逐", "打斗", "飙车", "切磋",
+    "震退", "弹射", "踩刹车", "拉开车门", "吐血", "喷出",
 ];
 
 const EMOTION_KEYWORDS: &[(&str, &str)] = &[
@@ -100,16 +179,18 @@ const EMOTION_KEYWORDS: &[(&str, &str)] = &[
 ];
 
 pub(crate) fn analyze_script_structure(text: &str) -> ScriptStructure {
-    let raw_paragraphs: Vec<&str> = text
-        .split("\n\n")
-        .map(|p| p.trim())
-        .filter(|p| !p.is_empty())
-        .collect();
+    let raw_paragraphs = split_script_into_blocks(text);
 
     let mut characters: HashMap<String, CharacterInfo> = HashMap::new();
     let mut paragraphs: Vec<Paragraph> = Vec::new();
 
     for para_text in &raw_paragraphs {
+        let is_header = is_scene_header_line(para_text);
+        let heading = if is_header {
+            normalize_scene_heading(para_text)
+        } else {
+            String::new()
+        };
         let (speakers, is_dialogue) = extract_speakers(para_text);
         let emotion = detect_emotion(para_text);
         let has_action = KEY_ACTION_KEYWORDS.iter().any(|kw| para_text.contains(kw));
@@ -125,13 +206,18 @@ pub(crate) fn analyze_script_structure(text: &str) -> ScriptStructure {
         }
 
         paragraphs.push(Paragraph {
-            text: para_text.to_string(),
+            text: para_text.clone(),
             is_dialogue_block: is_dialogue,
             speakers,
             emotion,
             has_key_action: has_action,
+            scene_index: 0,
+            scene_heading: heading,
+            is_scene_header: is_header,
         });
     }
+
+    assign_scene_metadata(&mut paragraphs);
 
     // Fix 9: 第二遍扫描：在纯叙述段中检测已识别的角色名
     let known_names: Vec<String> = characters.keys().cloned().collect();
@@ -158,149 +244,357 @@ pub(crate) fn analyze_script_structure(text: &str) -> ScriptStructure {
 
 // ──────────────── 阶段 2：分镜头设计 ────────────────
 
+/// 短剧快节奏默认策略：上游已拆好的段落 → 每段一镜，对白不合并
 pub(crate) fn design_shots(structure: &ScriptStructure, _full_text: &str) -> Vec<ShotPlan> {
     let paragraphs = &structure.paragraphs;
     if paragraphs.is_empty() {
         return Vec::new();
     }
 
-    let scene_boundaries: Vec<usize> = detect_scene_boundaries(paragraphs);
-
     let mut shots: Vec<ShotPlan> = Vec::new();
-    let mut current_segment = String::new();
-    let mut current_speakers: Vec<String> = Vec::new();
-    let mut current_duration = 0.0;
-    let mut current_start_para_idx = 0;
     let mut serial: i64 = 0;
 
     for (i, para) in paragraphs.iter().enumerate() {
-        let is_scene_boundary = scene_boundaries.contains(&i) && !current_segment.is_empty();
+        if para.is_scene_header {
+            serial += 1;
+            let hdr_dur = estimate_paragraph_duration(
+                &para.text, para.is_dialogue_block, para.has_key_action,
+            );
+            shots.push(build_shot_plan(
+                serial,
+                para.text.clone(),
+                NarrativePurpose::Establishing,
+                build_scene_context(i, paragraphs),
+                para.speakers.clone(),
+                String::new(),
+                hdr_dur.max(2.0),
+                (i, i + 1),
+                paragraphs,
+            ));
+            continue;
+        }
 
-        let should_split_for_action = para.has_key_action
-            && !current_segment.is_empty()
-            && !para.is_dialogue_block;
+        serial += 1;
+        let dur = estimate_paragraph_duration(
+            &para.text, para.is_dialogue_block, para.has_key_action,
+        );
+        let dialogue = extract_dialogue_text(&para.text, &para.speakers);
+        let mut shot = build_shot_plan(
+            serial,
+            para.text.clone(),
+            determine_narrative_purpose(serial, paragraphs.len(), i, paragraphs),
+            build_scene_context(i, paragraphs),
+            para.speakers.clone(),
+            dialogue,
+            dur.max(0.8),
+            (i, i + 1),
+            paragraphs,
+        );
+        shot.performance_note = extract_performance_note(&para.text);
+        shots.push(shot);
+    }
 
-        let is_emotion_shift = !current_segment.is_empty()
-            && !para.emotion.is_empty()
-            && !current_speakers.is_empty()
-            && para.emotion != paragraphs
-                .get(current_start_para_idx)
-                .map(|p| p.emotion.as_str())
-                .unwrap_or("")
-            && (para.emotion == "愤怒" || para.emotion == "悲伤" || para.emotion == "恐惧");
+    let mut shots = split_dialogue_shots(shots, paragraphs);
+    shots = split_overlong_shots(shots);
+    shots = expand_compound_shots(shots);
+    shots = inject_reaction_shots(shots);
+    let mut shots = merge_short_shots(shots);
+    assign_scene_roles(&mut shots);
+    apply_decisions_to_shots(&mut shots, paragraphs);
+    smooth_adjacent_shots(&mut shots);
+    renumber_shots(&mut shots);
+    shots
+}
 
-        // Fix 11: 使用 chars().count() 而非 len()（避免 UTF-8 字节数误判）
-        let is_empty_separator = para.text.chars().count() < 5 && current_segment.chars().count() > 50;
+fn build_shot_plan(
+    serial: i64,
+    text_segment: String,
+    narrative_purpose: NarrativePurpose,
+    scene_context: String,
+    characters_in_shot: Vec<String>,
+    dialogue_text: String,
+    estimated_duration_sec: f64,
+    para_range: (usize, usize),
+    paragraphs: &[Paragraph],
+) -> ShotPlan {
+    let lo = para_range.0.min(para_range.1).min(paragraphs.len());
+    let scene_index = paragraphs
+        .get(lo)
+        .map(|p| p.scene_index)
+        .unwrap_or(0);
+    let scene_heading = paragraphs
+        .get(lo)
+        .map(|p| p.scene_heading.clone())
+        .unwrap_or_default();
+    ShotPlan {
+        serial,
+        text_segment,
+        narrative_purpose,
+        scene_context,
+        characters_in_shot,
+        dialogue_text,
+        estimated_duration_sec,
+        para_range,
+        scene_index,
+        scene_heading,
+        ..ShotPlan::default()
+    }
+}
 
-        let should_flush = is_scene_boundary
-            || should_split_for_action
-            || is_emotion_shift
-            || is_empty_separator
-            || (i == paragraphs.len() - 1);
-
-        if should_flush {
-            if !current_segment.is_empty() {
-                let shot_start = current_start_para_idx;
-                if is_scene_boundary || should_split_for_action || is_emotion_shift || is_empty_separator {
-                    // flush 当前 segment（段落 [shot_start, i)），新段落单独成镜
-                    let flushed = std::mem::take(&mut current_segment);
-                    let flushed_speakers = std::mem::take(&mut current_speakers);
-                    let flushed_dur = current_duration;
-
-                    // 新段作为当前
-                    current_segment = para.text.clone();
-                    current_speakers = para.speakers.clone();
-                    current_duration = estimate_paragraph_duration(
-                        &para.text, para.is_dialogue_block, para.has_key_action,
-                    );
-                    current_start_para_idx = i;
-
-                    // push 旧镜
-                    serial += 1;
-                    let purpose = determine_narrative_purpose(
-                        serial, paragraphs.len(), i, paragraphs,
-                    );
-                    let scene_ctx = build_scene_context(shot_start, paragraphs);
-                    let dialogue = extract_dialogue_text(&flushed, &flushed_speakers);
-                    shots.push(ShotPlan {
-                        serial,
-                        text_segment: flushed,
-                        narrative_purpose: purpose,
-                        scene_context: scene_ctx,
-                        characters_in_shot: flushed_speakers,
-                        dialogue_text: dialogue,
-                        estimated_duration_sec: flushed_dur.max(1.0),
-                        para_range: (shot_start, i),
-                    });
-                    continue;
-                } else {
-                    // 最后一段：合并后 flush（段落 [shot_start, i] 包含 i）
-                    if i == paragraphs.len() - 1 {
-                        current_segment = format!("{}\n{}", current_segment, para.text);
-                        for s in &para.speakers {
-                            if !current_speakers.contains(s) { current_speakers.push(s.clone()); }
-                        }
-                        current_duration += estimate_paragraph_duration(
-                            &para.text, para.is_dialogue_block, para.has_key_action,
-                        );
-                    }
-                    let seg = std::mem::take(&mut current_segment);
-                    let spk = std::mem::take(&mut current_speakers);
-                    let dur = current_duration;
-                    serial += 1;
-                    let purpose = determine_narrative_purpose(
-                        serial, paragraphs.len(), i, paragraphs,
-                    );
-                    let scene_ctx = build_scene_context(shot_start, paragraphs);
-                    let dialogue = extract_dialogue_text(&seg, &spk);
-                    // 最后一个段落 i 已合并进 seg，所以半开区间是 [shot_start, i+1)
-                    shots.push(ShotPlan {
-                        serial,
-                        text_segment: seg,
-                        narrative_purpose: purpose,
-                        scene_context: scene_ctx,
-                        characters_in_shot: spk,
-                        dialogue_text: dialogue,
-                        estimated_duration_sec: dur.max(1.0),
-                        para_range: (shot_start, i + 1),
-                    });
-                    current_segment = String::new();
-                    current_speakers.clear();
-                    current_duration = 0.0;
-                    current_start_para_idx = i + 1;
-                }
-            } else {
-                // 第一个段落
-                current_segment = para.text.clone();
-                current_speakers = para.speakers.clone();
-                current_duration = estimate_paragraph_duration(
-                    &para.text, para.is_dialogue_block, para.has_key_action,
-                );
-                current_start_para_idx = i;
-            }
-        } else {
-            // 合并
-            if current_segment.is_empty() {
-                current_segment = para.text.clone();
-                current_speakers = para.speakers.clone();
-                current_duration = estimate_paragraph_duration(
-                    &para.text, para.is_dialogue_block, para.has_key_action,
-                );
-                current_start_para_idx = i;
-            } else {
-                current_segment = format!("{}\n{}", current_segment, para.text);
-                for s in &para.speakers {
-                    if !current_speakers.contains(s) { current_speakers.push(s.clone()); }
-                }
-                current_duration += estimate_paragraph_duration(
-                    &para.text, para.is_dialogue_block, para.has_key_action,
-                );
+fn assign_scene_roles(shots: &mut [ShotPlan]) {
+    let mut seen_scenes: HashMap<usize, bool> = HashMap::new();
+    for shot in shots.iter_mut() {
+        if shot.is_reaction_shot || shot.is_compound_step {
+            continue;
+        }
+        let key = shot.scene_index;
+        if !seen_scenes.contains_key(&key) {
+            seen_scenes.insert(key, true);
+            shot.is_scene_establishing = true;
+            if shot.narrative_purpose == NarrativePurpose::Advancing {
+                shot.narrative_purpose = NarrativePurpose::Establishing;
             }
         }
     }
+    if let Some(last) = shots.last_mut() {
+        if !last.is_reaction_shot {
+            last.narrative_purpose = NarrativePurpose::Closing;
+        }
+    }
+}
 
-    // 合并过短镜头
-    merge_short_shots(shots)
+/// 跳过人物小传等前导，从正文（第一集 / 首个场号）开始
+fn strip_script_preamble(text: &str) -> String {
+    if let Some(pos) = text.find("第一集") {
+        let after = text[pos..].trim();
+        let lines: Vec<&str> = after.lines().collect();
+        if lines.first().map(|l| l.trim().contains("第一集")).unwrap_or(false) {
+            return lines.iter().skip(1).map(|l| l.trim()).filter(|l| !l.is_empty()).collect::<Vec<_>>().join("\n");
+        }
+        return after.to_string();
+    }
+    for marker in ["1-1", "1－1", "01-1"] {
+        if let Some(pos) = text.find(marker) {
+            return text[pos..].trim().to_string();
+        }
+    }
+    text.trim().to_string()
+}
+
+fn flush_narrative_buf(buf: &mut String, blocks: &mut Vec<String>) {
+    let t = buf.trim();
+    if !t.is_empty() {
+        blocks.push(t.to_string());
+    }
+    buf.clear();
+}
+
+/// 将剧本文本拆成可分析块：支持单行剧本（▲动作 / 括号对白 / 场号）
+fn split_script_into_blocks(text: &str) -> Vec<String> {
+    let body = strip_script_preamble(text);
+    let mut blocks: Vec<String> = Vec::new();
+    let mut narrative_buf = String::new();
+
+    for line in body.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        if is_episode_title_line(line) {
+            flush_narrative_buf(&mut narrative_buf, &mut blocks);
+            blocks.push(line.to_string());
+            continue;
+        }
+        if is_scene_header_line(line) {
+            flush_narrative_buf(&mut narrative_buf, &mut blocks);
+            blocks.push(line.to_string());
+            continue;
+        }
+        if is_cast_line(line) {
+            flush_narrative_buf(&mut narrative_buf, &mut blocks);
+            blocks.push(line.to_string());
+            continue;
+        }
+        if is_action_line(line) {
+            flush_narrative_buf(&mut narrative_buf, &mut blocks);
+            blocks.push(normalize_action_line(line));
+            continue;
+        }
+        if is_script_dialogue_line(line) {
+            flush_narrative_buf(&mut narrative_buf, &mut blocks);
+            blocks.push(line.to_string());
+            continue;
+        }
+        // 动作/叙述行：默认单行成块（短剧常见格式）
+        flush_narrative_buf(&mut narrative_buf, &mut blocks);
+        blocks.push(line.to_string());
+    }
+    flush_narrative_buf(&mut narrative_buf, &mut blocks);
+
+    // 兼容：若上游已用双换行分段，对超大块二次按行拆分
+    let mut refined: Vec<String> = Vec::new();
+    for block in blocks {
+        if block.lines().count() <= 1 {
+            refined.push(block);
+            continue;
+        }
+        let lines: Vec<String> = block
+            .lines()
+            .map(|l| l.trim())
+            .filter(|l| !l.is_empty())
+            .map(String::from)
+            .collect();
+        let all_dialogue = lines.iter().all(|l| is_script_dialogue_line(l));
+        if all_dialogue && lines.len() >= 2 {
+            refined.extend(lines);
+        } else {
+            refined.push(block);
+        }
+    }
+    refined
+}
+
+fn is_episode_title_line(line: &str) -> bool {
+    line.contains('集')
+        && line.chars().count() <= 16
+        && !line.contains('：')
+        && !line.contains(':')
+        && !line.starts_with('▲')
+}
+
+fn is_cast_line(line: &str) -> bool {
+    line.starts_with("人物：") || line.starts_with("人物:")
+}
+
+fn is_action_line(line: &str) -> bool {
+    line.starts_with('▲') || line.starts_with('△') || line.starts_with('@')
+}
+
+fn normalize_action_line(line: &str) -> String {
+    line.trim()
+        .trim_start_matches('▲')
+        .trim_start_matches('△')
+        .trim_start_matches('@')
+        .trim()
+        .to_string()
+}
+
+/// 识别剧本对白行：张三：… / 陈南（兴奋：… / 陈南os：… / 陈南（气）:
+fn is_script_dialogue_line(line: &str) -> bool {
+    parse_speaker_prefix(line).is_some()
+}
+
+fn parse_speaker_prefix(line: &str) -> Option<String> {
+    let t = line.trim();
+    for marker in ["os：", "OS：", "os:", "OS:"] {
+        if let Some(pos) = t.find(marker) {
+            let name = t[..pos].trim();
+            if is_likely_character_name(name) {
+                return Some(name.to_string());
+            }
+        }
+    }
+    if let Some(pos) = t.find('：') {
+        let prefix = &t[..pos];
+        let name = prefix
+            .split('（')
+            .next()
+            .unwrap_or(prefix)
+            .split('(')
+            .next()
+            .unwrap_or(prefix)
+            .trim();
+        if is_likely_character_name(name) {
+            return Some(name.to_string());
+        }
+    }
+    if let Some(pos) = t.find(':') {
+        let prefix = &t[..pos];
+        if prefix.ends_with('）') || prefix.ends_with(')') {
+            let name = prefix
+                .split('（')
+                .next()
+                .unwrap_or(prefix)
+                .split('(')
+                .next()
+                .unwrap_or(prefix)
+                .trim();
+            if is_likely_character_name(name) {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
+}
+
+fn is_likely_character_name(name: &str) -> bool {
+    let n = name.chars().count();
+    n >= 1 && n <= 8 && !name.contains(' ') && is_likely_name(name)
+}
+
+fn is_dialogue_line(line: &str) -> bool {
+    is_script_dialogue_line(line)
+}
+
+fn is_scene_header_line(text: &str) -> bool {
+    let t = text.trim();
+    if t.starts_with("##") {
+        return true;
+    }
+    if t.contains("第") && t.contains("场") {
+        return true;
+    }
+    let first_line = t.lines().next().unwrap_or(t).trim();
+    if looks_like_scene_number(first_line) {
+        return true;
+    }
+    false
+}
+
+fn looks_like_scene_number(line: &str) -> bool {
+    let t = line.trim();
+    if t.len() < 3 {
+        return false;
+    }
+    let has_scene_id = t
+        .find('-')
+        .map(|dash| {
+            let before = t[..dash].chars().all(|c| c.is_ascii_digit()) && dash > 0;
+            let after: String = t[dash + 1..]
+                .chars()
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
+            before && !after.is_empty()
+        })
+        .unwrap_or(false);
+    let has_stage = t.contains('内') || t.contains('外');
+    let has_time = t.contains('日') || t.contains('夜') || t.contains('晨') || t.contains("傍晚");
+    has_scene_id && (has_stage || has_time) || (has_stage && has_time && t.chars().any(|c| c.is_ascii_digit()))
+}
+
+fn normalize_scene_heading(text: &str) -> String {
+    let t = text.trim().trim_start_matches('#').trim();
+    t.chars().take(48).collect()
+}
+
+fn assign_scene_metadata(paragraphs: &mut [Paragraph]) {
+    let mut scene_idx = 0usize;
+    let mut current_heading = String::new();
+    for para in paragraphs.iter_mut() {
+        if para.is_scene_header {
+            scene_idx += 1;
+            if !para.scene_heading.is_empty() {
+                current_heading = para.scene_heading.clone();
+            } else {
+                current_heading = normalize_scene_heading(&para.text);
+                para.scene_heading = current_heading.clone();
+            }
+        }
+        para.scene_index = scene_idx;
+        if !current_heading.is_empty() && !para.is_scene_header {
+            para.scene_heading = current_heading.clone();
+        }
+    }
 }
 
 // ──────────────── 辅助函数 ────────────────
@@ -310,15 +604,25 @@ fn extract_speakers(text: &str) -> (Vec<String>, bool) {
     let mut has_dialogue = false;
 
     for line in text.lines() {
-        let trimmed = line.trim();
-        if let Some(colon_pos) = trimmed.find('：') {
-            let prefix = &trimmed[..colon_pos];
-            if prefix.chars().count() <= 6 && !prefix.contains(' ') {
-                let name = prefix.trim_end_matches('说').trim().to_string();
-                if !name.is_empty() && is_likely_name(&name) {
-                    if !speakers.contains(&name) { speakers.push(name); }
-                    has_dialogue = true;
-                }
+        if let Some(name) = parse_speaker_prefix(line) {
+            if !speakers.contains(&name) {
+                speakers.push(name);
+            }
+            has_dialogue = true;
+        }
+    }
+
+    // 人物：陈南 师父
+    if !has_dialogue && text.starts_with("人物") {
+        let cast = text
+            .split('：')
+            .nth(1)
+            .or_else(|| text.split(':').nth(1))
+            .unwrap_or("");
+        for name in cast.split_whitespace() {
+            let n = name.trim();
+            if is_likely_character_name(n) && !speakers.contains(&n.to_string()) {
+                speakers.push(n.to_string());
             }
         }
     }
@@ -332,7 +636,7 @@ fn is_likely_name(s: &str) -> bool {
     let blacklist = [
         "但是", "不过", "因为", "所以", "如果", "虽然", "然而", "于是",
         "然后", "接着", "此时", "这时", "忽然", "突然", "只见", "只听",
-        "备注", "注意", "说明", "提示",
+        "备注", "注意", "说明", "提示", "人物",
     ];
     !blacklist.contains(&s)
 }
@@ -360,20 +664,50 @@ fn detect_emotion(text: &str) -> String {
 
 fn estimate_paragraph_duration(text: &str, is_dialogue: bool, has_action: bool) -> f64 {
     if is_dialogue {
-        let dur = text.chars().count() as f64 / 3.0;
-        dur.clamp(1.5, 15.0)
+        let dialogue_only = extract_dialogue_content(text);
+        let chars = dialogue_only.chars().count() as f64;
+        let dur = if chars > 0.0 { chars / 2.8 + 0.4 } else { 2.0 };
+        dur.clamp(1.2, 8.0)
     } else if has_action {
-        let dur = text.chars().count() as f64 / 6.0;
-        dur.clamp(1.0, 5.0)
+        let dur = text.chars().count() as f64 / 5.5 + 0.5;
+        dur.clamp(1.2, 5.0)
     } else {
-        1.5
+        let chars = text.chars().count();
+        if chars > 40 {
+            2.5
+        } else {
+            1.8
+        }
+    }
+}
+
+/// 仅统计冒号后的对白字数（更准确估算口播时长）
+fn extract_dialogue_content(text: &str) -> String {
+    let mut out = String::new();
+    for line in text.lines() {
+        let t = line.trim();
+        if let Some((_, content)) = t.split_once('：') {
+            out.push_str(content.trim());
+            out.push('\n');
+        }
+    }
+    if out.is_empty() {
+        text.to_string()
+    } else {
+        out
     }
 }
 
 fn detect_scene_boundaries(paragraphs: &[Paragraph]) -> Vec<usize> {
     let mut boundaries = Vec::new();
     for (i, para) in paragraphs.iter().enumerate() {
-        if i == 0 { continue; }
+        if i == 0 {
+            continue;
+        }
+        if para.is_scene_header {
+            boundaries.push(i);
+            continue;
+        }
         if TIME_JUMP_KEYWORDS.iter().any(|kw| para.text.contains(kw)) {
             boundaries.push(i);
             continue;
@@ -388,13 +722,74 @@ fn detect_scene_boundaries(paragraphs: &[Paragraph]) -> Vec<usize> {
     boundaries
 }
 
+/// 从对白行括号提取表演备注：陈南（兴奋：… / 陈南（皱眉）
+pub(crate) fn extract_performance_note(text: &str) -> String {
+    for line in text.lines() {
+        let t = line.trim();
+        if let Some(note) = parse_performance_note_from_line(t) {
+            return note;
+        }
+    }
+    String::new()
+}
+
+fn parse_performance_note_from_line(line: &str) -> Option<String> {
+    let t = line.trim();
+    let open = t
+        .char_indices()
+        .find(|(_, c)| *c == '（' || *c == '(')
+        .map(|(byte_idx, ch)| byte_idx + ch.len_utf8());
+    if open.is_none() {
+        return None;
+    }
+    let rest = t.get(open.unwrap()..)?;
+    let close_rel = rest.find('）').or_else(|| rest.find(')'));
+    let inner = if let Some(end) = close_rel {
+        rest[..end].trim()
+    } else {
+        // 未闭合括号：陈南（兴奋：台词…
+        let colon_byte = rest
+            .char_indices()
+            .find(|(_, c)| *c == '：' || *c == ':')
+            .map(|(i, _)| i);
+        if colon_byte.is_none() {
+            return None;
+        }
+        rest[..colon_byte.unwrap()].trim()
+    };
+    if inner.is_empty() || inner.chars().count() > 16 {
+        return None;
+    }
+    let note = inner
+        .split('：')
+        .next()
+        .or_else(|| inner.split(':').next())
+        .unwrap_or(inner)
+        .trim();
+    if note.is_empty() || note.chars().count() > 12 {
+        return None;
+    }
+    Some(note.to_string())
+}
+
 fn extract_dialogue_text(text: &str, speakers: &[String]) -> String {
-    if speakers.is_empty() { return String::new(); }
+    if is_cast_line(text) {
+        return String::new();
+    }
+    if is_script_dialogue_line(text) {
+        return text.trim().to_string();
+    }
+    if speakers.is_empty() {
+        return String::new();
+    }
     let lines: Vec<String> = text
         .lines()
         .filter(|line| {
             let t = line.trim();
-            speakers.iter().any(|s| t.starts_with(s.as_str()) && t.contains('：'))
+            if is_script_dialogue_line(t) {
+                return true;
+            }
+            speakers.iter().any(|s| t.starts_with(s.as_str()) && (t.contains('：') || t.contains('(')))
         })
         .map(|l| l.trim().to_string())
         .collect();
@@ -402,14 +797,11 @@ fn extract_dialogue_text(text: &str, speakers: &[String]) -> String {
 }
 
 fn determine_narrative_purpose(
-    serial: i64,
+    _serial: i64,
     total_paras: usize,
     current_para_idx: usize,
     paragraphs: &[Paragraph],
 ) -> NarrativePurpose {
-    if serial == 1 {
-        return NarrativePurpose::Establishing;
-    }
     // 检测情绪转折：当前段落有强烈负面情绪，且与上一段情绪不同
     if let Some(para) = paragraphs.get(current_para_idx) {
         let is_strong_emotion = para.emotion == "愤怒"
@@ -445,30 +837,53 @@ fn build_scene_context(para_idx: usize, paragraphs: &[Paragraph]) -> String {
     ctx.chars().take(300).collect()
 }
 
+fn is_narration_only_shot(shot: &ShotPlan) -> bool {
+    shot.dialogue_text.is_empty()
+        && !is_cast_line(&shot.text_segment)
+        && !is_script_dialogue_line(&shot.text_segment)
+        && !shot.is_scene_establishing
+}
+
 fn merge_short_shots(shots: Vec<ShotPlan>) -> Vec<ShotPlan> {
-    const MIN_DURATION: f64 = 2.0;
-    if shots.len() <= 1 { return shots; }
+    // 短剧快节奏：对白、场号、反应镜、复合步骤永不合并
+    const MAX_SINGLE_NARRATION: f64 = 1.2;
+    const MAX_COMBINED_NARRATION: f64 = 2.0;
+    if shots.len() <= 1 {
+        return shots;
+    }
     let mut merged: Vec<ShotPlan> = Vec::with_capacity(shots.len());
     for shot in shots {
         if let Some(last) = merged.last_mut() {
-            if last.estimated_duration_sec < MIN_DURATION && shot.estimated_duration_sec < MIN_DURATION {
-                // 两镜都过短：合并到前一镜
-                last.text_segment = format!("{}\n{}", last.text_segment, shot.text_segment);
-                last.estimated_duration_sec += shot.estimated_duration_sec;
-                last.para_range = (last.para_range.0, shot.para_range.1);
-                for c in &shot.characters_in_shot {
-                    if !last.characters_in_shot.contains(c) {
-                        last.characters_in_shot.push(c.clone());
-                    }
-                }
-                if !shot.dialogue_text.is_empty() {
-                    if last.dialogue_text.is_empty() {
-                        last.dialogue_text = shot.dialogue_text;
-                    } else {
-                        last.dialogue_text = format!("{}\n{}", last.dialogue_text, shot.dialogue_text);
-                    }
-                }
+            if last.is_compound_step
+                || shot.is_compound_step
+                || last.is_reaction_shot
+                || shot.is_reaction_shot
+                || last.is_scene_establishing
+                || shot.is_scene_establishing
+                || !last.dialogue_text.is_empty()
+                || !shot.dialogue_text.is_empty()
+                || last.scene_index != shot.scene_index
+            {
+                merged.push(shot);
                 continue;
+            }
+            if is_narration_only_shot(last)
+                && is_narration_only_shot(&shot)
+                && last.estimated_duration_sec < MAX_SINGLE_NARRATION
+                && shot.estimated_duration_sec < MAX_SINGLE_NARRATION
+            {
+                let combined = last.estimated_duration_sec + shot.estimated_duration_sec;
+                if combined <= MAX_COMBINED_NARRATION {
+                    last.text_segment = format!("{}\n{}", last.text_segment, shot.text_segment);
+                    last.estimated_duration_sec = combined;
+                    last.para_range = (last.para_range.0, shot.para_range.1);
+                    for c in &shot.characters_in_shot {
+                        if !last.characters_in_shot.contains(c) {
+                            last.characters_in_shot.push(c.clone());
+                        }
+                    }
+                    continue;
+                }
             }
         }
         merged.push(shot);
@@ -509,5 +924,96 @@ mod tests {
         let st = analyze_script_structure("张三：你好。\n\n李四：你来了。");
         assert_eq!(st.paragraphs.len(), 2);
         assert!(st.characters.contains_key("张三"));
+    }
+
+    #[test]
+    fn test_scene_header_split() {
+        let st = analyze_script_structure(
+            "1-1 日 内 客厅\n\n张三：你好。\n\n李四：来了。",
+        );
+        assert!(st.paragraphs.iter().any(|p| p.is_scene_header));
+        let with_scene = st.paragraphs.iter().find(|p| p.text.contains("张三")).unwrap();
+        assert_eq!(with_scene.scene_index, 1);
+        assert!(with_scene.scene_heading.contains("1-1"));
+    }
+
+    #[test]
+    fn test_design_shots_two_scenes() {
+        let body = "1-1 日 内 客厅\n\n张三：你好。\n\n2-1 夜 外 街道\n\n李四：谁？";
+        let st = analyze_script_structure(body);
+        let shots = design_shots(&st, body);
+        assert!(shots.len() >= 3);
+        let establishing: Vec<_> = shots.iter().filter(|s| s.is_scene_establishing).collect();
+        assert!(establishing.len() >= 2);
+    }
+
+    #[test]
+    fn test_parenthesis_dialogue_speaker() {
+        let (s, d) = extract_speakers("陈南（兴奋：我这一击用了七成功力");
+        assert!(d);
+        assert!(s.contains(&"陈南".to_string()));
+        let (s2, _) = extract_speakers("陈南os：我去，我未来小姨子？");
+        assert!(s2.contains(&"陈南".to_string()));
+    }
+
+    #[test]
+    fn test_extract_performance_note() {
+        assert_eq!(
+            extract_performance_note("陈南（兴奋：我这一击用了七成功力"),
+            "兴奋"
+        );
+        assert_eq!(extract_performance_note("李惠然（皱眉）：他们要追来了"), "皱眉");
+        assert!(extract_performance_note("悬崖，陈南挥拳").is_empty());
+    }
+
+    #[test]
+    fn test_episode1_tiejia_pipeline() {
+        use crate::executor::script_decision::format_shot_storyboard_block;
+        let text = include_str!("fixtures/episode1_tiejia.txt");
+        let st = analyze_script_structure(text);
+        assert!(
+            st.paragraphs.len() >= 35,
+            "expected many paragraphs, got {}",
+            st.paragraphs.len()
+        );
+        assert!(st.characters.contains_key("陈南"));
+        assert!(st.characters.contains_key("李惠然"));
+        let shots = design_shots(&st, text);
+        assert!(
+            shots.len() >= 48,
+            "short-drama pace expects ~50+ shots, got {}",
+            shots.len()
+        );
+        let scene_count = shots
+            .iter()
+            .map(|s| s.scene_index)
+            .collect::<std::collections::HashSet<_>>()
+            .len();
+        assert!(scene_count >= 2, "expected 2 scenes, got {}", scene_count);
+        let has_os = shots.iter().any(|s| s.text_segment.contains("os"));
+        assert!(has_os, "should parse inner monologue line");
+        eprintln!(
+            "episode1 stats: paragraphs={}, shots={}, scenes={}",
+            st.paragraphs.len(),
+            shots.len(),
+            scene_count
+        );
+        for shot in shots.iter().take(5) {
+            let block = format_shot_storyboard_block(shot, &shot.text_segment, &shot.dialogue_text);
+            eprintln!("--- 镜 {} [{}] ---\n{}\n", shot.serial, shot.scene_heading, block);
+        }
+        let climax: Vec<_> = shots
+            .iter()
+            .filter(|s| s.scene_heading.contains("1-2") && s.serial >= shots.len() as i64 - 5)
+            .collect();
+        for shot in climax {
+            eprintln!(
+                "--- 尾声镜 {} | {} | {} | {}s ---",
+                shot.serial,
+                shot.shot_size,
+                shot.text_segment.chars().take(40).collect::<String>(),
+                shot.estimated_duration_sec
+            );
+        }
     }
 }

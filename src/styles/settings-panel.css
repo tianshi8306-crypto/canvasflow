@@ -2,7 +2,7 @@
 .settings-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.58);
+  background: var(--canvas-float-backdrop, rgba(0, 0, 0, 0.58));
   display: grid;
   place-items: center;
   z-index: 50;

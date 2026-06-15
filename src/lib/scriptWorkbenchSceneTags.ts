@@ -1,3 +1,6 @@
+import type { ScriptBeat } from "@/lib/types";
+
+/** 从旧 sceneTags（运镜: xxx）解析运镜，兼容历史数据 */
 export function extractCameraMove(sceneTags: string): string {
   const raw = (sceneTags ?? "").trim();
   if (!raw) return "";
@@ -9,6 +12,13 @@ export function toSceneTags(cameraMove: string): string {
   const m = cameraMove.trim();
   if (!m) return "";
   return `运镜: ${m}`;
+}
+
+/** 优先读结构化 cameraMove 字段 */
+export function readCameraMove(beat: Pick<ScriptBeat, "cameraMove" | "sceneTags">): string {
+  const direct = (beat.cameraMove ?? "").trim();
+  if (direct) return direct;
+  return extractCameraMove(beat.sceneTags ?? "");
 }
 
 export function parseShotNumberRank(shotNumber: string): number {

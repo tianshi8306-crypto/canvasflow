@@ -473,19 +473,21 @@ export function VideoMultimodalInputPanel({
     return mergeSeedanceComplianceIntoValidation(base, complianceErrors);
   }, [orderedIncomingRefItems, draft.workflow, imageComplianceByEdge, refAtMeta]);
 
-  // 当前节点是否有输出路径（生成成功）
-  const nodeHasOutput = videoNodeId
-    ? Boolean(useProjectStore.getState().nodes.find((n) => n.id === videoNodeId)?.data.path)
-    : false;
+  const nodeVideoState = useProjectStore((s) =>
+    videoNodeId ? s.nodes.find((n) => n.id === videoNodeId)?.data : undefined,
+  );
+  const nodeHasOutput = Boolean(nodeVideoState?.path?.trim() || nodeVideoState?.assetId?.trim());
+  const awaitingNewResult = Boolean(nodeVideoState?.video?.awaitingNewResult);
 
   // 生成状态派生
   const jobStatus = activeJob?.status;
   const jobError = activeJob?.error ?? (draft as { error?: string }).error;
+  const jobLooksInProgress =
+    jobStatus === "queued" || jobStatus === "running";
   const isGenerating =
     submitting ||
-    jobStatus === "queued" ||
-    jobStatus === "running" ||
-    cancelling;
+    cancelling ||
+    (jobLooksInProgress && (!nodeHasOutput || awaitingNewResult));
   const isCancelled = jobStatus === "cancelled";
   const isFailed = jobStatus === "failed";
   const isSucceeded = (jobStatus === "succeeded" || nodeHasOutput) && !isCancelled;
@@ -500,7 +502,9 @@ export function VideoMultimodalInputPanel({
     error: jobError,
   });
   const showRecoverDreamina = Boolean(
-    isDreaminaModel(validModelId) && dreaminaSubmitId && (isFailed || isGenerating),
+    isDreaminaModel(validModelId) &&
+      dreaminaSubmitId &&
+      (isFailed || (isGenerating && (!nodeHasOutput || awaitingNewResult))),
   );
 
   const videoNodeLabel = useProjectStore((s) => {

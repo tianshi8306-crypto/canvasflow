@@ -73,15 +73,29 @@ pub(crate) fn incoming_texts_ordered_with_prompt_fallback(
         }
         if let Some(src) = node_by_id(graph, &e.source) {
             if src.node_type == "textNode" || src.node_type == "llm" {
-                let p = src
+                let prompt = src
                     .data
                     .get("prompt")
                     .and_then(|v| v.as_str())
                     .unwrap_or("")
                     .trim()
                     .to_string();
-                if !p.is_empty() {
-                    pairs.push((idx, p));
+                let model_input = src
+                    .data
+                    .get("params")
+                    .and_then(|p| p.get("textModelInput"))
+                    .and_then(|v| v.as_str())
+                    .map(|s| s.trim())
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.to_string())
+                    .unwrap_or_default();
+                let text = if !model_input.is_empty() {
+                    model_input
+                } else {
+                    prompt
+                };
+                if !text.is_empty() {
+                    pairs.push((idx, text));
                 }
             }
         }

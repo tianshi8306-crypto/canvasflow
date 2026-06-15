@@ -5,22 +5,12 @@
 
 ## 目录原则
 
-工程根目录下 `assets/` 以**媒体类型**为第一级，再区分来源：
+工程根目录下 `assets/`：**图片与视频**使用扁平序号目录（不区分模型来源），**音频**仍按来源子目录：
 
 ```
 assets/
-├── video/
-│   ├── import/          # 用户导入/拖入
-│   └── gen/
-│       ├── dreamina/    # 即梦 CLI/API 视频
-│       ├── seedance/    # Doubao Seedance API
-│       ├── mock/        # 本地 mock
-│       └── tools/       # 裁剪、去字幕等 FFmpeg 输出
-├── image/
-│   ├── import/
-│   └── gen/
-│       ├── generate/    # 图片 API
-│       └── dreamina/
+├── video/               # 全部视频：000001.mp4、000002.mp4 …
+├── image/               # 全部图片：000001.png、000002.jpg …
 ├── audio/
 │   ├── import/
 │   └── gen/
@@ -34,9 +24,9 @@ assets/
 
 | 场景 | 相对路径 |
 |------|----------|
-| 导入视频 | `assets/video/import/clip.mp4` |
-| Seedance 成片 | `assets/video/gen/seedance/seedance_gen_20260530_….mp4` |
-| 即梦成片 | `assets/video/gen/dreamina/dreamina_t2v_….mp4` |
+| 导入视频 | `assets/video/000001.mp4` |
+| 生成视频（任意模型） | `assets/video/000002.mp4` |
+| 生成图片 | `assets/image/000001.png` |
 | TTS | `assets/audio/gen/tts/tts_….mp3` |
 
 ## 索引与引用
