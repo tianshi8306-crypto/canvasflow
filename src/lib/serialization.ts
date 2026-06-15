@@ -61,10 +61,34 @@ type MigrationFn<TFrom, TTo> = (data: TFrom) => TTo;
 function migrateV0ToV1(data: CanvasV0): CanvasV1 {
   const rawNodes = Array.isArray(data.nodes) ? data.nodes : [];
 
+  // shotSize → scene 迁移：旧版用 shotSize 存景别，新版统一为 scene
+  const migratedNodes = rawNodes.map((node) => {
+    if (node && typeof node === "object" && !Array.isArray(node)) {
+      const n = node as Record<string, unknown>;
+      if (n.type === "scriptNode" && n.data && typeof n.data === "object" && !Array.isArray(n.data)) {
+        const data = n.data as Record<string, unknown>;
+        const beats = Array.isArray(data.scriptBeats) ? data.scriptBeats : [];
+        const migratedBeats = beats.map((beat) => {
+          if (beat && typeof beat === "object" && !Array.isArray(beat)) {
+            const b = beat as Record<string, unknown>;
+            const shotSize = typeof b.shotSize === "string" ? b.shotSize : "";
+            const scene = typeof b.scene === "string" ? b.scene : "";
+            if (shotSize && !scene) {
+              return { ...b, scene: shotSize };
+            }
+          }
+          return beat;
+        });
+        return { ...n, data: { ...data, scriptBeats: migratedBeats } };
+      }
+    }
+    return node;
+  });
+
   return {
     version: 1,
     viewport: data.viewport,
-    nodes: rawNodes,
+    nodes: migratedNodes,
     edges: data.edges,
   };
 }

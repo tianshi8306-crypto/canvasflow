@@ -27,6 +27,9 @@ export function SettingsAgentSection() {
       <p className="settingsFieldHint" style={{ marginBottom: 12 }}>
         控制 Hermes 是否自动改脚本/分镜并提交生成。关闭后仅展示计划，需回复「执行」再落画布。
       </p>
+      <p className="settingsFieldHint" style={{ marginBottom: 12 }}>
+        回复长短由 H 根据你的指令自动判断。
+      </p>
 
       <div className="settingsField">
         <div className="settingsToggle">
