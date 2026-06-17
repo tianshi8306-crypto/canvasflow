@@ -34,6 +34,7 @@ jobs:
           cache: npm
 
       - name: Remove lockfile and node_modules for fresh install
+        shell: bash
         run: rm -f package-lock.json && rm -rf node_modules
 
       - name: Install dependencies
@@ -140,6 +141,7 @@ jobs:
         run: brew install ffmpeg
 
       - name: Remove lockfile and node_modules for fresh install
+        shell: bash
         run: rm -f package-lock.json && rm -rf node_modules
 
       - name: Install frontend dependencies
