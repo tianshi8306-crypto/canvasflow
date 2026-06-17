@@ -8,8 +8,9 @@ test.describe("应用壳与画布", () => {
     await expect(trigger).toBeVisible({ timeout: 30_000 });
     // Open the dropdown to reveal menu items
     await trigger.click();
-    await expect(page.getByRole("button", { name: "新建工程" })).toBeVisible();
-    await expect(page.getByRole("button", { name: "打开工程" })).toBeVisible();
+    // 菜单项在 .workspaceMenuRow 中，trigger 按钮也包含类似文字，用 .workspaceMenuRow 限定
+    await expect(page.locator(".workspaceMenuRow", { hasText: "新建工程" })).toBeVisible();
+    await expect(page.locator(".workspaceMenuRow", { hasText: "打开工程" })).toBeVisible();
   });
 
   test("主区域存在 React Flow 画布", async ({ page }) => {
