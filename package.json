@@ -57,7 +57,7 @@
     "@tauri-apps/plugin-notification": "^2.3.3",
     "@tauri-apps/plugin-process": "^2.3.1",
     "@tauri-apps/plugin-updater": "^2.10.1",
-    "@xyflow/react": "^12.4.2",
+    "@xyflow/react": "^12.11.0",
     "clsx": "^2.1.1",
     "docx": "^9.7.1",
     "pdf-parse": "^2.4.5",
