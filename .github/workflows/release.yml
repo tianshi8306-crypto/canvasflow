@@ -56,7 +56,8 @@ jobs:
             libpango1.0-dev \
             libgdk-pixbuf2.0-dev \
             libatk1.0-dev \
-            libsoup-3.0-dev
+            libsoup-3.0-dev \
+            ffmpeg
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@v2
@@ -65,6 +66,9 @@ jobs:
 
       - name: Build frontend (required by Tauri)
         run: npm run build
+
+      - name: Prepare bundled ffmpeg for Rust tests
+        run: node scripts/tauri-build-with-ffmpeg.mjs --ci-prep
 
       - name: Quality gate
         run: npm run quality:gate
