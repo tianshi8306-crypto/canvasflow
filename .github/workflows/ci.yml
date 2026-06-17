@@ -107,10 +107,14 @@ jobs:
             libpango1.0-dev \
             libgdk-pixbuf2.0-dev \
             libatk1.0-dev \
-            libsoup-3.0-dev
+            libsoup-3.0-dev \
+            ffmpeg
 
       - name: Cache Rust artifacts
         uses: Swatinem/rust-cache@v2
+
+      - name: Prepare bundled ffmpeg
+        run: node scripts/tauri-build-with-ffmpeg.mjs --ci-prep
 
       - name: Rust test
         run: cargo test --manifest-path src-tauri/Cargo.toml
