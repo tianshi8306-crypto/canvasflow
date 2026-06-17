@@ -45,9 +45,25 @@ pub(crate) struct VideoMockJob {
 
 impl AppState {
     pub fn new() -> Self {
+        let mut client_builder = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(300));
+
+        // 显式从环境变量读取代理配置，确保在 Windows 等平台上也能正确走代理
+        if let Ok(proxy_url) = std::env::var("HTTPS_PROXY")
+            .or_else(|_| std::env::var("https_proxy"))
+            .or_else(|_| std::env::var("HTTP_PROXY"))
+            .or_else(|_| std::env::var("http_proxy"))
+            .or_else(|_| std::env::var("ALL_PROXY"))
+            .or_else(|_| std::env::var("all_proxy"))
+        {
+            if let Ok(proxy) = reqwest::Proxy::all(&proxy_url) {
+                eprintln!("[AppState] 使用代理: {}", proxy_url);
+                client_builder = client_builder.proxy(proxy);
+            }
+        }
+
         Self {
-            http: reqwest::Client::builder()
-                .timeout(std::time::Duration::from_secs(300))
+            http: client_builder
                 .build()
                 .expect("failed to build HTTP client"),
             video_jobs: Mutex::new(HashMap::new()),

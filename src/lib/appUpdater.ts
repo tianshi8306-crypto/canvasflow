@@ -37,8 +37,20 @@ function isLikelyOfflineError(err: unknown): boolean {
     msg.includes("dns") ||
     msg.includes("resolve") ||
     msg.includes("internet") ||
-    msg.includes("failed to fetch")
+    msg.includes("failed to fetch") ||
+    msg.includes("error sending request for url")
   );
+}
+
+/** 带友好提示的网络错误，用于手动更新检查时向用户展示。 */
+export class AppUpdaterNetworkError extends Error {
+  constructor(cause?: unknown) {
+    super(
+      "无法连接到更新服务器。请检查网络连接，或开启 VPN/系统代理后重试。"
+    );
+    this.name = "AppUpdaterNetworkError";
+    this.cause = cause;
+  }
 }
 
 /** 启动后仅检查一次；无网或已跳过版本时静默返回 null。 */
@@ -58,7 +70,8 @@ export async function checkForAppUpdateOnceAtStartup(): Promise<PendingAppUpdate
   }
 }
 
-/** 设置页手动检查更新；默认不跳过已忽略版本。 */
+/** 设置页手动检查更新；默认不跳过已忽略版本。
+ *  网络错误时抛出 AppUpdaterNetworkError，以便 UI 展示友好提示。 */
 export async function checkForAppUpdateManual(opts?: {
   respectSkipped?: boolean;
 }): Promise<PendingAppUpdate | null> {
@@ -75,7 +88,9 @@ export async function checkForAppUpdateManual(opts?: {
       update,
     };
   } catch (err) {
-    if (isLikelyOfflineError(err)) return null;
+    if (isLikelyOfflineError(err)) {
+      throw new AppUpdaterNetworkError(err);
+    }
     throw err instanceof Error ? err : new Error(String(err));
   }
 }
