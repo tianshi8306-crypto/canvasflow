@@ -28,3 +28,15 @@ nul
 src/styles/global.css.before-*
 src-tauri/bin/ffmpeg.exe
 src-tauri/bin/ffmpeg*.exe
+# Temporary scripts / extracted content
+docx_content.txt
+libtv_pages*.txt
+extract_*.ps1
+extract_*.cjs
+extract_*.mjs
+generate_doc_*.cjs
+read_docx*.cjs
+read_docx*.mjs
+run_extract.ps1
+simple_extract.ps1
+test_path.ps1
