@@ -42,6 +42,10 @@ import { ScriptWorkbenchTableView } from "@/components/ScriptWorkbenchTableView"
 import { ScriptWorkbenchToolbarCluster } from "@/components/ScriptWorkbenchToolbarCluster";
 import { ScriptRhythmReportBanner } from "@/components/ScriptRhythmReportBanner";
 import { useReplayArmCountdown } from "@/hooks/useReplayArmCountdown";
+import {
+  loadWorkbenchTableLayout,
+  persistWorkbenchTableLayout,
+} from "@/lib/scriptWorkbenchTableLayout";
 
 type Props = {
   nodeId: string;
@@ -57,6 +61,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
   const setStatusText = useProjectStore((s) => s.setStatusText);
   const projectPath = useProjectStore((s) => s.projectPath);
   const [view, setView] = useState<"table" | "card">("table");
+  const [tableLayout, setTableLayout] = useState(loadWorkbenchTableLayout);
   const [storyboardGenBusy, setStoryboardGenBusy] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [batchFillOpen, setBatchFillOpen] = useState(false);
@@ -848,13 +853,23 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
   );
   const selectedTemplateGuide = selectedTemplate ? PRESET_TEMPLATE_GUIDE[selectedTemplate.name] ?? null : null;
 
+  const onTableLayoutChange = (layout: typeof tableLayout) => {
+    setTableLayout(layout);
+    persistWorkbenchTableLayout(layout);
+  };
+
   return (
     <div className="scriptWorkbench">
       <ScriptRhythmReportBanner report={rhythmReport} />
+      <p className="scriptWorkbenchCanvasHint" role="status">
+        日常改镜请优先使用画布节点上的基本镜头表或「全屏脚本视图」；本工作台可切换基本表/专业表，基本表可直接编辑，专业表用于勾选与批量操作。
+      </p>
       <div ref={toolbarRef} className="scriptToolbar">
         <ScriptWorkbenchPrimaryActions
           view={view}
           setView={setView}
+          tableLayout={tableLayout}
+          setTableLayout={onTableLayoutChange}
           onOpenFullscreen={() => openScriptFullscreen(nodeId)}
           onDraftFromTheme={draftFromTheme}
           onSendToStoryboard={sendToStoryboardSection}
@@ -909,6 +924,7 @@ export function ScriptNodeWorkbench({ nodeId, beats, storedSelection, themePromp
       {view === "table" ? (
         <ScriptWorkbenchTableView
           containerRef={tableWrapRef}
+          tableLayout={tableLayout}
           rows={rows}
           selectedIds={selectedIds}
           projectPath={projectPath}

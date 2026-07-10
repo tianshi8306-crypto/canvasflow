@@ -388,7 +388,7 @@ export function FFmpegConcatPanel({ nodeId }: FFmpegConcatPanelProps) {
       <div className="fcp-header-row">
         <div className="fcp-header-title">
           <IconVideo />
-          <span>视频合成</span>
+          <span>剪辑</span>
         </div>
         <div className="fcp-header-meta">
           <span className="mono">{inputs.length} 个片段</span>

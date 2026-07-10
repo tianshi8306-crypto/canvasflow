@@ -1,13 +1,20 @@
 import type { ImageEditSubAction } from "@/lib/imageGeneration/imageEditIntent";
 import { BUILT_IN_PRESETS, USER_INPUT_PLACEHOLDER } from "@/lib/slashPresets";
 
-export type ImagePreviewToolbarActionKind = "edit" | "preset" | "utility" | "stub";
+export type ImagePreviewToolbarActionKind =
+  | "edit"
+  | "preset"
+  | "spawnGenerate"
+  | "utility"
+  | "stub";
 
 export type ImagePreviewToolbarAction = {
   id: string;
   label: string;
   kind: ImagePreviewToolbarActionKind;
   presetId?: string;
+  /** spawnGenerate：对应 imageToolbarSpawnGenerate 配置键 */
+  spawnId?: string;
   subAction?: ImageEditSubAction;
   stubMessage?: string;
 };
@@ -41,7 +48,12 @@ export const IMAGE_PREVIEW_TOOLBAR_GROUPS: ImagePreviewToolbarGroup[] = [
         kind: "stub",
         stubMessage: "25 宫格连续分镜即将支持",
       },
-      { id: "person3view", label: "角色三视图", kind: "preset", presetId: "builtin-person-3view" },
+      {
+        id: "person3view",
+        label: "角色三视图",
+        kind: "spawnGenerate",
+        spawnId: "person3view",
+      },
     ],
   },
   {

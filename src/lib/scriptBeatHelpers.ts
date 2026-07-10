@@ -86,6 +86,7 @@ export function normalizeScriptBeat(input: LegacyBeat): ScriptBeat {
     cameraMove: (input.cameraMove ?? "").toString(),
     cameraAngle: (input.cameraAngle ?? "").toString(),
     soundHint: (input.soundHint ?? "").toString(),
+    lightingMood: (input.lightingMood ?? "").toString(),
     editFocus: (input.editFocus ?? "").toString(),
     rhythmTag: (input.rhythmTag ?? input.sceneTags ?? "").toString(),
     storyboardBlock: (input.storyboardBlock ?? "").toString(),

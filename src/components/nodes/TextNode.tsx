@@ -11,7 +11,6 @@ import {
 } from "react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import { NodeAnchors } from "@/components/nodes/anchors";
-import { RF_NODE_INPUT_CLASS } from "@/lib/canvasInteraction";
 import type { FlowNodeData, TextWorkflowKind } from "@/lib/types";
 import {
   NodeChromeProvider,
@@ -26,22 +25,23 @@ import { TextNodeBottomPortal } from "@/components/nodes/TextNodeBottomPortal";
 import { GEN_PANEL_CHROME_WIDTH } from "@/hooks/useNodeGenerationChrome";
 import { TextPreviewToolbarPortal } from "@/components/nodes/TextPreviewToolbarPortal";
 import { TextNodeResizeHandle } from "@/components/nodes/TextNodeResizeHandle";
-import { TextNodeExpandEditModal } from "@/components/nodes/TextNodeExpandEditModal";
-import { TextNodePasteImportModal } from "@/components/nodes/TextNodePasteImportModal";
+import { TextPromptDocSurface, type TextPromptDocSurfaceHandle } from "@/components/nodes/TextPromptDocSurface";
 import { orderedIncomingScriptNodeIds } from "@/lib/incomingScriptBinding";
 import { isPassiveTextContainer } from "@/lib/textNodeContainerMode";
 import { hasUpstreamForTextProcessing } from "@/lib/textNodeUpstreamProcess";
-import { syncTextPromptFromUpstreamScript } from "@/lib/textScriptSync";
 import {
-  downloadTextAsFile,
-  readClipboardText,
   writeClipboardText,
 } from "@/lib/textNodeClipboard";
+import { isTextInputTarget } from "@/lib/canvasInteraction";
+import { applyFormatExec } from "@/lib/textPromptFormatExec";
+import { htmlToMarkdown } from "@/lib/textPromptHtml";
+import { normalizeTextPromptMarkdown } from "@/lib/textPromptMarkdown";
 import { useTextNodeFrameResize } from "@/hooks/useTextNodeFrameResize";
 import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 import "./TextNodeChrome.css";
+import "./TextPromptDocument.css";
 
 type TextParams = {
   textChrome?: boolean;
@@ -86,12 +86,10 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
   const isComposerExpanded = expandedComposerNodeId === id;
 
   const [editing, setEditing] = useState(false);
-  const [expandEditOpen, setExpandEditOpen] = useState(false);
-  const [expandDraft, setExpandDraft] = useState("");
-  const [pasteImportOpen, setPasteImportOpen] = useState(false);
-  const [pasteDraft, setPasteDraft] = useState("");
-  const editRef = useRef<HTMLDivElement>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const editSurfaceRef = useRef<TextPromptDocSurfaceHandle>(null);
   const pendingFormatRef = useRef<{ command: string; value?: string } | null>(null);
+  const setTextPreviewExpandedNodeId = useCanvasUiStore((s) => s.setTextPreviewExpandedNodeId);
 
   const isPassiveContainer = useMemo(
     () => isPassiveTextContainer(id, nodes, edges),
@@ -135,7 +133,8 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
 
   const savePromptWithLimit = useCallback(
     (next: string, savedTip = "已保存正文") => {
-      const limited = clampByDeepThinkingLimit(next);
+      const normalized = normalizeTextPromptMarkdown(next);
+      const limited = clampByDeepThinkingLimit(normalized);
       updateNodeData(id, { prompt: limited.text });
       if (limited.clipped) {
         setStatusText(`已超出深度思考模型上限，已截断到 ${DEEP_THINKING_MAX_INPUT_CHARS} 字`);
@@ -147,39 +146,31 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
     [clampByDeepThinkingLimit, id, setStatusText, updateNodeData],
   );
 
-  const clampEditableAfterPaste = useCallback(() => {
-    requestAnimationFrame(() => {
-      const current = editRef.current?.innerText ?? "";
-      const limited = clampByDeepThinkingLimit(current);
-      if (editRef.current && limited.text !== current) {
-        editRef.current.textContent = limited.text;
-        setStatusText(`已超出深度思考模型上限，已截断到 ${DEEP_THINKING_MAX_INPUT_CHARS} 字`);
-      }
-    });
-  }, [clampByDeepThinkingLimit, setStatusText]);
+
+  const saveEditDraft = useCallback(
+    (draft: string, savedTip = "") => {
+      const next = savePromptWithLimit(draft, savedTip);
+      setEditDraft(next);
+      return next;
+    },
+    [savePromptWithLimit],
+  );
 
   const saveFromEditor = useCallback(() => {
-    const el = editRef.current;
-    if (!el) return;
-    const t = el.innerText ?? "";
-    const next = savePromptWithLimit(t, "");
-    el.textContent = next;
-  }, [savePromptWithLimit]);
+    saveEditDraft(editDraft, "");
+  }, [editDraft, saveEditDraft]);
 
+  const prevSelectedRef = useRef(selected);
   useEffect(() => {
-    if (!selected) {
-      requestAnimationFrame(() => setEditing(false));
+    const wasSelected = prevSelectedRef.current;
+    prevSelectedRef.current = selected;
+    if (wasSelected && !selected) {
+      if (editing) {
+        saveFromEditor();
+      }
+      setEditing(false);
     }
-  }, [selected]);
-
-  useEffect(() => {
-    if (!expandEditOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setExpandEditOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [expandEditOpen]);
+  }, [editing, saveFromEditor, selected]);
 
   useEffect(() => {
     if (multiSelect && selected) {
@@ -189,54 +180,58 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
 
   const prevEditing = useRef(false);
   useEffect(() => {
-    if (editing && !prevEditing.current && editRef.current) {
-      editRef.current.textContent = prompt;
-      requestAnimationFrame(() => {
-        const el = editRef.current;
-        if (!el) return;
-        el.focus();
-        const range = document.createRange();
-        range.selectNodeContents(el);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      });
+    if (editing && !prevEditing.current) {
+      setEditDraft(prompt);
     }
     prevEditing.current = editing;
   }, [editing, prompt]);
 
-  const enterEditing = useCallback((e: ReactMouseEvent) => {
-    e.stopPropagation();
-    setEditing(true);
-  }, []);
+  const requestEdit = useCallback(
+    (e: ReactMouseEvent) => {
+      e.stopPropagation();
+      if (editing) return;
+      if (e.type === "click" && !uiSelected) return;
+      setEditDraft(prompt);
+      setEditing(true);
+    },
+    [editing, prompt, uiSelected],
+  );
 
-  const exec = useCallback((command: string, value?: string) => {
-    editRef.current?.focus();
-    try {
-      document.execCommand(command, false, value);
-    } catch {
-      /* ignore */
-    }
-  }, []);
+  const execFormat = useCallback(
+    (command: string, value?: string) => {
+      const root = editSurfaceRef.current?.getRoot();
+      if (!root) return;
+      root.focus();
+      applyFormatExec(command, value);
+      const next = htmlToMarkdown(root.innerHTML);
+      const limited = clampByDeepThinkingLimit(next);
+      setEditDraft(limited.text);
+      if (limited.clipped) {
+        setStatusText(`已超出深度思考模型上限，已截断到 ${DEEP_THINKING_MAX_INPUT_CHARS} 字`);
+      }
+    },
+    [clampByDeepThinkingLimit, setStatusText],
+  );
 
   const handleFormatExec = useCallback(
     (command: string, value?: string) => {
       if (!editing) {
         pendingFormatRef.current = { command, value };
+        setEditDraft(prompt);
         setEditing(true);
         return;
       }
-      exec(command, value);
+      execFormat(command, value);
     },
-    [editing, exec],
+    [editing, execFormat, prompt],
   );
 
   useEffect(() => {
     if (!editing || !pendingFormatRef.current) return;
     const pending = pendingFormatRef.current;
     pendingFormatRef.current = null;
-    requestAnimationFrame(() => exec(pending.command, pending.value));
-  }, [editing, exec]);
+    requestAnimationFrame(() => execFormat(pending.command, pending.value));
+  }, [editing, execFormat]);
 
   const composerLayout = "default" as const;
 
@@ -263,85 +258,27 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
     }
   }, [isPassiveContainer, isComposerPinned, setPinnedGenPanelId]);
 
-  const handleSyncFromScript = useCallback(() => {
-    const synced = syncTextPromptFromUpstreamScript(id, nodes, edges);
-    if (!synced?.trim()) {
-      setStatusText("未能从上游脚本节点获取内容");
-      return;
-    }
-    savePromptWithLimit(synced, "已从脚本同步到正文");
-  }, [edges, id, nodes, savePromptWithLimit, setStatusText]);
-
-  const showPreviewTopPortal = expandedChrome && (hasBody || hasScriptUpstream);
-  const showFormatInToolbar = editing;
+  const showPreviewTopPortal =
+    editing || (expandedChrome && (hasBody || hasScriptUpstream));
+  const showFormatInToolbar = editing || (expandedChrome && hasBody);
   const showResizeHandle = expandedChrome && uiSelected && !editing;
 
   const openExpandEdit = useCallback(() => {
-    const draft = editing ? (editRef.current?.innerText ?? prompt) : prompt;
-    setExpandDraft(draft);
-    setExpandEditOpen(true);
-    if (editing) setEditing(false);
-  }, [editing, prompt]);
-
-  const commitExpandEdit = useCallback(() => {
-    savePromptWithLimit(expandDraft, "已保存正文");
-    setExpandEditOpen(false);
-  }, [expandDraft, savePromptWithLimit]);
+    const startInEdit = editing;
+    if (editing) {
+      saveFromEditor();
+      setEditing(false);
+    }
+    setTextPreviewExpandedNodeId(id, startInEdit);
+  }, [editing, id, saveFromEditor, setTextPreviewExpandedNodeId]);
 
   const handleCopyBody = useCallback(() => {
-    const text = editing ? (editRef.current?.innerText ?? prompt) : prompt;
+    const text = editing ? editDraft : prompt;
     void writeClipboardText(text).then(
       () => setStatusText("已复制正文到剪贴板"),
       () => setStatusText("复制失败，请手动选择文本"),
     );
-  }, [editing, prompt, setStatusText]);
-
-  const openPasteImport = useCallback(() => {
-    setPasteDraft("");
-    setPasteImportOpen(true);
-    if (editing) setEditing(false);
-  }, [editing]);
-
-  const readPasteClipboard = useCallback(() => {
-    void readClipboardText().then(
-      (text) => setPasteDraft(text),
-      () => setStatusText("读取剪贴板失败"),
-    );
-  }, [setStatusText]);
-
-  const commitPasteImport = useCallback(() => {
-    const clip = pasteDraft.trim();
-    if (!clip) {
-      setStatusText("没有可导入的文本");
-      return;
-    }
-    const base = editing ? (editRef.current?.innerText ?? prompt) : prompt;
-    savePromptWithLimit(`${base}${base ? "\n" : ""}${clip}`, "已粘贴导入到正文");
-    setPasteImportOpen(false);
-  }, [editing, pasteDraft, prompt, savePromptWithLimit, setStatusText]);
-
-  const handleDownloadBody = useCallback(() => {
-    const text = editing ? (editRef.current?.innerText ?? prompt) : prompt;
-    if (!text.trim()) {
-      setStatusText("正文为空，无法下载");
-      return;
-    }
-    const safeLabel = (data.label ?? "文本")
-      .replace(/[<>:"/\\|?*]/g, "_")
-      .trim()
-      .slice(0, 48);
-    downloadTextAsFile(text, `${safeLabel || "text"}.txt`);
-    setStatusText("已下载正文");
-  }, [data.label, editing, prompt, setStatusText]);
-
-  useEffect(() => {
-    if (!pasteImportOpen) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setPasteImportOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [pasteImportOpen]);
+  }, [editing, editDraft, prompt, setStatusText]);
 
   const { onResizePointerDown } = useTextNodeFrameResize(id, showResizeHandle);
 
@@ -352,12 +289,14 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
       if (!(target instanceof Element)) return;
       const inPanel = bottomPanelRef.current?.contains(target);
       const inToolbar = previewToolbarRef.current?.contains(target);
+      const inPreview = previewRef.current?.contains(target);
+      const inExpandedPreview = Boolean(target.closest(".textPreviewExpanded-overlay"));
       const inVideoGen = document.querySelector(".videoGenPanel--chrome")?.contains(target);
-      if (inVideoGen) return;
-      if (!inPanel && !inToolbar) {
-        document.getSelection()?.removeAllRanges();
-        (document.activeElement as HTMLElement)?.blur?.();
+      if (inVideoGen || inPreview || inPanel || inToolbar || inExpandedPreview) {
+        return;
       }
+      document.getSelection()?.removeAllRanges();
+      (document.activeElement as HTMLElement)?.blur?.();
     };
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && editing) {
@@ -366,9 +305,10 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
         return;
       }
       if (e.key === "Delete" || e.key === "Backspace") {
+        if (editing) return;
         const t = e.target;
-        if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
-        if ((t as HTMLElement).isContentEditable) return;
+        if (isTextInputTarget(t)) return;
+        if (t instanceof Element && t.closest(".textPreviewExpanded-overlay")) return;
         e.preventDefault();
         deleteSelection();
       }
@@ -427,45 +367,41 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
   const renderEmptyShell = () => (
     <div
       className="textNodeEmptyShell"
-      onDoubleClick={enterEditing}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={requestEdit}
+      onDoubleClick={requestEdit}
       onWheel={stopWheel}
-      title="双击编辑正文"
+      title="单击或双击编辑正文"
     >
       <NodePanelPlaceholder kind="textNode" />
     </div>
   );
 
   const renderBody = () => {
-    if (editing) {
-      return (
-        <div
-          className={`textNodeEditable textNodeEditable--integrated ${RF_NODE_INPUT_CLASS}`}
-          ref={editRef}
-          contentEditable
-          suppressContentEditableWarning
-          onPointerDown={stop}
-          onWheel={stopWheel}
-          onBlur={() => {
-            saveFromEditor();
-            setEditing(false);
-          }}
-          onPaste={clampEditableAfterPaste}
-        />
-      );
-    }
-    if (hasBody) {
-      return (
-        <div
-          className={`textNodeReadOnly textNodeReadOnly--integrated mono ${RF_NODE_INPUT_CLASS}`}
-          title="双击编辑正文"
-          onDoubleClick={enterEditing}
-          onWheel={stopWheel}
-        >
-          {prompt}
-        </div>
-      );
-    }
-    return renderEmptyShell();
+    if (!hasBody && !editing) return renderEmptyShell();
+    return (
+      <TextPromptDocSurface
+        ref={editSurfaceRef}
+        className="textNodeReadOnly--integrated"
+        markdown={editing ? editDraft : prompt}
+        editing={editing}
+        clamp={!userSizedShell && !editing}
+        placeholder="在此编辑正文…"
+        onMarkdownChange={(next) => {
+          const limited = clampByDeepThinkingLimit(next);
+          setEditDraft(limited.text);
+          if (limited.clipped) {
+            setStatusText(`已超出深度思考模型上限，已截断到 ${DEEP_THINKING_MAX_INPUT_CHARS} 字`);
+          }
+        }}
+        onWheel={stopWheel}
+        onBlur={() => {
+          saveFromEditor();
+          setEditing(false);
+        }}
+        onRequestEdit={requestEdit}
+      />
+    );
   };
 
   return (
@@ -500,33 +436,8 @@ function TextNodeInner({ id, data, selected, type }: NodeProps<Node<FlowNodeData
         toolbarRef={previewToolbarRef}
         onFormatExec={handleFormatExec}
         showFormat={showFormatInToolbar}
-        onSyncFromScript={hasScriptUpstream ? handleSyncFromScript : undefined}
         onCopyBody={hasBody ? handleCopyBody : undefined}
         onExpandEdit={openExpandEdit}
-        onPasteImport={openPasteImport}
-        onDownloadBody={handleDownloadBody}
-      />
-
-      <TextNodeExpandEditModal
-        open={expandEditOpen}
-        draft={expandDraft}
-        maxChars={DEEP_THINKING_MAX_INPUT_CHARS}
-        onDraftChange={setExpandDraft}
-        onClose={() => setExpandEditOpen(false)}
-        onCommit={commitExpandEdit}
-        onWheel={stopWheel}
-      />
-
-      <TextNodePasteImportModal
-        open={pasteImportOpen}
-        target="prompt"
-        draft={pasteDraft}
-        maxChars={DEEP_THINKING_MAX_INPUT_CHARS}
-        onDraftChange={setPasteDraft}
-        onClose={() => setPasteImportOpen(false)}
-        onReadClipboard={readPasteClipboard}
-        onCommit={commitPasteImport}
-        onWheel={stopWheel}
       />
 
       <TextNodeBottomPortal

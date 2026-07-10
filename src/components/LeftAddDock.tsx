@@ -236,7 +236,7 @@ export function LeftAddDock({ open, onOpen, onClose, projectPath, onRequestUploa
             />
             <DockRow
               icon={<IconCut />}
-              label="视频合成"
+              label="剪辑"
               onClick={() => doAdd(() => makeNode("ffmpegConcat", newNodeDataByType.ffmpegConcat()))}
             />
             <DockRow

@@ -1,5 +1,6 @@
 import { SCRIPT_DRAFT_STATUS_DONE } from "@/lib/scriptNodeActionLabels";
 import { normalizeScriptBeat } from "@/lib/scriptBeatHelpers";
+import { assembleStoryboardDraftFromBeats, patchFromScriptBeatsEdit } from "@/lib/storyboardDraftSync";
 import type { ScriptBeat } from "@/lib/types";
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
 
@@ -64,6 +65,8 @@ export const scriptDraftFromThemeAgentRuntime: NodeTaskAgentRuntime<
     ctx.updateNodeData(ctx.nodeId, {
       scriptBeats: seed,
       scriptBeatSelection: seed.map((s) => s.id),
+      storyboardDraft: assembleStoryboardDraftFromBeats(seed),
+      scriptShotCount: seed.length,
     });
     ctx.setStatusText(SCRIPT_DRAFT_STATUS_DONE);
   },
@@ -175,10 +178,10 @@ export const scriptPersistBeatsAgentRuntime: NodeTaskAgentRuntime<
   },
   validate: ({ normalized, prunedSelection }) => ({ normalized, prunedSelection }),
   commit: ({ normalized, prunedSelection }, ctx) => {
-    ctx.updateNodeData(ctx.nodeId, {
-      scriptBeats: normalized,
-      scriptBeatSelection: prunedSelection,
-    });
+    ctx.updateNodeData(
+      ctx.nodeId,
+      patchFromScriptBeatsEdit(normalized, prunedSelection),
+    );
   },
 };
 

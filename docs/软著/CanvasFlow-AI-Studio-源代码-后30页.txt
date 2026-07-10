@@ -1,0 +1,1523 @@
+--- 第 1 页 ---
+
+fn parse_user_credit_result(result: &CommandResult) -> (bool, Option<Value>, String) {
+    if result.ok {
+        let credit = serde_json::from_str::<Value>(result.output.trim()).ok();
+        let logged_in = credit.as_ref().map(|v| v.is_object()).unwrap_or(false);
+        let message = if logged_in {
+            "即梦已登录".into()
+        } else {
+            "即梦状态暂不可用".into()
+        };
+        return (logged_in, credit, message);
+    }
+
+    let output = result.output.trim();
+    if output.is_empty() || output.contains("未检测到有效登录态") {
+        return (false, None, "未登录，点击登录即可使用".into());
+    }
+    (
+        false,
+        None,
+        extract_error_from_tail(output).unwrap_or_else(|| "读取即梦状态失败".into()),
+    )
+}
+
+fn normalize_login_mode(mode: &str) -> Result<String, String> {
+    let m = mode.trim().to_lowercase();
+    match m.as_str() {
+        "web" | "headless" | "" => Ok(if m.is_empty() || m == "headless" {
+            "headless".into()
+        } else {
+            "web".into()
+        }),
+        _ => Err("当前仅支持网页登录或扫码登录".into()),
+    }
+}
+
+fn normalize_runtime_message(message: &str) -> String {
+    let text = message.trim();
+    if text.is_empty() {
+        return "即梦登录失败，请重试".into();
+    }
+    let lower = text.to_lowercase();
+    if lower.contains("bind:") || lower.contains("only one usage of each socket address") {
+        return "检测到上次未完成的登录流程，已自动重置，请重新点击登录".into();
+    }
+    if text.contains("读取二维码响应失败") || lower.contains("empty response body") {
+        return "即梦二维码获取失败，请重新点击登录".into();
+    }
+    if text.contains("等待登录超时") {
+        return "扫码登录已超时，请重新点击登录".into();
+
+--- 第 2 页 ---
+    }
+    text.to_string()
+}
+
+fn extract_error_from_tail(text: &str) -> Option<String> {
+    for line in text.lines().rev() {
+        let s = line.trim();
+        if s.is_empty() || s.contains(QR_READY_MARKER) {
+            continue;
+        }
+        return Some(s.to_string());
+    }
+    None
+}
+
+fn append_output_tail(runtime: &mut DreaminaLoginRuntime, line: &str) {
+    runtime.output_tail.push(line.to_string());
+    if runtime.output_tail.len() > OUTPUT_TAIL_LIMIT {
+        let extra = runtime.output_tail.len() - OUTPUT_TAIL_LIMIT;
+        runtime.output_tail.drain(0..extra);
+    }
+}
+
+fn mark_login_success(runtime: &mut DreaminaLoginRuntime, reused: bool) {
+    runtime.phase = if reused { "reused" } else { "success" }.into();
+    runtime.message = if reused {
+        "当前即梦登录态仍然有效"
+    } else {
+        "即梦已登录成功"
+    }
+    .into();
+    runtime.error.clear();
+}
+
+fn normalize_url_candidate(raw: &str) -> String {
+    let mut value = raw.trim().to_string();
+    value = value.trim_start_matches(['<', '（', '(', '【', '[', '"', '\'']).to_string();
+    value = value.trim_end_matches(['>', '）', ')', '】', ']', '"', '\'']).to_string();
+    if value.starts_with("http://") || value.starts_with("https://") {
+        value
+    } else {
+        String::new()
+    }
+}
+
+fn sync_manual_login_links(runtime: &mut DreaminaLoginRuntime) {
+    runtime.login_page_url = LOGIN_PAGE_URL.into();
+    let mut urls: Vec<String> = Vec::new();
+    for line in &runtime.output_tail {
+        for m in line.split_whitespace() {
+
+--- 第 3 页 ---
+            let u = normalize_url_candidate(m);
+            if !u.is_empty() && !urls.contains(&u) {
+                urls.push(u);
+            }
+        }
+    }
+    let callback = urls
+        .iter()
+        .find(|u| u.contains("/dreamina/cli/v1/dreamina_cli_login"))
+        .cloned()
+        .unwrap_or_default();
+    let authorize = if !runtime.verification_url.is_empty() {
+        runtime.verification_url.clone()
+    } else {
+        urls.iter()
+            .find(|u| u.contains("/passport/web_login") || u.contains("/passport/web/web_login"))
+            .or(urls.iter().find(|u| **u != LOGIN_PAGE_URL))
+            .cloned()
+            .unwrap_or_default()
+    };
+    if !authorize.is_empty() {
+        runtime.authorize_url = authorize;
+    }
+    runtime.callback_url = callback;
+    runtime.manual_login_available = !runtime.authorize_url.is_empty()
+        || !runtime.callback_url.is_empty()
+        || !runtime.login_page_url.is_empty();
+}
+
+#[cfg(windows)]
+fn cleanup_stale_login_processes() -> Result<(), String> {
+    let output = Command::new("powershell.exe")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "Get-CimInstance Win32_Process -Filter \"Name = 'dreamina.exe'\" | \
+             Select-Object ProcessId, CommandLine | ConvertTo-Json -Compress",
+        ])
+        .output()
+        .map_err(|e| e.to_string())?;
+    if !output.status.success() {
+        return Ok(());
+    }
+    let raw = String::from_utf8_lossy(&output.stdout);
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return Ok(());
+    }
+    let value: Value = match serde_json::from_str(trimmed) {
+        Ok(v) => v,
+
+--- 第 4 页 ---
+        Err(_) => return Ok(()),
+    };
+    let items: Vec<&Value> = match &value {
+        Value::Array(arr) => arr.iter().collect(),
+        Value::Object(_) => vec![&value],
+        _ => return Ok(()),
+    };
+    for item in items {
+        let cmd = item
+            .get("CommandLine")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        let normalized = cmd.replace('"', " ").to_lowercase();
+        if !normalized.contains("--headless") {
+            continue;
+        }
+        if !normalized.contains(" login ") && !normalized.contains(" relogin ") {
+            continue;
+        }
+        if let Some(pid) = item.get("ProcessId").and_then(|v| v.as_u64()) {
+            let _ = Command::new("taskkill")
+                .args(["/PID", &pid.to_string(), "/T", "/F"])
+                .output();
+        }
+    }
+    thread::sleep(Duration::from_millis(400));
+    Ok(())
+}
+
+#[cfg(not(windows))]
+fn cleanup_stale_login_processes() -> Result<(), String> {
+    Ok(())
+}
+
+
+/* ========== src-tauri/src/graph.rs ========== */
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet, VecDeque};
+
+/// 从 `source` 沿有向边能到达的所有节点（不含 `source` 自身）。用于节点失败后标记下游为 skipped。
+pub fn downstream_descendants(graph: &CanvasGraph, source: &str) -> HashSet<String> {
+    let mut out = HashSet::new();
+    let mut stack = vec![source.to_string()];
+    while let Some(u) = stack.pop() {
+        for e in &graph.edges {
+            if e.source == u && out.insert(e.target.clone()) {
+                stack.push(e.target.clone());
+            }
+        }
+    }
+
+--- 第 5 页 ---
+    out.remove(source);
+    out
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct FlowNode {
+    pub id: String,
+    #[serde(rename = "type")]
+    pub node_type: String,
+    pub data: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FlowEdge {
+    pub id: String,
+    pub source: String,
+    pub target: String,
+    #[serde(default)]
+    pub source_handle: Option<String>,
+    #[serde(default)]
+    pub target_handle: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CanvasGraph {
+    pub nodes: Vec<FlowNode>,
+    pub edges: Vec<FlowEdge>,
+}
+
+pub fn validate_dag(graph: &CanvasGraph) -> Result<(), String> {
+    let mut adj: HashMap<String, Vec<String>> = HashMap::new();
+    let mut nodes: HashSet<String> = HashSet::new();
+    for n in &graph.nodes {
+        nodes.insert(n.id.clone());
+    }
+    for e in &graph.edges {
+        if !nodes.contains(&e.source) {
+            return Err(format!("边引用了不存在的源节点: {}", e.source));
+        }
+        if !nodes.contains(&e.target) {
+            return Err(format!("边引用了不存在的目标节点: {}", e.target));
+        }
+        adj.entry(e.source.clone())
+            .or_default()
+            .push(e.target.clone());
+    }
+    let mut indeg: HashMap<String, usize> = HashMap::new();
+    for n in &graph.nodes {
+        indeg.insert(n.id.clone(), 0);
+
+--- 第 6 页 ---
+    }
+    for (_s, tgts) in &adj {
+        for t in tgts {
+            *indeg.entry(t.clone()).or_insert(0) += 1;
+        }
+    }
+    let mut q: VecDeque<String> = VecDeque::new();
+    for (id, &deg) in &indeg {
+        if deg == 0 {
+            q.push_back(id.clone());
+        }
+    }
+    let mut visited = 0usize;
+    while let Some(u) = q.pop_front() {
+        visited += 1;
+        if let Some(nexts) = adj.get(&u) {
+            for v in nexts {
+                let entry = indeg.get_mut(v).ok_or_else(|| "内部错误: indeg".to_string())?;
+                *entry -= 1;
+                if *entry == 0 {
+                    q.push_back(v.clone());
+                }
+            }
+        }
+    }
+    if visited != graph.nodes.len() {
+        return Err("工作流图中存在环路，无法执行".into());
+    }
+    Ok(())
+}
+
+pub fn topological_order(graph: &CanvasGraph) -> Result<Vec<String>, String> {
+    validate_dag(graph)?;
+    let mut adj: HashMap<String, Vec<String>> = HashMap::new();
+    for e in &graph.edges {
+        adj.entry(e.source.clone())
+            .or_default()
+            .push(e.target.clone());
+    }
+    let mut indeg: HashMap<String, usize> = HashMap::new();
+    for n in &graph.nodes {
+        indeg.insert(n.id.clone(), 0);
+    }
+    for (_s, tgts) in &adj {
+        for t in tgts {
+            *indeg.entry(t.clone()).or_insert(0) += 1;
+        }
+    }
+    let mut q: VecDeque<String> = VecDeque::new();
+    for (id, &deg) in &indeg {
+
+--- 第 7 页 ---
+        if deg == 0 {
+            q.push_back(id.clone());
+        }
+    }
+    let mut order = Vec::new();
+    while let Some(u) = q.pop_front() {
+        order.push(u.clone());
+        if let Some(nexts) = adj.get(&u) {
+            for v in nexts {
+                let entry = indeg.get_mut(v).ok_or_else(|| "内部错误: indeg".to_string())?;
+                *entry -= 1;
+                if *entry == 0 {
+                    q.push_back(v.clone());
+                }
+            }
+        }
+    }
+    if order.len() != graph.nodes.len() {
+        return Err("拓扑排序失败".into());
+    }
+    Ok(order)
+}
+
+#[cfg(test)]
+mod downstream_tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn downstream_descendants_chain() {
+        let g = CanvasGraph {
+            nodes: vec![
+                FlowNode {
+                    id: "a".into(),
+                    node_type: "textNode".into(),
+                    data: json!({}),
+                },
+                FlowNode {
+                    id: "b".into(),
+                    node_type: "textNode".into(),
+                    data: json!({}),
+                },
+                FlowNode {
+                    id: "c".into(),
+                    node_type: "textNode".into(),
+                    data: json!({}),
+                },
+            ],
+            edges: vec![
+                FlowEdge {
+
+--- 第 8 页 ---
+                    id: "e1".into(),
+                    source: "a".into(),
+                    target: "b".into(),
+                    source_handle: None,
+                    target_handle: None,
+                },
+                FlowEdge {
+                    id: "e2".into(),
+                    source: "b".into(),
+                    target: "c".into(),
+                    source_handle: None,
+                    target_handle: None,
+                },
+            ],
+        };
+        let d = downstream_descendants(&g, "a");
+        assert!(d.contains("b") && d.contains("c"));
+        assert!(!d.contains("a"));
+    }
+}
+
+
+/* ========== src-tauri/src/settings.rs ========== */
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+use tauri::Manager;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ProviderConfig {
+    pub id: String,
+    pub label: String,
+    pub base_url: String,
+    pub model: String,
+    pub priority: i32,
+    pub enabled: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ImageModelConfig {
+    pub id: String,
+    #[serde(default)]
+    pub vendor_name: String,
+    #[serde(default)]
+    pub model_name: String,
+    #[serde(default)]
+    pub model_variant: String,
+    pub label: String,
+    pub model: String,
+
+--- 第 9 页 ---
+    #[serde(default)]
+    pub api_base_url: String,
+    pub enabled: bool,
+    pub priority: i32,
+    /// 为 false 时前端多图融合降级为单张图生图
+    #[serde(default = "default_true")]
+    pub supports_multi_ref_fusion: bool,
+    #[serde(default = "default_max_reference_images")]
+    pub max_reference_images: u8,
+    #[serde(default = "default_true")]
+    pub supports_image_edit: bool,
+    /// API 端点类型：images | chat，默认 images
+    #[serde(default)]
+    pub endpoint_type: Option<String>,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_max_reference_images() -> u8 {
+    4
+}
+
+fn default_agent_max_concurrent_media() -> u8 {
+    2
+}
+
+fn default_theme_preset() -> String {
+    "dark".into()
+}
+
+fn default_font_size() -> String {
+    "medium".into()
+}
+
+fn default_cursor_style() -> String {
+    "default".into()
+}
+
+fn default_prompt_action_surface() -> String {
+    "themed".into()
+}
+
+fn default_node_spacing() -> u32 {
+    120
+}
+
+fn default_node_direction() -> String {
+    "right".into()
+
+--- 第 10 页 ---
+}
+
+fn default_highlight_color() -> String {
+    "white".into()
+}
+
+fn default_align_trigger_mode() -> String {
+    "click".into()
+}
+
+fn default_align_distribute_gap() -> u32 {
+    40
+}
+
+fn default_upload_quality() -> String {
+    "standard".into()
+}
+
+fn default_project_auto_save_idle_sec() -> u32 {
+    2
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AppSettings {
+    #[serde(default)]
+    pub providers: Vec<ProviderConfig>,
+    #[serde(default)]
+    pub default_provider_id: Option<String>,
+    #[serde(default)]
+    pub ffmpeg_path: Option<String>,
+    #[serde(default)]
+    pub image_models: Vec<ImageModelConfig>,
+    #[serde(default)]
+    pub video_models: Vec<ImageModelConfig>,
+    #[serde(default)]
+    pub audio_models: Vec<ImageModelConfig>,
+    /// 为 true 时任一节点失败即中止整图（与默认「失败下游跳过」相反）。
+    #[serde(default)]
+    pub abort_workflow_on_failure: bool,
+    /// 自定义 Hermes 用户记忆根目录；空则使用各工程内 `.canvasflow/hermes-knowledge-user/`。
+    #[serde(default)]
+    pub hermes_memory_root: Option<String>,
+    /// Hermes Agent：识别制片意图后自动执行（关则仅展示计划，需用户确认）
+    #[serde(default = "default_true")]
+    pub agent_auto_execute: bool,
+    /// 大批量出图/出视频跳过对话「继续」确认
+    #[serde(default = "default_true")]
+    pub agent_auto_batch: bool,
+    /// 允许自动改脚本/分镜
+
+--- 第 11 页 ---
+    #[serde(default = "default_true")]
+    pub agent_allow_script_edit: bool,
+    /// 允许自动提交出图/出视频 API
+    #[serde(default = "default_true")]
+    pub agent_allow_media_submit: bool,
+    /// 同时进行的媒体生成任务上限（1～3）
+    #[serde(default = "default_agent_max_concurrent_media")]
+    pub agent_max_concurrent_media: u8,
+    /// 步内 Agent loop：执行前补齐依赖、失败后规则 recovery
+    #[serde(default = "default_true")]
+    pub agent_loop_enabled: bool,
+    /// 长上下文 workstate 摘要用 LLM（关则仅规则压缩）
+    #[serde(default = "default_true")]
+    pub agent_long_context_llm_summary: bool,
+    /// 任务结束后 LLM 复盘
+    #[serde(default = "default_true")]
+    pub agent_post_job_llm_reflect: bool,
+    /// 灵体对失败/断链建议自动执行
+    #[serde(default = "default_true")]
+    pub agent_proactive_recovery: bool,
+    /// 外接 MCP Server（stdio 子进程）
+    #[serde(default)]
+    pub hermes_mcp_servers: Vec<crate::mcp_stdio::HermesMcpServerConfig>,
+
+    // ── 外观（与前端 AppSettings 对齐，须持久化到 settings.json）──
+    #[serde(default = "default_theme_preset")]
+    pub theme_preset: String,
+    #[serde(default = "default_font_size")]
+    pub font_size: String,
+    #[serde(default = "default_cursor_style")]
+    pub cursor_style: String,
+    #[serde(default = "default_true")]
+    pub grid_dots_visible: bool,
+    #[serde(default = "default_prompt_action_surface")]
+    pub prompt_action_surface: String,
+
+    // ── 节点行为 ──
+    #[serde(default = "default_true")]
+    pub show_video_meta: bool,
+    #[serde(default = "default_true")]
+    pub image_video_node_resize_enabled: bool,
+    #[serde(default = "default_true")]
+    pub prompt_box_resize_enabled: bool,
+    #[serde(default = "default_true")]
+    pub title_follows_canvas_zoom: bool,
+    #[serde(default = "default_node_spacing")]
+    pub node_spacing: u32,
+    #[serde(default = "default_node_direction")]
+    pub node_direction: String,
+    #[serde(default = "default_true")]
+
+--- 第 12 页 ---
+    pub node_avoid_overlap: bool,
+
+    // ── 画布对齐 ──
+    #[serde(default = "default_true")]
+    pub selection_related_highlight_enabled: bool,
+    #[serde(default = "default_highlight_color")]
+    pub selection_related_highlight_color: String,
+    #[serde(default = "default_true")]
+    pub snap_guides_enabled: bool,
+    #[serde(default = "default_true")]
+    pub connection_lines_visible: bool,
+    #[serde(default)]
+    pub snap_grid_enabled: bool,
+    #[serde(default = "default_align_trigger_mode")]
+    pub align_feature_trigger_mode: String,
+    #[serde(default = "default_align_distribute_gap")]
+    pub align_distribute_gap: u32,
+
+    // ── 素材 ──
+    #[serde(default = "default_upload_quality")]
+    pub upload_quality: String,
+    #[serde(default = "default_project_auto_save_idle_sec")]
+    pub project_auto_save_idle_sec: u32,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            providers: vec![ProviderConfig {
+                id: "deepseek".into(),
+                label: "DeepSeek".into(),
+                base_url: "https://api.deepseek.com/v1".into(),
+                model: "deepseek-v4-flash".into(),
+                priority: 0,
+                enabled: true,
+            }],
+            default_provider_id: Some("deepseek".into()),
+            ffmpeg_path: None,
+            image_models: Vec::new(),
+            video_models: Vec::new(),
+            audio_models: Vec::new(),
+            abort_workflow_on_failure: false,
+            hermes_memory_root: None,
+            agent_auto_execute: true,
+            agent_auto_batch: true,
+            agent_allow_script_edit: true,
+            agent_allow_media_submit: true,
+            agent_max_concurrent_media: default_agent_max_concurrent_media(),
+            agent_loop_enabled: true,
+            agent_long_context_llm_summary: true,
+
+--- 第 13 页 ---
+            agent_post_job_llm_reflect: true,
+            agent_proactive_recovery: true,
+            hermes_mcp_servers: Vec::new(),
+            theme_preset: default_theme_preset(),
+            font_size: default_font_size(),
+            cursor_style: default_cursor_style(),
+            grid_dots_visible: true,
+            prompt_action_surface: default_prompt_action_surface(),
+            show_video_meta: true,
+            image_video_node_resize_enabled: true,
+            prompt_box_resize_enabled: true,
+            title_follows_canvas_zoom: true,
+            node_spacing: default_node_spacing(),
+            node_direction: default_node_direction(),
+            node_avoid_overlap: true,
+            selection_related_highlight_enabled: true,
+            selection_related_highlight_color: default_highlight_color(),
+            snap_guides_enabled: true,
+            connection_lines_visible: true,
+            snap_grid_enabled: false,
+            align_feature_trigger_mode: default_align_trigger_mode(),
+            align_distribute_gap: default_align_distribute_gap(),
+            upload_quality: default_upload_quality(),
+            project_auto_save_idle_sec: default_project_auto_save_idle_sec(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppSettings;
+
+    #[test]
+    fn round_trip_theme_preset_light() {
+        let json = r#"{
+            "providers": [],
+            "themePreset": "light",
+            "gridDotsVisible": true,
+            "snapGuidesEnabled": true,
+            "connectionLinesVisible": true,
+            "projectAutoSaveIdleSec": 2
+        }"#;
+        let parsed: AppSettings = serde_json::from_str(json).expect("parse");
+        assert_eq!(parsed.theme_preset, "light");
+        let out = serde_json::to_string(&parsed).expect("serialize");
+        assert!(out.contains("\"themePreset\":\"light\""));
+    }
+}
+
+pub fn settings_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
+
+--- 第 14 页 ---
+    let mut dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    dir.push("settings.json");
+    Ok(dir)
+}
+
+pub fn load_settings(app: &tauri::AppHandle) -> Result<AppSettings, String> {
+    let path = settings_path(app)?;
+    if !path.exists() {
+        return Ok(AppSettings::default());
+    }
+    let raw = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    let s: AppSettings = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    Ok(s)
+}
+
+pub fn save_settings(app: &tauri::AppHandle, settings: &AppSettings) -> Result<(), String> {
+    let path = settings_path(app)?;
+    let raw = serde_json::to_string_pretty(settings).map_err(|e| e.to_string())?;
+    std::fs::write(&path, raw).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+
+/* ========== src-tauri/src/commands/project_cmd.rs ========== */
+use crate::command_common::register_project_asset_scope;
+use crate::media::{probe_image_file, probe_media, ImageFileProbe, MediaMeta};
+use std::path::PathBuf;
+use tauri::Manager;
+
+/// 同步命令：在部分平台上文件夹对话框与 WebView 焦点强相关，避免 `async` + 阻塞对话框卡在运行时线程上。
+#[tauri::command]
+pub fn pick_project_folder(
+    app: tauri::AppHandle,
+    default_directory: Option<String>,
+) -> Result<Option<String>, String> {
+    use tauri_plugin_dialog::DialogExt;
+    let mut builder = app.dialog().file();
+    if let Some(dir) = default_directory {
+        let trimmed = dir.trim();
+        if !trimmed.is_empty() {
+            let path = PathBuf::from(trimmed);
+            if path.is_dir() {
+                builder = builder.set_directory(path);
+            }
+        }
+    }
+
+--- 第 15 页 ---
+    let folder = builder.blocking_pick_folder();
+
+    if let Some(w) = app.get_webview_window("main") {
+        let _ = w.show();
+        let _ = w.set_focus();
+    }
+
+    match folder {
+        None => Ok(None),
+        Some(p) => {
+            let path = p.into_path().map_err(|e| e.to_string())?;
+            Ok(Some(path.to_string_lossy().into_owned()))
+        }
+    }
+}
+
+#[tauri::command]
+pub fn ensure_project_structure(app: tauri::AppHandle, project_path: String) -> Result<(), String> {
+    let root = PathBuf::from(&project_path);
+    std::fs::create_dir_all(root.join("assets")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(root.join(".canvasflow")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(root.join(".canvasflow/templates")).map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(root.join(".canvasflow/workflows")).map_err(|e| e.to_string())?;
+    register_project_asset_scope(&app, &project_path)?;
+    Ok(())
+}
+
+#[tauri::command]
+pub fn read_canvasflow_json(project_path: String) -> Result<String, String> {
+    let path = PathBuf::from(&project_path).join("canvasflow.json");
+    std::fs::read_to_string(&path).map_err(|e| format!("读取 canvasflow.json 失败: {}", e))
+}
+
+#[tauri::command]
+pub async fn write_canvasflow_json_bytes(
+    project_path: String,
+    content: Vec<u8>,
+) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || {
+        let path = PathBuf::from(&project_path).join("canvasflow.json");
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+        }
+        let tmp = path.with_extension("json.tmp");
+        std::fs::write(&tmp, &content).map_err(|e| e.to_string())?;
+        if path.exists() {
+            std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+        }
+        std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+    })
+
+--- 第 16 页 ---
+    .await
+    .map_err(|e| format!("写入 canvasflow.json 任务失败: {}", e))?
+}
+
+#[tauri::command]
+pub async fn write_canvasflow_json(project_path: String, content: String) -> Result<(), String> {
+    write_canvasflow_json_bytes(project_path, content.into_bytes()).await
+}
+
+#[derive(serde::Serialize)]
+pub struct GroupTemplateSummary {
+    pub id: String,
+    pub name: String,
+    pub rel_path: String,
+    pub created_at: u64,
+}
+
+#[derive(serde::Serialize)]
+pub struct WorkflowSummary {
+    pub id: String,
+    pub name: String,
+    pub rel_path: String,
+    pub created_at: u64,
+    pub node_count: u32,
+    pub edge_count: u32,
+    pub kind: String,
+}
+
+#[tauri::command]
+pub fn write_project_rel_text_file(
+    project_path: String,
+    rel_path: String,
+    content: String,
+) -> Result<(), String> {
+    let rel = rel_path.replace('\\', "/");
+    let path = PathBuf::from(&project_path).join(&rel);
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&path, content).map_err(|e| format!("写入 {} 失败: {}", path.display(), e))
+}
+
+#[tauri::command]
+pub fn read_project_rel_text_file(project_path: String, rel_path: String) -> Result<String, String> {
+    let rel = rel_path.replace('\\', "/");
+    let path = PathBuf::from(&project_path).join(&rel);
+    std::fs::read_to_string(&path).map_err(|e| format!("读取 {} 失败: {}", path.display(), e))
+}
+
+/// ffprobe 工程内媒体相对路径（供参考视频横幅等 UI 展示元信息）
+
+--- 第 17 页 ---
+#[tauri::command]
+pub fn probe_project_rel_media(
+    project_path: String,
+    rel_path: String,
+) -> Result<MediaMeta, String> {
+    let rel = rel_path.replace('\\', "/").trim_start_matches('/').to_string();
+    let path = PathBuf::from(project_path.trim()).join(&rel);
+    probe_media(&path)
+}
+
+/// 工程内图片：宽高 + 文件大小（Seedance 2.0 合规预检）
+#[tauri::command]
+pub fn probe_project_rel_image(
+    project_path: String,
+    rel_path: String,
+) -> Result<ImageFileProbe, String> {
+    let rel = rel_path.replace('\\', "/").trim_start_matches('/').to_string();
+    let path = PathBuf::from(project_path.trim()).join(&rel);
+    probe_image_file(&path)
+}
+
+/// 列出工程内某相对目录下的文件（仅一层，返回相对路径）
+#[tauri::command]
+pub fn list_project_rel_dir_files(
+    project_path: String,
+    rel_dir: String,
+) -> Result<Vec<String>, String> {
+    let project = PathBuf::from(project_path.trim());
+    let dir = project.join(rel_dir.replace('\\', "/"));
+    if !dir.is_dir() {
+        return Ok(vec![]);
+    }
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let rel = path
+            .strip_prefix(&project)
+            .map_err(|_| "路径解析失败".to_string())?
+            .to_string_lossy()
+            .replace('\\', "/");
+        out.push(rel);
+    }
+    out.sort();
+    Ok(out)
+}
+
+
+--- 第 18 页 ---
+#[tauri::command]
+pub fn list_group_template_summaries(project_path: String) -> Result<Vec<GroupTemplateSummary>, String> {
+    let dir = PathBuf::from(&project_path).join(".canvasflow/templates");
+    if !dir.is_dir() {
+        return Ok(vec![]);
+    }
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+        let rel_path = format!(
+            ".canvasflow/templates/{}",
+            path.file_name().and_then(|s| s.to_str()).unwrap_or("template.json")
+        );
+        let raw = std::fs::read_to_string(&path).unwrap_or_default();
+        let (id, name, created_at) = if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+            let id = v
+                .get("id")
+                .and_then(|x| x.as_str())
+                .unwrap_or("")
+                .to_string();
+            let name = v
+                .get("name")
+                .and_then(|x| x.as_str())
+                .unwrap_or("分组模板")
+                .to_string();
+            let created_at = v.get("createdAt").and_then(|x| x.as_u64()).unwrap_or(0);
+            (
+                if id.is_empty() {
+                    path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("template")
+                        .to_string()
+                } else {
+                    id
+                },
+                name,
+                created_at,
+            )
+        } else {
+            (
+                path.file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("template")
+                    .to_string(),
+                "分组模板".to_string(),
+                0,
+
+--- 第 19 页 ---
+            )
+        };
+        out.push(GroupTemplateSummary {
+            id,
+            name,
+            rel_path,
+            created_at,
+        });
+    }
+    out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(out)
+}
+
+#[tauri::command]
+pub fn list_workflow_summaries(project_path: String) -> Result<Vec<WorkflowSummary>, String> {
+    let dir = PathBuf::from(&project_path).join(".canvasflow/workflows");
+    if !dir.is_dir() {
+        return Ok(vec![]);
+    }
+    let mut out = Vec::new();
+    for entry in std::fs::read_dir(&dir).map_err(|e| e.to_string())? {
+        let entry = entry.map_err(|e| e.to_string())?;
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+        let rel_path = format!(
+            ".canvasflow/workflows/{}",
+            path.file_name().and_then(|s| s.to_str()).unwrap_or("workflow.json")
+        );
+        let raw = std::fs::read_to_string(&path).unwrap_or_default();
+        let (id, name, created_at, node_count, edge_count, kind) =
+            if let Ok(v) = serde_json::from_str::<serde_json::Value>(&raw) {
+                let id = v
+                    .get("id")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("")
+                    .to_string();
+                let name = v
+                    .get("name")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("工作流")
+                    .to_string();
+                let created_at = v.get("createdAt").and_then(|x| x.as_u64()).unwrap_or(0);
+                let kind = v
+                    .get("kind")
+                    .and_then(|x| x.as_str())
+                    .unwrap_or("selection")
+                    .to_string();
+                let nodes_len = v
+
+--- 第 20 页 ---
+                    .get("nodes")
+                    .and_then(|x| x.as_array())
+                    .map(|a| a.len() as u32)
+                    .unwrap_or(0);
+                let edges_len = v
+                    .get("edges")
+                    .and_then(|x| x.as_array())
+                    .map(|a| a.len() as u32)
+                    .unwrap_or(0);
+                let group_extra = if kind == "group" { 1 } else { 0 };
+                (
+                    if id.is_empty() {
+                        path.file_stem()
+                            .and_then(|s| s.to_str())
+                            .unwrap_or("workflow")
+                            .to_string()
+                    } else {
+                        id
+                    },
+                    name,
+                    created_at,
+                    nodes_len + group_extra,
+                    edges_len,
+                    kind,
+                )
+            } else {
+                (
+                    path.file_stem()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("workflow")
+                        .to_string(),
+                    "工作流".to_string(),
+                    0,
+                    0,
+                    0,
+                    "selection".to_string(),
+                )
+            };
+        out.push(WorkflowSummary {
+            id,
+            name,
+            rel_path,
+            created_at,
+            node_count,
+            edge_count,
+            kind,
+        });
+    }
+    out.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+    Ok(out)
+
+--- 第 21 页 ---
+}
+
+#[tauri::command]
+pub fn delete_project_rel_file(project_path: String, rel_path: String) -> Result<(), String> {
+    let rel = rel_path.replace('\\', "/");
+    let path = PathBuf::from(project_path.trim()).join(&rel);
+    if path.is_file() {
+        std::fs::remove_file(&path).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub fn open_project_dir(project_path: String) -> Result<(), String> {
+    let path = PathBuf::from(project_path);
+    #[cfg(windows)]
+    {
+        std::process::Command::new("explorer")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(path)
+            .spawn()
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+
+/* ========== src-tauri/src/commands/timeline_cmd.rs ========== */
+use crate::command_common::resolve_ffmpeg_bin_auto;
+use crate::compose_concat::{compose_concat_clips, TimelineEncodeOptions};
+use crate::settings;
+use crate::timeline_trim::{resolve_timeline_clip_paths, TimelineRenderClip};
+use std::path::PathBuf;
+use tauri_plugin_dialog::DialogExt;
+
+#[tauri::command]
+pub fn render_timeline(
+
+--- 第 22 页 ---
+    app: tauri::AppHandle,
+    project_path: String,
+    clips: Vec<TimelineRenderClip>,
+    output_rel_path: Option<String>,
+    encode_options: Option<TimelineEncodeOptions>,
+    export_format: Option<String>,
+) -> Result<String, String> {
+    if clips.is_empty() {
+        return Err("没有可导出的视频片段".into());
+    }
+
+    let root = PathBuf::from(&project_path);
+    let out_rel = output_rel_path
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "assets/exports/final.mp4".into());
+
+    let settings = settings::load_settings(&app)?;
+    let ffmpeg = resolve_ffmpeg_bin_auto(&app, &settings);
+
+    let resolved = resolve_timeline_clip_paths(&root, &ffmpeg, &clips)?;
+    compose_concat_clips(
+        &root,
+        &ffmpeg,
+        &resolved,
+        &out_rel,
+        encode_options,
+        export_format.as_deref(),
+    )
+}
+
+/// 弹出系统保存对话框，让用户选择导出路径，然后 FFmpeg 合成到该绝对路径。
+/// 返回所选绝对路径，失败时返回错误描述。
+#[tauri::command]
+pub async fn render_timeline_to_path(
+    app: tauri::AppHandle,
+    project_path: String,
+    clips: Vec<TimelineRenderClip>,
+    default_name: Option<String>,
+    encode_options: Option<TimelineEncodeOptions>,
+    export_format: Option<String>,
+) -> Result<String, String> {
+    if clips.is_empty() {
+        return Err("没有可导出的视频片段".into());
+    }
+
+    let default = default_name
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| "final.mp4".into());
+
+    let chosen = app
+
+--- 第 23 页 ---
+        .dialog()
+        .file()
+        .add_filter("视频文件", &["mp4", "mov", "webm", "gif"])
+        .add_filter("所有文件", &["*"])
+        .set_file_name(&default)
+        .blocking_save_file();
+
+    let Some(dest) = chosen else {
+        return Err("已取消导出".into());
+    };
+    let dest_path = dest.to_string();
+
+    let root = PathBuf::from(&project_path);
+    let settings = settings::load_settings(&app)?;
+    let ffmpeg = resolve_ffmpeg_bin_auto(&app, &settings);
+
+    let resolved = resolve_timeline_clip_paths(&root, &ffmpeg, &clips)?;
+
+    // 先合成到工程内临时文件，再复制到用户指定路径
+    let dest_abs = PathBuf::from(&dest_path);
+    let ext = dest_abs
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("mp4");
+    let temp_rel = format!(
+        "assets/exports/__save_dialog_{}.{}",
+        uuid::Uuid::new_v4(),
+        ext
+    );
+
+    compose_concat_clips(
+        &root,
+        &ffmpeg,
+        &resolved,
+        &temp_rel,
+        encode_options,
+        export_format.as_deref(),
+    )?;
+
+    let temp_abs = root.join(&temp_rel);
+    let dest_abs = PathBuf::from(&dest_path);
+
+    if let Err(e) = std::fs::copy(&temp_abs, &dest_abs) {
+        let _ = std::fs::remove_file(&temp_abs);
+        return Err(format!("导出到目标路径失败：{e}"));
+    }
+    let _ = std::fs::remove_file(&temp_abs);
+
+    Ok(dest_path)
+}
+
+--- 第 24 页 ---
+
+/// 在系统文件管理器中打开指定文件/目录。
+#[tauri::command]
+pub fn reveal_in_shell(path: String) -> Result<(), String> {
+    let p = path.trim();
+    if p.is_empty() {
+        return Err("路径为空".into());
+    }
+    // 如果是相对路径，先尝试用工程内路径
+    let abs = std::path::absolute(PathBuf::from(p))
+        .unwrap_or_else(|_| PathBuf::from(p));
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg("/select,")
+            .arg(abs.to_string_lossy().as_ref())
+            .spawn()
+            .map_err(|e| format!("打开文件管理器失败：{e}"))?;
+    }
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(abs.to_string_lossy().as_ref())
+            .spawn()
+            .map_err(|e| format!("打开 Finder 失败：{e}"))?;
+    }
+    #[cfg(target_os = "linux")]
+    {
+        // Linux: 尝试打开文件所在目录
+        if let Some(parent) = abs.parent() {
+            std::process::Command::new("xdg-open")
+                .arg(parent)
+                .spawn()
+                .map_err(|e| format!("打开文件管理器失败：{e}"))?;
+        }
+    }
+
+    Ok(())
+}
+
+
+/* ========== src-tauri/src/vault.rs ========== */
+use keyring::{Entry, Error};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::path::PathBuf;
+
+fn is_dev_profile() -> bool {
+
+--- 第 25 页 ---
+    cfg!(debug_assertions)
+}
+
+fn keyring_service() -> &'static str {
+    if is_dev_profile() {
+        "com.canvasflow.studio.dev"
+    } else {
+        "com.canvasflow.studio"
+    }
+}
+
+fn local_data_dir_name() -> &'static str {
+    if is_dev_profile() {
+        "canvasflow-dev"
+    } else {
+        "canvasflow"
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+struct LocalVaultFile {
+    #[serde(default)]
+    keys: HashMap<String, String>,
+}
+
+fn user_data_base() -> Result<PathBuf, String> {
+    #[cfg(windows)]
+    {
+        std::env::var("APPDATA")
+            .map(PathBuf::from)
+            .map_err(|_| "无法读取 APPDATA 环境变量".to_string())
+    }
+    #[cfg(not(windows))]
+    {
+        std::env::var("HOME")
+            .map(PathBuf::from)
+            .map_err(|_| "无法读取 HOME 环境变量".to_string())
+            .map(|home| home.join(".config"))
+    }
+}
+
+fn local_vault_path() -> Result<PathBuf, String> {
+    let dir = user_data_base()?.join(local_data_dir_name());
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.join("api-keys.json"))
+}
+
+/// 旧版 dev/release 共用的明文路径（仅用于一次性迁移）。
+fn legacy_shared_local_vault_path() -> PathBuf {
+    user_data_base()
+
+--- 第 26 页 ---
+        .unwrap_or_else(|_| PathBuf::from("."))
+        .join("canvasflow")
+        .join("api-keys.json")
+}
+
+fn read_local_vault_at(path: &PathBuf) -> Result<LocalVaultFile, String> {
+    if !path.exists() {
+        return Ok(LocalVaultFile::default());
+    }
+    let raw = std::fs::read_to_string(path).map_err(|e| e.to_string())?;
+    let parsed: LocalVaultFile = serde_json::from_str(&raw).map_err(|e| e.to_string())?;
+    Ok(parsed)
+}
+
+fn read_local_vault() -> Result<LocalVaultFile, String> {
+    read_local_vault_at(&local_vault_path()?)
+}
+
+fn write_local_vault(v: &LocalVaultFile) -> Result<(), String> {
+    let path = local_vault_path()?;
+    if v.keys.is_empty() {
+        if path.exists() {
+            std::fs::remove_file(path).map_err(|e| e.to_string())?;
+        }
+        return Ok(());
+    }
+    let raw = serde_json::to_string_pretty(v).map_err(|e| e.to_string())?;
+    std::fs::write(path, raw).map_err(|e| e.to_string())
+}
+
+fn keyring_entry(provider_id: &str) -> Result<Entry, String> {
+    let key = format!("provider:{}", provider_id);
+    Entry::new(keyring_service(), &key).map_err(|e| e.to_string())
+}
+
+fn store_in_keyring(provider_id: &str, api_key: &str) -> Result<(), String> {
+    keyring_entry(provider_id)?
+        .set_password(api_key)
+        .map_err(|e| e.to_string())
+}
+
+fn read_from_keyring(provider_id: &str) -> Result<Option<String>, String> {
+    match keyring_entry(provider_id)?.get_password() {
+        Ok(s) => Ok(Some(s)),
+        Err(Error::NoEntry) => Ok(None),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+fn delete_from_keyring(provider_id: &str) -> Result<(), String> {
+
+--- 第 27 页 ---
+    match keyring_entry(provider_id)?.delete_credential() {
+        Ok(()) => Ok(()),
+        Err(Error::NoEntry) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    }
+}
+
+fn remove_local_key(provider_id: &str) -> Result<(), String> {
+    let mut lv = read_local_vault()?;
+    if lv.keys.remove(provider_id).is_none() {
+        return Ok(());
+    }
+    write_local_vault(&lv)
+}
+
+fn store_in_local_vault(provider_id: &str, api_key: &str) -> Result<(), String> {
+    let mut lv = read_local_vault()?;
+    lv.keys.insert(provider_id.to_string(), api_key.to_string());
+    write_local_vault(&lv)
+}
+
+fn read_from_local_vault(provider_id: &str) -> Result<Option<String>, String> {
+    let lv = read_local_vault()?;
+    Ok(lv.keys.get(provider_id).cloned())
+}
+
+/// 将本地明文 vault 中的 Key 迁入系统凭据；读回失败时保留本地兜底。
+fn migrate_local_key_to_keyring(provider_id: &str, api_key: &str) {
+    let _ = store_api_key(provider_id, api_key);
+}
+
+/// 应用启动时一次性迁移：避免旧版本留下的 api-keys.json 长期明文驻留。
+pub fn migrate_plaintext_vault_to_keyring() {
+    let Ok(mut lv) = read_local_vault() else {
+        return;
+    };
+    if !lv.keys.is_empty() {
+        let pending: Vec<(String, String)> = lv.keys.drain().collect();
+        for (provider_id, api_key) in pending {
+            if store_api_key(&provider_id, &api_key).is_ok() {
+                continue;
+            }
+            lv.keys.insert(provider_id, api_key);
+        }
+        let _ = write_local_vault(&lv);
+    }
+
+    // Dev 启动：将旧版共享明文文件中尚未存在于 dev 命名空间的 Key 导入（不删除源文件）。
+    if !is_dev_profile() {
+        return;
+
+--- 第 28 页 ---
+    }
+    let legacy_path = legacy_shared_local_vault_path();
+    let Ok(legacy) = read_local_vault_at(&legacy_path) else {
+        return;
+    };
+    for (provider_id, api_key) in legacy.keys {
+        let already = read_from_keyring(&provider_id)
+            .ok()
+            .flatten()
+            .is_some()
+            || read_from_local_vault(&provider_id)
+                .ok()
+                .flatten()
+                .is_some();
+        if already {
+            continue;
+        }
+        let _ = store_api_key(&provider_id, &api_key);
+    }
+}
+
+pub fn store_api_key(provider_id: &str, api_key: &str) -> Result<(), String> {
+    let keyring_store_ok = store_in_keyring(provider_id, api_key).is_ok();
+    // 始终保留本地镜像，避免 Windows 凭据库读失败导致画布无法使用已保存的 Key
+    match store_in_local_vault(provider_id, api_key) {
+        Ok(()) => Ok(()),
+        Err(local_err) if keyring_store_ok => {
+            eprintln!(
+                "[vault] keyring ok but local mirror failed for {provider_id}: {local_err}"
+            );
+            Ok(())
+        }
+        Err(local_err) => Err(format!(
+            "系统凭据与本地兜底均写入失败：{}",
+            local_err
+        )),
+    }
+}
+
+pub fn get_api_key(provider_id: &str) -> Result<Option<String>, String> {
+    // 仅供 debug / 集成测试注入假 Key；release 构建忽略此环境变量。
+    #[cfg(any(test, debug_assertions))]
+    if let Ok(k) = std::env::var("CANVASFLOW_TEST_API_KEY") {
+        let k = k.trim().to_string();
+        if !k.is_empty() {
+            let _ = provider_id;
+            return Ok(Some(k));
+        }
+    }
+
+
+--- 第 29 页 ---
+    // 本地明文兜底优先：Windows 凭据库偶发读失败时仍可提交生成
+    if let Ok(Some(v)) = read_from_local_vault(provider_id) {
+        migrate_local_key_to_keyring(provider_id, &v);
+        return Ok(Some(v));
+    }
+
+    match read_from_keyring(provider_id) {
+        Ok(Some(v)) => Ok(Some(v)),
+        Ok(None) | Err(_) => Ok(None),
+    }
+}
+
+pub fn delete_api_key(provider_id: &str) -> Result<(), String> {
+    let local_err = remove_local_key(provider_id).err();
+    match delete_from_keyring(provider_id) {
+        Ok(()) => {
+            if let Some(le) = local_err {
+                Err(le)
+            } else {
+                Ok(())
+            }
+        }
+        Err(keyring_err) => {
+            if let Some(le) = local_err {
+                Err(format!("系统凭据删除失败：{}；本地删除失败：{}", keyring_err, le))
+            } else {
+                Err(keyring_err)
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn dev_profile_uses_isolated_namespace() {
+        assert!(is_dev_profile());
+        assert_eq!(keyring_service(), "com.canvasflow.studio.dev");
+        assert_eq!(local_data_dir_name(), "canvasflow-dev");
+    }
+
+    #[test]
+    fn local_vault_path_lives_under_profile_dir() {
+        let path = local_vault_path().expect("path");
+        let parent = path.parent().expect("parent");
+        assert_eq!(parent.file_name().and_then(|s| s.to_str()), Some(local_data_dir_name()));
+        assert_eq!(path.file_name().and_then(|s| s.to_str()), Some("api-keys.json"));
+    }
+
+--- 第 30 页 ---
+
+    #[test]
+    fn write_local_vault_removes_file_when_empty() {
+        let path = local_vault_path().expect("path");
+        write_local_vault(&LocalVaultFile {
+            keys: HashMap::from([("p1".into(), "secret".into())]),
+        })
+        .expect("write");
+        assert!(path.exists());
+
+        write_local_vault(&LocalVaultFile::default()).expect("clear");
+        assert!(!path.exists());
+    }
+}

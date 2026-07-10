@@ -3,6 +3,7 @@ import { useReactFlow } from "@xyflow/react";
 import { useProjectStore } from "@/store/projectStore";
 import { getUndoRedoAvailability } from "@/store/projectStore";
 import { CANVAS_Z } from "@/components/canvas/menuConstants";
+import { isTextInputTarget } from "@/lib/canvasInteraction";
 
 export function NodeSelectionToolbar() {
   const selectedNodeIds = useProjectStore((s) => s.selectedNodeIds);
@@ -58,7 +59,7 @@ export function NodeSelectionToolbar() {
   useLayoutEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (!visible) return;
-      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (isTextInputTarget(e.target) || isTextInputTarget(document.activeElement)) return;
 
       if (e.key === "Delete" || e.key === "Backspace") {
         e.preventDefault();

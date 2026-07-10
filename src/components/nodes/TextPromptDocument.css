@@ -1,0 +1,185 @@
+/* 文本节点预览正文：节点内与全屏展开共用同一套 Markdown 排版 */
+.textPromptDoc {
+  --tpd-text: rgba(255, 255, 255, 0.9);
+  --tpd-muted: rgba(255, 255, 255, 0.58);
+  --tpd-rule: rgba(255, 255, 255, 0.22);
+  color: var(--tpd-text);
+  font-size: 14px;
+  line-height: 1.72;
+  font-family: inherit;
+  word-break: break-word;
+  letter-spacing: 0.01em;
+}
+
+.textPromptDoc > *:first-child {
+  margin-top: 0;
+}
+
+.textPromptDoc > *:last-child {
+  margin-bottom: 0;
+}
+
+.textPromptDoc h1 {
+  color: rgba(255, 255, 255, 0.98);
+  font-weight: 700;
+  font-size: 1.65em;
+  line-height: 1.28;
+  margin: 0 0 1.25em;
+  text-align: center;
+}
+
+.textPromptDoc h2 {
+  color: rgba(255, 255, 255, 0.96);
+  font-weight: 600;
+  font-size: 1.28em;
+  line-height: 1.35;
+  margin: 1.75em 0 0.85em;
+  padding-bottom: 0.5em;
+  border-bottom: 1px solid var(--tpd-rule);
+}
+
+.textPromptDoc h2:first-child {
+  margin-top: 0;
+}
+
+.textPromptDoc h3 {
+  color: rgba(255, 255, 255, 0.9);
+  font-weight: 600;
+  font-size: 1.05em;
+  line-height: 1.4;
+  margin: 1.15em 0 0.45em;
+}
+
+.textPromptDoc h4 {
+  color: rgba(255, 255, 255, 0.88);
+  font-weight: 600;
+  font-size: 1em;
+  margin: 0.9em 0 0.35em;
+}
+
+.textPromptDoc p {
+  margin: 0.72em 0;
+}
+
+.textPromptDoc p:first-child {
+  margin-top: 0;
+}
+
+.textPromptDoc strong {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.98);
+}
+
+.textPromptDoc em {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.textPromptDoc hr {
+  border: none;
+  height: 1px;
+  margin: 1.5em 0;
+  background: var(--tpd-rule);
+}
+
+.textPromptDoc ul,
+.textPromptDoc ol {
+  margin: 0.65em 0 0.85em;
+  padding-left: 1.4em;
+}
+
+.textPromptDoc li {
+  margin: 0.35em 0;
+}
+
+.textPromptDoc li > p {
+  margin: 0.2em 0;
+}
+
+.textPromptDoc blockquote {
+  margin: 0.75em 0;
+  padding-left: 0.9em;
+  border-left: 3px solid var(--tpd-rule);
+  color: var(--tpd-muted);
+}
+
+.textPromptDoc code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.textPromptDoc pre {
+  margin: 0.85em 0;
+  padding: 10px 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+}
+
+.textPromptDoc pre code {
+  background: transparent;
+  padding: 0;
+}
+
+/* 节点预览：与全屏同一套排版，仅裁切视口并底部渐隐 */
+.textPromptDoc--clamp {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.textPromptDoc--clamp::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 32px;
+  background: linear-gradient(
+    to bottom,
+    transparent,
+    var(--tpd-fade-bg, var(--gen-panel-bg, #2b2b2b))
+  );
+  pointer-events: none;
+}
+
+.textPromptMarkdownEditor {
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-primary, #e0e0e0);
+  font-size: 14px;
+  line-height: 1.72;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.textPromptMarkdownEditor::placeholder {
+  color: var(--text-placeholder, #616161);
+}
+
+/* WYSIWYG 编辑：与阅读态同一套 .textPromptDoc 排版 */
+.textPromptDoc--editable {
+  outline: none;
+  cursor: text;
+}
+
+.textPromptDoc--editable:focus {
+  outline: none;
+}
+
+.textPromptDoc--editable:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-placeholder, #616161);
+  pointer-events: none;
+}

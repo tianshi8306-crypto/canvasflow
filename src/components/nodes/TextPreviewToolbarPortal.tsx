@@ -43,7 +43,7 @@ export function TextPreviewToolbarPortal({
       pos={pos}
       setPanelRef={setToolbarRef}
       className="textPreviewToolbarPortalRoot previewToolbarChrome--stack"
-      style={{ maxWidth: "min(520px, 92vw)" }}
+      style={{ maxWidth: "min(640px, 96vw)" }}
       onPointerDown={(e) => e.stopPropagation()}
     >
       <div className="textPreviewToolbarChrome">

@@ -8,6 +8,7 @@ use super::script_decision::{
     apply_decisions_to_shots, expand_compound_shots, inject_reaction_shots,
     renumber_shots, smooth_adjacent_shots, split_dialogue_shots, split_overlong_shots,
 };
+use super::script_parse_requirement::{parse_episode_number_token, CutProfile};
 
 // ──────────────── 阶段 1 数据结构 ────────────────
 
@@ -87,6 +88,8 @@ pub(crate) struct ShotPlan {
     pub(crate) performance_note: String,
     /// BGM 氛围提示（规则引擎）
     pub(crate) bgm_hint: String,
+    /// 人物弧提示（编剧 pass，供逐镜 LLM）
+    pub(crate) character_arc_hint: String,
 }
 
 impl Default for ShotPlan {
@@ -117,6 +120,7 @@ impl Default for ShotPlan {
             dialogue_type: String::new(),
             performance_note: String::new(),
             bgm_hint: String::new(),
+            character_arc_hint: String::new(),
         }
     }
 }
@@ -245,7 +249,11 @@ pub(crate) fn analyze_script_structure(text: &str) -> ScriptStructure {
 // ──────────────── 阶段 2：分镜头设计 ────────────────
 
 /// 短剧快节奏默认策略：上游已拆好的段落 → 每段一镜，对白不合并
-pub(crate) fn design_shots(structure: &ScriptStructure, _full_text: &str) -> Vec<ShotPlan> {
+pub(crate) fn design_shots(
+    structure: &ScriptStructure,
+    _full_text: &str,
+    plan: Option<&super::script_parse_plan::ScriptParsePlan>,
+) -> Vec<ShotPlan> {
     let paragraphs = &structure.paragraphs;
     if paragraphs.is_empty() {
         return Vec::new();
@@ -294,13 +302,21 @@ pub(crate) fn design_shots(structure: &ScriptStructure, _full_text: &str) -> Vec
         shots.push(shot);
     }
 
-    let mut shots = split_dialogue_shots(shots, paragraphs);
-    shots = split_overlong_shots(shots);
+    let requirement = plan.map(|p| &p.hints);
+    let cut = plan.map(|p| p.cut).unwrap_or_default();
+
+    let mut shots = split_dialogue_shots(shots, paragraphs, &cut);
+    shots = split_overlong_shots(shots, &cut);
     shots = expand_compound_shots(shots);
-    shots = inject_reaction_shots(shots);
-    let mut shots = merge_short_shots(shots);
+    shots = inject_reaction_shots(
+        shots,
+        requirement
+            .map(|h| h.prefer_reaction_shots)
+            .unwrap_or(false),
+    );
+    let mut shots = merge_short_shots(shots, &cut);
     assign_scene_roles(&mut shots);
-    apply_decisions_to_shots(&mut shots, paragraphs);
+    apply_decisions_to_shots(&mut shots, paragraphs, requirement);
     smooth_adjacent_shots(&mut shots);
     renumber_shots(&mut shots);
     shots
@@ -364,7 +380,7 @@ fn assign_scene_roles(shots: &mut [ShotPlan]) {
 }
 
 /// 跳过人物小传等前导，从正文（第一集 / 首个场号）开始
-fn strip_script_preamble(text: &str) -> String {
+pub(crate) fn strip_script_preamble(text: &str) -> String {
     if let Some(pos) = text.find("第一集") {
         let after = text[pos..].trim();
         let lines: Vec<&str> = after.lines().collect();
@@ -460,6 +476,81 @@ fn is_episode_title_line(line: &str) -> bool {
         && !line.contains('：')
         && !line.contains(':')
         && !line.starts_with('▲')
+}
+
+/// 按集号截取剧本文本（配合解析要求「先输出第一集」）
+pub(crate) fn scope_script_to_episode(text: &str, episode: u32) -> String {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut markers: Vec<(u32, usize)> = Vec::new();
+    for (i, line) in lines.iter().enumerate() {
+        if let Some(ep) = episode_number_from_title_line(line.trim()) {
+            markers.push((ep, i));
+        }
+    }
+    if markers.is_empty() {
+        if episode == 1 {
+            return strip_script_preamble(text);
+        }
+        return String::new();
+    }
+    let Some(start_line) = markers
+        .iter()
+        .find(|(ep, _)| *ep == episode)
+        .map(|(_, i)| *i)
+    else {
+        return String::new();
+    };
+    let end_line = markers
+        .iter()
+        .find(|(ep, idx)| *ep > episode && *idx > start_line)
+        .map(|(_, i)| *i)
+        .unwrap_or(lines.len());
+    lines[start_line..end_line]
+        .iter()
+        .copied()
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
+fn episode_number_from_title_line(line: &str) -> Option<u32> {
+    let line = line.trim();
+    if line.is_empty() || line.chars().count() > 24 {
+        return None;
+    }
+    if is_episode_title_line(line) {
+        let di = line.find('第')?;
+        let rest = &line[di + '第'.len_utf8()..];
+        let ji = rest.find('集')?;
+        return parse_episode_number_token(rest[..ji].trim());
+    }
+    let upper = line.to_uppercase();
+    if let Some(rest) = upper.strip_prefix("EP") {
+        let digits: String = rest
+            .chars()
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if let Ok(n) = digits.parse::<u32>() {
+            if n > 0 {
+                return Some(n);
+            }
+        }
+    }
+    if upper.starts_with("EPISODE") {
+        let rest = &line[7..];
+        let digits: String = rest
+            .chars()
+            .skip_while(|c| !c.is_ascii_digit())
+            .take_while(|c| c.is_ascii_digit())
+            .collect();
+        if let Ok(n) = digits.parse::<u32>() {
+            if n > 0 {
+                return Some(n);
+            }
+        }
+    }
+    None
 }
 
 fn is_cast_line(line: &str) -> bool {
@@ -598,6 +689,14 @@ fn assign_scene_metadata(paragraphs: &mut [Paragraph]) {
 }
 
 // ──────────────── 辅助函数 ────────────────
+
+/// 对白/文本改写后刷新段落元数据（说话人、情绪等）
+pub(crate) fn refresh_paragraph_metadata(para: &mut Paragraph) {
+    let (speakers, is_dialogue) = extract_speakers(&para.text);
+    para.speakers = speakers;
+    para.is_dialogue_block = is_dialogue;
+    para.emotion = detect_emotion(&para.text);
+}
 
 fn extract_speakers(text: &str) -> (Vec<String>, bool) {
     let mut speakers: Vec<String> = Vec::new();
@@ -844,10 +943,10 @@ fn is_narration_only_shot(shot: &ShotPlan) -> bool {
         && !shot.is_scene_establishing
 }
 
-fn merge_short_shots(shots: Vec<ShotPlan>) -> Vec<ShotPlan> {
-    // 短剧快节奏：对白、场号、反应镜、复合步骤永不合并
-    const MAX_SINGLE_NARRATION: f64 = 1.2;
-    const MAX_COMBINED_NARRATION: f64 = 2.0;
+fn merge_short_shots(shots: Vec<ShotPlan>, cut: &CutProfile) -> Vec<ShotPlan> {
+    // 对白、场号、反应镜、复合步骤永不合并；叙述镜阈值由体裁/节奏决定
+    let max_single = cut.merge_single_narration_max_sec;
+    let max_combined = cut.merge_combined_narration_max_sec;
     if shots.len() <= 1 {
         return shots;
     }
@@ -869,11 +968,11 @@ fn merge_short_shots(shots: Vec<ShotPlan>) -> Vec<ShotPlan> {
             }
             if is_narration_only_shot(last)
                 && is_narration_only_shot(&shot)
-                && last.estimated_duration_sec < MAX_SINGLE_NARRATION
-                && shot.estimated_duration_sec < MAX_SINGLE_NARRATION
+                && last.estimated_duration_sec < max_single
+                && shot.estimated_duration_sec < max_single
             {
                 let combined = last.estimated_duration_sec + shot.estimated_duration_sec;
-                if combined <= MAX_COMBINED_NARRATION {
+                if combined <= max_combined {
                     last.text_segment = format!("{}\n{}", last.text_segment, shot.text_segment);
                     last.estimated_duration_sec = combined;
                     last.para_range = (last.para_range.0, shot.para_range.1);
@@ -941,7 +1040,7 @@ mod tests {
     fn test_design_shots_two_scenes() {
         let body = "1-1 日 内 客厅\n\n张三：你好。\n\n2-1 夜 外 街道\n\n李四：谁？";
         let st = analyze_script_structure(body);
-        let shots = design_shots(&st, body);
+        let shots = design_shots(&st, body, None);
         assert!(shots.len() >= 3);
         let establishing: Vec<_> = shots.iter().filter(|s| s.is_scene_establishing).collect();
         assert!(establishing.len() >= 2);
@@ -967,6 +1066,60 @@ mod tests {
     }
 
     #[test]
+    fn test_scope_script_to_episode() {
+        let text = "人物小传\n陈南：男主\n第一集\n场1\n对白A\n第二集\n场2\n对白B";
+        let ep1 = scope_script_to_episode(text, 1);
+        assert!(ep1.contains("对白A"), "ep1={}", ep1);
+        assert!(!ep1.contains("对白B"));
+        let ep2 = scope_script_to_episode(text, 2);
+        assert!(ep2.contains("对白B"), "ep2={}", ep2);
+        assert!(!ep2.contains("对白A"));
+    }
+
+    #[test]
+    fn test_scope_script_ep_format() {
+        let text = "EP01\n场A\n对白1\nEP02\n场B\n对白2";
+        let ep1 = scope_script_to_episode(text, 1);
+        assert!(ep1.contains("对白1"));
+        assert!(!ep1.contains("对白2"));
+    }
+
+    #[test]
+    fn test_film_produces_fewer_shots_than_ad_on_same_text() {
+        let text = "1-1日 内 客厅\n人物：甲 乙\n甲：你好。\n乙：来了。\n甲：坐吧。\n▲甲倒茶\n▲乙点头";
+        let st = analyze_script_structure(text);
+        let film_hints = super::super::script_parse_requirement::parse_requirement_hints("电影");
+        let ad_hints = super::super::script_parse_requirement::parse_requirement_hints("广告");
+        use super::super::script_parse_plan::{finalize_plan, PlanSource};
+        let film_plan = finalize_plan(
+            film_hints,
+            super::super::script_parse::ScriptStyleProfile::Film,
+            "电影",
+            text,
+            PlanSource::UserBrief,
+            false,
+            "电影".into(),
+        );
+        let ad_plan = finalize_plan(
+            ad_hints,
+            super::super::script_parse::ScriptStyleProfile::Ad,
+            "广告",
+            text,
+            PlanSource::UserBrief,
+            false,
+            "广告".into(),
+        );
+        let film_shots = design_shots(&st, text, Some(&film_plan));
+        let ad_shots = design_shots(&st, text, Some(&ad_plan));
+        assert!(
+            ad_shots.len() >= film_shots.len(),
+            "ad={} film={}",
+            ad_shots.len(),
+            film_shots.len()
+        );
+    }
+
+    #[test]
     fn test_episode1_tiejia_pipeline() {
         use crate::executor::script_decision::format_shot_storyboard_block;
         let text = include_str!("fixtures/episode1_tiejia.txt");
@@ -978,7 +1131,7 @@ mod tests {
         );
         assert!(st.characters.contains_key("陈南"));
         assert!(st.characters.contains_key("李惠然"));
-        let shots = design_shots(&st, text);
+        let shots = design_shots(&st, text, None);
         assert!(
             shots.len() >= 48,
             "short-drama pace expects ~50+ shots, got {}",
@@ -999,7 +1152,7 @@ mod tests {
             scene_count
         );
         for shot in shots.iter().take(5) {
-            let block = format_shot_storyboard_block(shot, &shot.text_segment, &shot.dialogue_text);
+            let block = format_shot_storyboard_block(shot, &shot.text_segment, &shot.dialogue_text, "");
             eprintln!("--- 镜 {} [{}] ---\n{}\n", shot.serial, shot.scene_heading, block);
         }
         let climax: Vec<_> = shots

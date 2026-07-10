@@ -1,3 +1,4 @@
+import { LLM_PANEL_PLACEHOLDER } from "@/lib/nodeComposerPlaceholders";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { TextProviderPicker } from "@/components/nodes/TextProviderPicker";
 import {
@@ -152,7 +153,7 @@ export function LLMPanel({ nodeId, prompt, modelInput, providerId }: Props) {
           value={inputText}
           onChange={setInputText}
           onSlashTrigger={handleSlashTrigger}
-          placeholder="输入提示词，让 LLM 生成内容…"
+          placeholder={LLM_PANEL_PLACEHOLDER}
           className="scriptGenComposerInput"
           nodeLabels={nodeLabels}
         />

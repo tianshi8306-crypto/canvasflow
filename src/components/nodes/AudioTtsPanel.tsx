@@ -1,3 +1,4 @@
+import { AUDIO_TTS_PLACEHOLDER } from "@/lib/nodeComposerPlaceholders";
 import { isTauri } from "@tauri-apps/api/core";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -211,7 +212,7 @@ export function AudioTtsPanel({
           <textarea
             ref={textareaRef}
             className={`audioTtsPanelTextarea atp-v2-textarea${onRequestExpand ? "" : " atp-v2-textarea--expanded"} ${RF_NODE_INPUT_CLASS}`}
-            placeholder="输入要合成的文本"
+            placeholder={AUDIO_TTS_PLACEHOLDER}
             rows={1}
             value={prompt}
             maxLength={MAX_CHARS}

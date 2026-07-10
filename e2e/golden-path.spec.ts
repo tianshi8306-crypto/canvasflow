@@ -38,7 +38,7 @@ test.describe("黄金路径冒烟（浏览器模式）", () => {
 
   test("合成节点单击打开全屏剪辑工作台", async ({ page }) => {
     await gotoApp(page);
-    await addFromDock(page, "视频合成");
+    await addFromDock(page, "剪辑");
     const composeNode = page.locator(".react-flow__node").last();
     await expect(composeNode).toBeVisible({ timeout: 10_000 });
     await composeNode.dblclick();

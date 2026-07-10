@@ -1,9 +1,11 @@
 import type { RefObject } from "react";
 import type { ScriptBeat } from "@/lib/types";
+import type { ScriptBeatsTableLayout } from "@/lib/scriptBeatsTableModel";
 import { ScriptBeatsEditorTable } from "@/components/ScriptBeatsEditorTable";
 
 type Props = {
   containerRef: RefObject<HTMLDivElement>;
+  tableLayout: ScriptBeatsTableLayout;
   rows: ScriptBeat[];
   selectedIds: string[];
   projectPath: string | null;
@@ -15,6 +17,7 @@ type Props = {
 
 export function ScriptWorkbenchTableView({
   containerRef,
+  tableLayout,
   rows,
   selectedIds,
   projectPath,
@@ -23,6 +26,8 @@ export function ScriptWorkbenchTableView({
   onStatusText,
   onScrollTopChange,
 }: Props) {
+  const isBasic = tableLayout === "basic";
+
   return (
     <div
       ref={containerRef}
@@ -33,7 +38,9 @@ export function ScriptWorkbenchTableView({
     >
       <ScriptBeatsEditorTable
         variant="inline"
-        readOnly
+        tableMode={tableLayout}
+        inlineContext={isBasic ? "workbench" : undefined}
+        readOnly={!isBasic}
         rows={rows}
         selectedIds={selectedIds}
         onToggleSelect={onToggleSelect}

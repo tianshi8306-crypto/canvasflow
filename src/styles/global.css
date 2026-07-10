@@ -6236,7 +6236,7 @@ body .zoomMenu {
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
-  overflow-x: scroll !important;
+  overflow: auto !important;
   cursor: grab;
 }
 
@@ -6264,6 +6264,15 @@ body .zoomMenu {
 .scriptTableInlineRoot--compact .scriptTable td {
   padding-left: 5px;
   padding-right: 5px;
+}
+
+.scriptTableInlineRoot--widePreset .scriptTable {
+  min-width: max-content;
+}
+
+.scriptTableInlineRoot--widePreset .scriptTable th,
+.scriptTableInlineRoot--widePreset .scriptTable td {
+  vertical-align: top;
 }
 
 .scriptTableWrap::-webkit-scrollbar {
@@ -6622,6 +6631,278 @@ body .zoomMenu {
   min-height: 56px;
 }
 
+.scriptLibViewBadge {
+  font-size: 11px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border);
+  color: var(--cf-soft-white-secondary);
+  background: var(--cf-charcoal-inset);
+}
+
+.scriptTableRowIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.5em;
+  font-weight: 600;
+  color: var(--cf-soft-white-secondary);
+}
+
+.scriptDescHighlight-role {
+  background: rgba(96, 165, 250, 0.14);
+  color: #93c5fd;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* 基本镜头表行槽：画布 72px / 全屏与工作台 96px */
+.scriptTable--basicInline {
+  --script-basic-row-h: 72px;
+  --script-basic-content-max-h: 52px;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView,
+.scriptTable--basicInline.scriptTable--workbenchBasic {
+  --script-basic-row-h: 96px;
+  --script-basic-content-max-h: 76px;
+}
+
+.scriptTable--basicInline tbody td,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView tbody td {
+  height: var(--script-basic-row-h);
+  max-height: var(--script-basic-row-h);
+  overflow: hidden;
+  vertical-align: top;
+}
+
+.scriptTable--basicInline .scriptTableCellReadonly,
+.scriptTable--basicInline .scriptTableDisplayCell,
+.scriptTable--basicInline textarea,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView .scriptTableCellReadonly,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView .scriptTableDisplayCell,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView textarea {
+  max-height: var(--script-basic-content-max-h);
+  min-height: 0;
+  overflow-y: auto;
+  line-height: 1.55;
+  font-size: 12px;
+}
+
+.scriptTable--basicInline textarea,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView textarea {
+  resize: none;
+  border-color: transparent;
+  background: transparent;
+  padding: 4px 6px;
+}
+
+.scriptTable--basicInline textarea:focus,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView textarea:focus {
+  border-color: var(--cf-border);
+  background: var(--cf-charcoal-inset);
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView .scriptTableCellReadonly {
+  display: block;
+  padding: 4px 6px;
+  box-sizing: border-box;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView .scriptTableCellReadonly--placeholder {
+  color: var(--muted);
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView input,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView select {
+  border-color: transparent;
+  background: transparent;
+  padding: 4px 6px;
+  font-size: 12px;
+  min-height: 32px;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView input:focus,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView select:focus {
+  border-color: var(--cf-border);
+  background: var(--cf-charcoal-inset);
+}
+
+.scriptInspectorDraft {
+  margin-top: 12px;
+  border: 1px solid var(--cf-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--cf-charcoal-inset);
+}
+
+.scriptInspectorDraft-summary {
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.scriptInspectorDraft-hint {
+  margin: 8px 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.scriptInspectorDraftTextarea {
+  width: 100%;
+  min-height: 160px;
+  box-sizing: border-box;
+  font-size: 12px;
+  line-height: 1.55;
+  border-radius: 8px;
+  border: 1px solid var(--cf-border);
+  background: var(--cf-charcoal-surface);
+  color: var(--text);
+  padding: 10px 12px;
+  resize: vertical;
+}
+
+/* 全屏 · 基本视图：大行高、无竖线，对标分镜确认表 */
+.scriptTable.scriptTableFullscreen.scriptTable--basicView {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView th,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView td {
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  padding: 12px 14px;
+  vertical-align: top;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView thead th {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cf-border);
+  white-space: nowrap;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView tbody td {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView th:nth-child(3),
+.scriptTable.scriptTableFullscreen.scriptTable--basicView td:nth-child(3) {
+  min-width: 360px;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView th:nth-child(4),
+.scriptTable.scriptTableFullscreen.scriptTable--basicView td:nth-child(4) {
+  width: 56px;
+  min-width: 56px;
+  max-width: 72px;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTable--basicView th:last-child,
+.scriptTable.scriptTableFullscreen.scriptTable--basicView td:last-child {
+  min-width: 240px;
+}
+
+.scriptTable--basicInline col:nth-child(3) {
+  width: 320px !important;
+  min-width: 320px !important;
+  max-width: 320px !important;
+}
+
+.scriptTable--basicInline col:nth-child(4) {
+  width: 52px !important;
+  min-width: 52px !important;
+  max-width: 52px !important;
+}
+
+.scriptTable--basicInline th:nth-child(3),
+.scriptTable--basicInline td:nth-child(3) {
+  width: 320px;
+  min-width: 320px;
+  max-width: 320px;
+}
+
+.scriptTable--basicInline th:nth-child(4),
+.scriptTable--basicInline td:nth-child(4) {
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+}
+
+.scriptTable--basicInline th:nth-child(4) select,
+.scriptTable--basicInline td:nth-child(4) select {
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 11px;
+}
+
+.scriptTableDisplayCell {
+  display: block;
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 4px 6px;
+  margin: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: 1.65;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+  overflow-y: auto;
+}
+
+.scriptTableDisplayCell:hover,
+.scriptTableDisplayCell:focus-visible {
+  border-color: var(--cf-border);
+  background: var(--cf-charcoal-inset);
+  outline: none;
+}
+
+.scriptWorkbenchCanvasHint {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+  border: 1px solid var(--cf-border);
+  border-radius: 8px;
+  background: var(--cf-charcoal-inset);
+}
+
+/* 全屏镜头表：行高容纳约 4–5 行正文（LibWide 的 56px 会覆盖通用规则，需单独抬高） */
+.scriptTable.scriptTableFullscreen.scriptTableLibWide textarea {
+  min-height: 96px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTableLibWide tbody td {
+  padding: 8px 10px;
+  vertical-align: top;
+}
+
+.scriptTable.scriptTableFullscreen.scriptTableLibWide .scriptTableCellReadonly {
+  display: block;
+  min-height: 96px;
+  line-height: 1.55;
+  padding: 4px 6px;
+  box-sizing: border-box;
+}
+
 .scriptTableFullscreen textarea {
   min-height: 72px;
 }
@@ -6942,6 +7223,10 @@ body .zoomMenu {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+
+.scriptTableCellReadonly--placeholder {
+  color: var(--muted);
 }
 
 /* 只读模式 - 脚本表单元格纯文本展示 */
@@ -8080,6 +8365,54 @@ body .zoomMenu {
   min-height: 0;
   padding: 12px 16px;
   overflow: auto;
+}
+
+.scriptLibDraftWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 100%;
+  min-height: 360px;
+}
+
+.scriptLibDraftHint {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+.scriptLibDraftPreview {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.scriptLibDraftPreview .scriptNodeViewTag {
+  margin-bottom: 6px;
+}
+
+.scriptLibDraftTextarea {
+  flex: 1;
+  min-height: 320px;
+  width: 100%;
+  resize: none;
+  border: 1px solid var(--border-button);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.5;
+  padding: 12px 14px;
+  box-sizing: border-box;
+}
+
+.scriptLibDraftTextarea:focus {
+  outline: none;
+  border-color: rgba(94, 234, 212, 0.45);
+  box-shadow: 0 0 0 1px rgba(94, 234, 212, 0.2);
 }
 
 /* —— 画布左下角工具条（与左侧 leftAddDock 工具栏视觉统一）与快捷键浮层 —— */

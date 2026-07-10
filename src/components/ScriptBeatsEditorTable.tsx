@@ -5,9 +5,11 @@ import {
   DEFAULT_HIDDEN_COLS,
   getInlineColWidth,
   inlineFixedWidthByContainer,
+  INLINE_COLUMNS_BASIC,
   INLINE_COLUMNS_COMPACT,
   INLINE_COLUMNS_MEDIUM,
   INLINE_COLUMNS_WIDE,
+  inlineFixedWidthBasic,
   loadFieldsQueryFromSession,
   loadFilterQueryFromStorage,
   loadHiddenColsFromStorage,
@@ -15,7 +17,9 @@ import {
   persistFilterQueryToStorage,
   persistHiddenColsToStorage,
   rowMatchesFilter,
+  SCRIPT_BEATS_BASIC_VIEW_COLUMNS,
   SCRIPT_BEATS_FULLSCREEN_BASE_COLUMNS,
+  type ScriptBeatsTableLayout,
   type ScriptBeatsTableVariant,
   type TableCol,
 } from "@/lib/scriptBeatsTableModel";
@@ -23,15 +27,24 @@ import { ScriptBeatsEditorTableToolbar } from "@/components/ScriptBeatsEditorTab
 import { ScriptBeatsTableCellRenderer } from "@/components/ScriptBeatsTableCellRenderer";
 
 export type { ScriptBeatsTableVariant } from "@/lib/scriptBeatsTableModel";
-export { SCRIPT_BEATS_FULLSCREEN_BASE_COLUMNS } from "@/lib/scriptBeatsTableModel";
+export type { ScriptBeatsTableLayout } from "@/lib/scriptBeatsTableModel";
+export { SCRIPT_BEATS_BASIC_VIEW_COLUMNS, SCRIPT_BEATS_FULLSCREEN_BASE_COLUMNS } from "@/lib/scriptBeatsTableModel";
 
 type Props = {
   variant: ScriptBeatsTableVariant;
-  /** 只读模式：禁用编辑、删除、移动、角色编辑；参考图上传除外 */
+  /** basic=9列确认表；pro=全字段（仅全屏） */
+  tableMode?: "basic" | "pro";
+  /** @deprecated 用 tableMode；全屏专业表切换 */
+  fullscreenLayout?: ScriptBeatsTableLayout;
+  onFullscreenLayoutChange?: (layout: ScriptBeatsTableLayout) => void;
+  inlineColumnPreset?: "auto" | "wide";
+  /** 画布节点内联表默认 canvas；Inspector 工作台基本表用 workbench（行高 96px） */
+  inlineContext?: "canvas" | "workbench";
+  inlineDescRows?: number;
   readOnly?: boolean;
   rows: ScriptBeat[];
-  selectedIds: string[];
-  onToggleSelect: (id: string) => void;
+  selectedIds?: string[];
+  onToggleSelect?: (id: string) => void;
   onPersistRows: (next: ScriptBeat[]) => void;
   projectPath?: string | null;
   onStatusText?: (msg: string) => void;
@@ -42,9 +55,15 @@ type Props = {
 /** 脚本镜头表格（只读模式：仅展示 + 勾选 + 参考图上传；编辑/删除/移动全部禁用） */
 export function ScriptBeatsEditorTable({
   variant,
+  tableMode = "basic",
+  fullscreenLayout,
+  onFullscreenLayoutChange,
+  inlineColumnPreset = "auto",
+  inlineContext = "canvas",
+  inlineDescRows,
   readOnly = false,
   rows,
-  selectedIds,
+  selectedIds = [],
   onToggleSelect,
   onPersistRows,
   projectPath,
@@ -52,10 +71,26 @@ export function ScriptBeatsEditorTable({
   highlightBeatId,
   onHighlightDone,
 }: Props) {
+  const resolvedTableMode =
+    tableMode === "pro" || fullscreenLayout === "pro" ? "pro" : "basic";
+  const isBasicTable = resolvedTableMode === "basic";
+  const showSelectionColumn = !isBasicTable;
   const normRows = rows.map((b) => normalizeScriptBeat(b));
-  const descRows = variant === "fullscreen" ? 3 : 2;
-  const tableClass =
-    variant === "fullscreen" ? "scriptTable scriptTableFullscreen scriptTableLibWide" : "scriptTable";
+  const descRows =
+    variant === "fullscreen" ? 6 : (inlineDescRows ?? 3);
+  const forceWideInline =
+    variant === "inline" && (inlineColumnPreset === "wide" || isBasicTable);
+  const tableClass = [
+    "scriptTable",
+    variant === "fullscreen" ? "scriptTableFullscreen scriptTableLibWide" : "",
+    isBasicTable ? "scriptTable--basicView" : "",
+    variant === "inline" && isBasicTable ? "scriptTable--basicInline" : "",
+    variant === "inline" && isBasicTable && inlineContext === "workbench"
+      ? "scriptTable--workbenchBasic"
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   const [hiddenCols, setHiddenCols] = useState<Set<string>>(() => loadHiddenColsFromStorage());
   const [fieldsOpen, setFieldsOpen] = useState(false);
@@ -95,13 +130,16 @@ export function ScriptBeatsEditorTable({
   }, [maxRoleCount]);
 
   const fullscreenCols = useMemo<TableCol[]>(() => {
+    if (isBasicTable) {
+      return SCRIPT_BEATS_BASIC_VIEW_COLUMNS;
+    }
     const out: TableCol[] = [];
     for (const c of SCRIPT_BEATS_FULLSCREEN_BASE_COLUMNS) {
       out.push(c);
       if (c.key === "description") out.push(...dynamicRoleCols);
     }
     return out;
-  }, [dynamicRoleCols]);
+  }, [dynamicRoleCols, isBasicTable]);
 
   useEffect(() => {
     if (variant !== "inline") return;
@@ -121,11 +159,17 @@ export function ScriptBeatsEditorTable({
   }, [variant]);
 
   const inlineCols = useMemo<TableCol[]>(() => {
+    if (isBasicTable) return INLINE_COLUMNS_BASIC;
+    if (forceWideInline) return INLINE_COLUMNS_WIDE;
     if (inlineContainerWidth <= 0) return INLINE_COLUMNS_WIDE;
     if (inlineContainerWidth < 760) return INLINE_COLUMNS_COMPACT;
     if (inlineContainerWidth < 1020) return INLINE_COLUMNS_MEDIUM;
     return INLINE_COLUMNS_WIDE;
-  }, [inlineContainerWidth]);
+  }, [forceWideInline, inlineContainerWidth, isBasicTable]);
+
+  const inlineWidthForLayout = forceWideInline
+    ? Math.max(inlineContainerWidth, 1020)
+    : inlineContainerWidth;
 
   const visibleCols = useMemo(() => {
     if (variant !== "fullscreen") return inlineCols;
@@ -284,10 +328,16 @@ export function ScriptBeatsEditorTable({
   };
 
   const cols = visibleCols;
-  const colCount = cols.length + 1;
+  const colCount = cols.length + (showSelectionColumn ? 1 : 0);
   const inlineColStyle = (c: TableCol): CSSProperties | undefined => {
     if (variant === "fullscreen") return c.minW ? { minWidth: c.minW } : undefined;
-    const fixed = inlineFixedWidthByContainer(c.key, inlineContainerWidth);
+    if (isBasicTable) {
+      const fixed = inlineFixedWidthBasic(c.key);
+      if (fixed) {
+        return { width: fixed, minWidth: fixed, maxWidth: fixed };
+      }
+    }
+    const fixed = inlineFixedWidthByContainer(c.key, inlineWidthForLayout);
     if (fixed) {
       return {
         width: fixed,
@@ -299,10 +349,15 @@ export function ScriptBeatsEditorTable({
   };
   const inlineTableWidth = useMemo(() => {
     if (variant === "fullscreen") return undefined;
-    const base = 36 + cols.reduce((sum, c) => sum + getInlineColWidth(c, inlineContainerWidth), 0);
+    const colW = (c: TableCol) =>
+      isBasicTable
+        ? (inlineFixedWidthBasic(c.key) ?? c.minW ?? 100)
+        : getInlineColWidth(c, inlineWidthForLayout);
+    const selectionW = showSelectionColumn ? 36 : 0;
+    const base = selectionW + cols.reduce((sum, c) => sum + colW(c), 0);
     const containerBase = inlineContainerWidth > 0 ? inlineContainerWidth + 180 : base;
     return Math.max(base, containerBase);
-  }, [variant, cols, inlineContainerWidth]);
+  }, [variant, cols, inlineContainerWidth, inlineWidthForLayout, isBasicTable, showSelectionColumn]);
 
   const tableEl = (
     <table
@@ -319,16 +374,20 @@ export function ScriptBeatsEditorTable({
     >
       {variant !== "fullscreen" ? (
         <colgroup>
-          <col style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
+          {showSelectionColumn ? (
+            <col style={{ width: 36, minWidth: 36, maxWidth: 36 }} />
+          ) : null}
           {cols.map((c) => {
-            const w = colWidths[c.key] ?? getInlineColWidth(c, inlineContainerWidth);
+            const w = isBasicTable
+              ? (inlineFixedWidthBasic(c.key) ?? c.minW ?? 100)
+              : (colWidths[c.key] ?? getInlineColWidth(c, inlineContainerWidth));
             return <col key={`col-${c.key}`} style={{ width: w, minWidth: w, maxWidth: w }} />;
           })}
         </colgroup>
       ) : null}
       <thead>
         <tr>
-          <th style={{ width: 36 }} aria-label="勾选" />
+          {showSelectionColumn ? <th style={{ width: 36 }} aria-label="勾选" /> : null}
           {cols.map((c, colIdx) => (
             <th
               key={c.key}
@@ -366,31 +425,32 @@ export function ScriptBeatsEditorTable({
             </td>
           </tr>
         ) : (
-          displayRows.map((b) => {
+          displayRows.map((b, displayIdx) => {
             const origIdx = normRows.findIndex((r) => r.id === b.id);
             const idx = origIdx >= 0 ? origIdx : 0;
+            const displayIndex = displayIdx + 1;
             return (
               <tr
                 key={b.id}
                 data-beat-id={b.id}
                 className={highlightBeatId === b.id ? "scriptTableRow--highlight" : ""}
               >
-                <td tabIndex={0}>
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.includes(b.id)}
-                    onChange={() => onToggleSelect(b.id)}
-                    aria-label={`选择镜头 ${idx + 1}`}
-                  />
-                </td>
+                {showSelectionColumn ? (
+                  <td tabIndex={0}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(b.id)}
+                      onChange={() => onToggleSelect?.(b.id)}
+                      aria-label={`选择镜头 ${displayIndex}`}
+                    />
+                  </td>
+                ) : null}
                 {cols.map((c) => (
-                  <td
-                    key={c.key}
-                    className={selectedIds.includes(normRows[idx]?.id) ? "cell-selected" : ""}
-                  >
+                  <td key={c.key}>
                     <ScriptBeatsTableCellRenderer
                       beat={b}
                       rowIndex={idx}
+                      displayIndex={displayIndex}
                       colKey={c.key}
                       variant={variant}
                       descRows={descRows}
@@ -399,6 +459,7 @@ export function ScriptBeatsEditorTable({
                       onStatusText={onStatusText}
                       onPersistRows={onPersistRows}
                       readOnly={readOnly}
+                      basicTable={isBasicTable}
                     />
                   </td>
                 ))}
@@ -415,8 +476,14 @@ export function ScriptBeatsEditorTable({
       <div
         ref={inlineRootRef}
         className={`scriptTableInlineRoot ${
-          inlineContainerWidth < 760 ? "scriptTableInlineRoot--compact" : inlineContainerWidth < 1020 ? "scriptTableInlineRoot--medium" : ""
-        }`}
+          forceWideInline
+            ? ""
+            : inlineContainerWidth < 760
+              ? "scriptTableInlineRoot--compact"
+              : inlineContainerWidth < 1020
+                ? "scriptTableInlineRoot--medium"
+                : ""
+        }${forceWideInline ? " scriptTableInlineRoot--widePreset" : ""}`}
       >
         {tableEl}
       </div>
@@ -452,6 +519,10 @@ export function ScriptBeatsEditorTable({
         setFilterQuery={setFilterQuery}
         displayRowsLength={displayRows.length}
         normRowsLength={normRows.length}
+        fullscreenLayout={resolvedTableMode}
+        onFullscreenLayoutChange={(layout) => {
+          onFullscreenLayoutChange?.(layout);
+        }}
       />
 
       <div ref={tableWrapRef} className="scriptTableFullscreenScroll">

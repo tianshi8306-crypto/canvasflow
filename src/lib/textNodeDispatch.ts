@@ -1,3 +1,4 @@
+import { normalizeTextPromptMarkdown } from "@/lib/textPromptMarkdown";
 import { textNodeDispatchAgentRuntime } from "@/lib/nodeAgentRuntime/dagnodeDispatchAgents";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import {
@@ -65,7 +66,7 @@ export async function dispatchTextNodeComposerRun({
         model,
       });
       updateNodeData(nodeId, {
-        prompt: result,
+        prompt: normalizeTextPromptMarkdown(result),
         params: { ...params, textModelInput: "" },
       });
       setStatusText("处理完成，结果已写入预览");

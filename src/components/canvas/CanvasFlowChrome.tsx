@@ -13,6 +13,7 @@ import {
   FloatMenuSection,
   FloatMenuShell,
 } from "@/components/canvas/CanvasFloatMenu";
+import { isTextInputTarget } from "@/lib/canvasInteraction";
 import {
   IconFitScreen,
   IconZoomIn,
@@ -25,12 +26,7 @@ const MIN_ZOOM = 0.15;
 const MAX_ZOOM = 3;
 
 function isEditingTextField(target: EventTarget | null): boolean {
-  const el = target as HTMLElement | null;
-  if (!el) return false;
-  const tag = el.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-  if (typeof el.isContentEditable === "boolean" && el.isContentEditable) return true;
-  return Boolean(el.closest(".canvasShortcutsOverlayCard"));
+  return isTextInputTarget(target);
 }
 
 /** 小地图图标 - 简化网格+边框 */
@@ -179,7 +175,7 @@ export function CanvasFlowChrome() {
           return;
         }
       }
-      if (isEditingTextField(e.target)) return;
+      if (isEditingTextField(e.target) || isEditingTextField(document.activeElement)) return;
 
       const key = e.key.toLowerCase();
       const mod = e.ctrlKey || e.metaKey;

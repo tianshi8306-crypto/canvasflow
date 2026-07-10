@@ -223,6 +223,32 @@ export type FlowNodeData = {
   scriptShotCount?: number;
   /** 集级节奏报告（前 30 秒钩子、特写占比等） */
   scriptRhythmReport?: ScriptRhythmReport;
+  /** 节点预览主交付：整份可编辑分镜稿 */
+  storyboardDraft?: string;
+  /** 分镜稿版本：每次解析 +1 */
+  storyboardDraftRevision?: number;
+  /** 最近一次解析是否走了自动规划（不对画布展示） */
+  scriptParseAutoPlanned?: boolean;
+  /** 人物弧分析摘要（编剧 pass，静默写入） */
+  characterArcNotes?: {
+    applied?: boolean;
+    episodeHookNote?: string;
+    turningPointCount?: number;
+    characters?: Array<{
+      name: string;
+      arcSummary?: string;
+      startState?: string;
+      endState?: string;
+      relationshipNotes?: string;
+    }>;
+  };
+  /** 对白改写摘要（编剧 pass，静默写入） */
+  dialogueRewriteNotes?: {
+    applied?: boolean;
+    mode?: "preserve" | "light" | "short_drama";
+    rewriteCount?: number;
+    skippedCount?: number;
+  };
   /** 节点运行状态（C.1：节点状态机） */
   status?: NodeStatus;
 };

@@ -1,6 +1,8 @@
 import { invoke, isTauri } from "@tauri-apps/api/core";
 import type { Edge, Node, Viewport } from "@xyflow/react";
 import { rebuildShotNodeRegistry } from "@/lib/hermes";
+import { migrateScriptNodesOnLoad } from "@/lib/scriptBeatsMigration";
+import { reconcileBeatsPromptFields } from "@/lib/scriptPromptSynthesis";
 import { isCanvasMediaNodeType } from "@/lib/nodeMediaRef";
 import { rememberProjectOpened } from "@/lib/recentProjects";
 import { defaultViewport, parseCanvas, serializeCanvas } from "@/lib/serialization";
@@ -57,7 +59,7 @@ function applyScriptAssetPatches(
       data.storyboardShots = patch.storyboardShots as StoryboardShot[];
     }
     if (patch.scriptBeats) {
-      data.scriptBeats = patch.scriptBeats as ScriptBeat[];
+      data.scriptBeats = reconcileBeatsPromptFields(patch.scriptBeats as ScriptBeat[]);
     }
     return { ...n, data };
   });
@@ -152,6 +154,8 @@ export async function loadProjectFolder(
     const raw = await invoke<string>("read_canvasflow_json", { projectPath: folder });
     const parsed = parseCanvas(raw);
     let { nodes } = parsed;
+    const migration = migrateScriptNodesOnLoad(nodes);
+    nodes = migration.nodes;
     const { edges, viewport, invalidEdgesDropped, meta } = parsed;
     const backfill = await applyAssetIdBackfill(folder, nodes);
     nodes = backfill.nodes;
@@ -165,6 +169,9 @@ export async function loadProjectFolder(
     if (backfill.patched > 0) {
       suffixParts.push(`已补全 ${backfill.patched} 个素材 ID`);
     }
+    if (migration.migratedCount > 0) {
+      suffixParts.push(`已迁移 ${migration.migratedCount} 个脚本节点镜头表`);
+    }
     const statusText =
       suffixParts.length > 0 ? `${statusBase}（${suffixParts.join("；")}）` : statusBase;
     return {
@@ -173,7 +180,7 @@ export async function loadProjectFolder(
       edges,
       viewport,
       statusText,
-      projectDirtyFromBackfill: backfill.patched > 0,
+      projectDirtyFromBackfill: backfill.patched > 0 || migration.migratedCount > 0,
       imageNodeCounter: meta?.imageNodeCounter != null ? meta.imageNodeCounter : maxImgIdx,
       videoNodeCounter: meta?.videoNodeCounter != null ? meta.videoNodeCounter : maxVidIdx,
       textNodeCounter: meta?.textNodeCounter != null ? meta.textNodeCounter : maxTextIdx,

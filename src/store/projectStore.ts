@@ -58,6 +58,8 @@ import {
   validateConnection,
 } from "@/lib/flowConnectionPolicy";
 import { applyTextWorkflowSyncToNodes } from "@/lib/textNodeWorkflowSync";
+import { mergeTextNodeDataPatch } from "@/lib/textNodePromptPatch";
+import { applyTextToScriptConnectionFeedback } from "@/lib/scriptUpstreamConnect";
 import { patchVideoNodesWithUpstreamVideoPrompt } from "@/lib/videoGeneration/videoVideoPromptSync";
 import { CANVAS_EDGE_STYLE_DEFAULT } from "@/lib/canvasColors";
 import { makeFlowEdge } from "@/lib/flowEdge";
@@ -514,6 +516,10 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     for (const e of get().edges) markEdgeDirty(e.id);
 
     const targetNode = get().nodes.find((n) => n.id === normalized.target);
+    if (sn.type === "textNode" && targetNode?.type === "scriptNode") {
+      applyTextToScriptConnectionFeedback(get, set, normalized.target);
+    }
+
     if (
       targetNode?.type === "ffmpegConcat" &&
       (sn.type === "videoNode" || sn.type === "ffmpegConcat")
@@ -547,8 +553,9 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     set((s) => ({
       nodes: s.nodes.map((n) => {
         if (n.id !== id) return n;
-        const data = { ...n.data, ...patch };
-        for (const [key, val] of Object.entries(patch)) {
+        const mergedPatch = mergeTextNodeDataPatch(n.type, patch);
+        const data = { ...n.data, ...mergedPatch };
+        for (const [key, val] of Object.entries(mergedPatch)) {
           if (val === undefined) delete (data as Record<string, unknown>)[key];
         }
         return { ...n, data };
@@ -822,13 +829,13 @@ export const useProjectStore = create<ProjectState>((set, get) => {
   spawnAnchoredPartner: ({ anchorNodeId, direction, partnerType }) => {
     const state = get();
     const anchor = state.nodes.find((n) => n.id === anchorNodeId);
-    if (!anchor) return;
+    if (!anchor) return undefined;
     const sourceT = direction === "incoming" ? partnerType : anchor.type;
     const targetT = direction === "incoming" ? anchor.type : partnerType;
     if (!isConnectionAllowed(sourceT, targetT)) {
       const msg = connectionRejectedReason(sourceT, targetT);
       set({ statusText: msg ? `无法创建连线：${msg}` : "无法创建连线：类型不匹配" });
-      return;
+      return undefined;
     }
     const factory = newNodeDataByType[partnerType];
     const newId = crypto.randomUUID();
@@ -863,7 +870,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     const nodesWithPartner = [...state.nodes, newNode];
     if (hasParallelEdge(state.edges, edge)) {
       set({ statusText: "无法创建连线：相同节点之间已存在连线" });
-      return;
+      return undefined;
     }
     const verdict = validateConnection(
       {
@@ -877,7 +884,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     );
     if (!verdict.ok) {
       set({ statusText: `无法创建连线：${verdict.reason}` });
-      return;
+      return undefined;
     }
     recordBeforeDiscreteMutation(get);
     set((s) => {
@@ -888,6 +895,7 @@ export const useProjectStore = create<ProjectState>((set, get) => {
     afterGraphEdit();
     get().setSelectedNodeIds([newId]);
     get().setStatusText(direction === "incoming" ? "已在左侧添加并联线" : "已在右侧添加并联线");
+    return newId;
   },
 
   setupFirstLastFrameForVideoNode: (videoNodeId) => {

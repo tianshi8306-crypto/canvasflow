@@ -28,6 +28,7 @@ import { SCRIPT_NODE_ENTRY_HINT } from "@/lib/scriptNodeCanvasEntries";
 import { ScriptUpstreamTextBanner } from "@/components/script/ScriptUpstreamTextBanner";
 import { ScriptReferenceVideoBanner } from "@/components/script/ScriptReferenceVideoBanner";
 import { ScriptHermesAutoChainControl } from "@/components/script/ScriptHermesAutoChainControl";
+import { ScriptNodeDraftInspector } from "@/components/script/ScriptNodeDraftInspector";
 import { ScriptStoryboardSection } from "@/components/ScriptStoryboardSection";
 import {
   incomingScriptUpstreamState,
@@ -495,6 +496,7 @@ export function Inspector() {
             storedSelection={node.data.scriptBeatSelection}
             themePrompt={node.data.prompt ?? ""}
           />
+          <ScriptNodeDraftInspector nodeId={node.id} />
           <ScriptStoryboardSection
             nodeId={node.id}
             beats={node.data.scriptBeats ?? []}

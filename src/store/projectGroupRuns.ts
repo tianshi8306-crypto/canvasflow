@@ -16,6 +16,7 @@ import {
 import { fetchRunEvents } from "@/shared/api/runs";
 import type { GraphRunWithPatchResult, ProjectState } from "./projectStoreTypes";
 import { scheduleSave } from "./projectSaveDebounce";
+import { applyTextNodeDataPatch } from "@/lib/textNodePromptPatch";
 
 type SetState = (
   partial:
@@ -37,7 +38,7 @@ async function applySubgraphRunResult(
       nodes: s.nodes.map((n) => {
         const p = res.nodePatches.find((x) => x.nodeId === n.id);
         if (!p) return n;
-        return { ...n, data: { ...n.data, ...p.dataPatch } };
+        return applyTextNodeDataPatch(n, p.dataPatch);
       }),
     }));
     if (get().projectPath) scheduleSave(get);

@@ -4,6 +4,7 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type Node, type NodeProps } from "@xyflow/react";
 import type { FlowNodeData } from "@/lib/types";
+import { isTextInputTarget } from "@/lib/canvasInteraction";
 import { computeImageNodeFrameSize } from "@/lib/imageGeneration/imageAspectSize";
 import { useNodeExpandedChrome } from "@/hooks/useNodeExpandedChrome";
 import { normalizeTimelineClips } from "@/lib/compose";
@@ -60,8 +61,7 @@ function MinimalFFmpegNodeInner({ id, data, selected = false }: NodeProps<Node<F
     if (!selected) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Delete" || e.key === "Backspace") {
-        const t = e.target;
-        if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+        if (isTextInputTarget(e.target)) return;
         e.preventDefault();
         deleteSelection();
       }

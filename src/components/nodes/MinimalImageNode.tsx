@@ -3,6 +3,7 @@
  */
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FlowNodeData } from "@/lib/types";
+import { isTextInputTarget } from "@/lib/canvasInteraction";
 import {
   computeImageNodeFrameSize,
   resolveImageNodeFrameRatio,
@@ -129,8 +130,7 @@ function MinimalImageNodeInner({ id, data, selected = false }: MinimalImageNodeP
         (document.activeElement as HTMLElement)?.blur?.();
       }
       if (e.key === "Delete" || e.key === "Backspace") {
-        const t = e.target;
-        if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
+        if (isTextInputTarget(e.target)) return;
         e.preventDefault();
         deleteSelection();
       }

@@ -1,0 +1,1559 @@
+--- 第 1 页 ---
+/* ========== src/main.tsx ========== */
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { applyAppTheme } from "@/lib/appTheme";
+import "./styles/app-boot.css";
+import "./styles/global.css";
+import "./styles/app-theme.css";
+import "./styles/app-theme-nodes.css";
+import "@/components/nodes/nodeChrome/nodeChromeTokens.css";
+
+applyAppTheme("dark");
+import "@xyflow/react/dist/style.css";
+import { AppRoot } from "@/app/AppRoot";
+
+ReactDOM.createRoot(document.getElementById("root")!).render(
+  <React.StrictMode>
+    <AppRoot />
+  </React.StrictMode>,
+);
+
+
+/* ========== src/App.tsx ========== */
+import { isTauri } from "@tauri-apps/api/core";
+import { appendNodeAgentEvent } from "@/shared/api/runs";
+import { useEffect, useState } from "react";
+import { FlowCanvas } from "@/components/FlowCanvas";
+import { AppTopBar } from "@/components/AppTopBar";
+import { SettingsPanel } from "@/components/SettingsPanel";
+import { ScriptNodeFullscreenOverlay } from "@/components/ScriptNodeFullscreenOverlay";
+import { ComposeEditorOverlay } from "@/components/compose/ComposeEditorOverlay";
+import { OnboardingGuide, shouldShowOnboarding } from "@/components/OnboardingGuide";
+import "@/components/OnboardingGuide.css";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { HermesScriptVersionDiffOverlay } from "@/components/hermes/HermesScriptVersionDiffOverlay";
+import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
+import { isCanvasShortcutBlockedTarget, useCanvasShortcutActions } from "@/hooks/canvas/useCanvasShortcutActions";
+import { nudgeDeltaFromArrowKey } from "@/lib/nodeCanvasNudge";
+import { bindActiveTabToProject } from "@/lib/canvasTabSync";
+import { describeWorkspaceCloseRisk } from "@/lib/canvasCloseGuard";
+import { useProjectStore } from "@/store/projectStore";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
+import { HermesOrbSuggestionBridge } from "@/components/hermes/HermesOrbSuggestionBridge";
+import { AppUpdateDialog } from "@/components/AppUpdateDialog";
+import { useAppUpdateAtStartup } from "@/hooks/useAppUpdateAtStartup";
+import { initHermesAutoChain, syncCanvasMcpBridgeContext } from "@/lib/hermes";
+import "@/styles/hermes-shell.css";
+import {
+  isPassiveAudioAsset,
+  AUDIO_PASSIVE_REFERENCE_STATUS,
+} from "@/lib/audioNodeContainerMode";
+
+--- 第 2 页 ---
+import {
+  isPassiveTextContainer,
+  TEXT_PASSIVE_CONTAINER_STATUS,
+} from "@/lib/textNodeContainerMode";
+import { useNodeStatusListener } from "@/hooks/useNodeStatus";
+import { useProjectAutoSaveSettingsSync } from "@/hooks/useProjectAutoSaveSettingsSync";
+import { useCanvasSettingsSync } from "@/hooks/useCanvasSettingsSync";
+import type { SettingsCategory } from "@/components/SettingsNav";
+
+type OpenSettingsDetail = {
+  category?: SettingsCategory;
+  focusSectionId?: string;
+};
+
+export default function App() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsOpenRequest, setSettingsOpenRequest] = useState<{
+    category: SettingsCategory | null;
+    focusSectionId: string | null;
+    nonce: number;
+  }>({ category: null, focusSectionId: null, nonce: 0 });
+  useProjectAutoSaveSettingsSync();
+  useCanvasSettingsSync();
+
+  const scriptFullscreenNodeId = useProjectStore((s) => s.scriptFullscreenNodeId);
+  const composeEditorNodeId = useCanvasUiStore((s) => s.composeEditorNodeId);
+  const projectPath = useProjectStore((s) => s.projectPath);
+  const lastRunId = useProjectStore((s) => s.lastRunId);
+  const setLastRunId = useProjectStore((s) => s.setLastRunId);
+  const groupSelectedNodes = useProjectStore((s) => s.groupSelectedNodes);
+  const ungroupSelectedNodes = useProjectStore((s) => s.ungroupSelectedNodes);
+  const copySelection = useProjectStore((s) => s.copySelection);
+  const pasteSelection = useProjectStore((s) => s.pasteSelection);
+  const deleteSelection = useProjectStore((s) => s.deleteSelection);
+  const nudgeSelectedNodes = useProjectStore((s) => s.nudgeSelectedNodes);
+  const newProject = useProjectStore((s) => s.newProject);
+  const openProject = useProjectStore((s) => s.openProject);
+  const saveProject = useProjectStore((s) => s.saveProject);
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
+  const {
+    duplicateSelection,
+    runGenerateShortcut,
+    openAddPanelCenter,
+    toggleShortcutsOverlay,
+  } = useCanvasShortcutActions();
+  const setTextGenPanelPinnedNodeId = useCanvasUiStore((s) => s.setTextGenPanelPinnedNodeId);
+  const setAudioTtsPanelPinnedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelPinnedNodeId);
+  const setAudioTtsPanelNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelNodeId);
+  const setStatusText = useProjectStore((s) => s.setStatusText);
+
+--- 第 3 页 ---
+  const toggleHermes = useCanvasUiStore((s) => s.toggleHermes);
+  const collapseHermes = useCanvasUiStore((s) => s.collapseHermes);
+  const hermesMode = useCanvasUiStore((s) => s.hermesMode);
+  const hermesJobDrawerOpen = useCanvasUiStore((s) => s.hermesJobDrawerOpen);
+  const closeHermesJobDrawer = useCanvasUiStore((s) => s.closeHermesJobDrawer);
+  const confirmDialog = useCanvasUiStore((s) => s.confirmDialog);
+  const { pendingUpdate, dismissPendingUpdate } = useAppUpdateAtStartup();
+
+  useEffect(() => {
+    const onKeydown = (ev: KeyboardEvent) => {
+      const shouldBlockCanvasShortcut = isCanvasShortcutBlockedTarget(ev.target);
+      const mod = ev.ctrlKey || ev.metaKey;
+      const key = ev.key.toLowerCase();
+
+      if (ev.key === "?" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        toggleShortcutsOverlay();
+        return;
+      }
+
+      const nudgeDelta = nudgeDeltaFromArrowKey(ev.key, ev.shiftKey);
+      if (
+        nudgeDelta &&
+        !mod &&
+        !ev.altKey &&
+        !shouldBlockCanvasShortcut &&
+        useProjectStore.getState().selectedNodeIds.length > 0
+      ) {
+        ev.preventDefault();
+        nudgeSelectedNodes(nudgeDelta.dx, nudgeDelta.dy);
+        return;
+      }
+
+      if (key === "tab" && !mod && !ev.altKey && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        openAddPanelCenter();
+        return;
+      }
+
+      if (mod && ev.shiftKey && key === "h" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        toggleHermes();
+        return;
+      }
+
+      const isRedoCombo =
+        (mod && key === "z" && ev.shiftKey) || (mod && key === "y" && !ev.shiftKey);
+      const isUndoCombo = mod && key === "z" && !ev.shiftKey;
+
+      if (isRedoCombo) {
+
+--- 第 4 页 ---
+        if (!shouldBlockCanvasShortcut) {
+          ev.preventDefault();
+          redo();
+        }
+        return;
+      }
+      if (isUndoCombo) {
+        if (!shouldBlockCanvasShortcut) {
+          ev.preventDefault();
+          undo();
+        }
+        return;
+      }
+
+      if (mod && !ev.shiftKey && !ev.altKey && key === "n" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        void newProject();
+        return;
+      }
+      if (mod && !ev.shiftKey && !ev.altKey && key === "o" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        void openProject();
+        return;
+      }
+      if (mod && !ev.shiftKey && !ev.altKey && key === "s" && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        void saveProject();
+        return;
+      }
+
+      const isUngroup = mod && ev.altKey && ev.shiftKey && key === "g";
+      const isGroup = mod && key === "g" && !ev.shiftKey && !ev.altKey;
+      const isDup = mod && ev.shiftKey && key === "c";
+      const isGenerate = mod && key === "enter";
+      const isCopy = mod && key === "c" && !ev.shiftKey;
+      const isPaste = mod && key === "v";
+      const isDelete = ev.key === "Delete" || ev.key === "Backspace";
+      const isOpenTextComposer = mod && ev.shiftKey && key === "g" && !ev.altKey;
+
+      if (isUngroup && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        ungroupSelectedNodes();
+        return;
+      }
+      if (isGroup && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        groupSelectedNodes();
+        return;
+      }
+      if (isDup && !shouldBlockCanvasShortcut) {
+
+--- 第 5 页 ---
+        ev.preventDefault();
+        duplicateSelection();
+        return;
+      }
+      if (isGenerate && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        runGenerateShortcut();
+        return;
+      }
+      if (isCopy && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        copySelection();
+        return;
+      }
+      if (isPaste && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        pasteSelection();
+        return;
+      }
+      if (isDelete && !shouldBlockCanvasShortcut) {
+        ev.preventDefault();
+        deleteSelection();
+        return;
+      }
+      if (isOpenTextComposer && !shouldBlockCanvasShortcut) {
+        const { selectedNodeIds, nodes, edges: allEdges } = useProjectStore.getState();
+        if (selectedNodeIds.length === 1) {
+          const selected = nodes.find((n) => n.id === selectedNodeIds[0]);
+          if (selected?.type === "textNode") {
+            ev.preventDefault();
+            if (isPassiveTextContainer(selected.id, nodes, allEdges)) {
+              setStatusText(TEXT_PASSIVE_CONTAINER_STATUS);
+              return;
+            }
+            setTextGenPanelPinnedNodeId(selected.id);
+            setStatusText("已打开模型对话面板（Ctrl+Shift+G）");
+            return;
+          }
+          if (selected?.type === "audioNode") {
+            ev.preventDefault();
+            if (isPassiveAudioAsset(selected.id, nodes, allEdges)) {
+              setStatusText(AUDIO_PASSIVE_REFERENCE_STATUS);
+              return;
+            }
+            setAudioTtsPanelPinnedNodeId(selected.id);
+            setAudioTtsPanelNodeId(selected.id);
+            setStatusText("已打开文字转语音面板（Ctrl+Shift+G）");
+          }
+        }
+      }
+
+--- 第 6 页 ---
+    };
+    window.addEventListener("keydown", onKeydown);
+    return () => window.removeEventListener("keydown", onKeydown);
+  }, [
+    copySelection,
+    deleteSelection,
+    nudgeSelectedNodes,
+    duplicateSelection,
+    groupSelectedNodes,
+    newProject,
+    openAddPanelCenter,
+    openProject,
+    pasteSelection,
+    redo,
+    runGenerateShortcut,
+    saveProject,
+    setStatusText,
+    setAudioTtsPanelNodeId,
+    setAudioTtsPanelPinnedNodeId,
+    setTextGenPanelPinnedNodeId,
+    toggleShortcutsOverlay,
+    ungroupSelectedNodes,
+    undo,
+  ]);
+
+  useEffect(() => {
+    const onAgentEvent = (ev: Event) => {
+      if (!isTauri()) return;
+      if (!projectPath) return;
+      const detail = (ev as CustomEvent<NodeAgentRuntimeEvent>).detail;
+      if (!detail) return;
+      void appendNodeAgentEvent({
+        projectPath,
+        nodeId: detail.nodeId,
+        agentName: detail.agentName,
+        phase: detail.phase,
+        elapsedMs: detail.elapsedMs,
+        error: detail.error,
+        runId: lastRunId ?? undefined,
+      }).then((newRunId) => {
+        // 若当前无 run_id，将新生成的 run_id 回填到 store（单节点即席运行场景）
+        if (!lastRunId) {
+          setLastRunId(newRunId);
+        }
+      });
+    };
+    window.addEventListener("node-agent-event", onAgentEvent);
+    return () => window.removeEventListener("node-agent-event", onAgentEvent);
+  }, [lastRunId, projectPath, setLastRunId]);
+
+
+--- 第 7 页 ---
+  useEffect(() => {
+    const onOpenSettings = (ev: Event) => {
+      const detail = (ev as CustomEvent<OpenSettingsDetail>).detail;
+      setSettingsOpenRequest((prev) => ({
+        category: detail?.category ?? null,
+        focusSectionId: detail?.focusSectionId ?? null,
+        nonce: prev.nonce + 1,
+      }));
+      setSettingsOpen(true);
+    };
+    window.addEventListener("r3-open-settings", onOpenSettings);
+    return () => window.removeEventListener("r3-open-settings", onOpenSettings);
+  }, []);
+
+  // 已有画布内容但无 Tab 时补一条（兼容旧会话 / 热更新）
+  useEffect(() => {
+    const { tabs } = useCanvasUiStore.getState();
+    if (tabs.length > 0) return;
+    const { nodes, projectPath } = useProjectStore.getState();
+    if (nodes.length > 0 || projectPath) bindActiveTabToProject();
+  }, []);
+
+  // 初始化 Hermes 自动串联
+  useEffect(() => {
+    const cleanup = initHermesAutoChain();
+    return cleanup;
+  }, []);
+
+  useEffect(() => {
+    collapseHermes();
+  }, [collapseHermes]);
+
+  useEffect(() => {
+    syncCanvasMcpBridgeContext(projectPath);
+  }, [projectPath]);
+
+  useEffect(() => {
+    const onBeforeUnload = (e: BeforeUnloadEvent) => {
+      const risk = describeWorkspaceCloseRisk();
+      if (!risk.shouldConfirm) return;
+      e.preventDefault();
+      e.returnValue = "";
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return;
+
+--- 第 8 页 ---
+      if (
+        scriptFullscreenNodeId ||
+        composeEditorNodeId ||
+        confirmDialog?.open ||
+        pendingUpdate ||
+        settingsOpen
+      ) {
+        return;
+      }
+      if (hermesJobDrawerOpen) {
+        e.preventDefault();
+        closeHermesJobDrawer();
+        return;
+      }
+      if (hermesMode === "expanded") {
+        e.preventDefault();
+        collapseHermes();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [
+    collapseHermes,
+    closeHermesJobDrawer,
+    composeEditorNodeId,
+    confirmDialog?.open,
+    pendingUpdate,
+    hermesJobDrawerOpen,
+    hermesMode,
+    scriptFullscreenNodeId,
+    settingsOpen,
+  ]);
+
+  // 初始化节点状态监听器
+  useNodeStatusListener();
+
+  // 首次安装引导：检测是否需要展示
+  useEffect(() => {
+    if (!shouldShowOnboarding()) return;
+    // 等待启动画面完全淡出后再展示引导
+    const timer = window.setTimeout(() => {
+      useCanvasUiStore.getState().openOnboardingGuide();
+    }, 2800);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  return (
+    <div className="appShell">
+      <AppTopBar />
+
+
+--- 第 9 页 ---
+      <div className="mainSplit">
+        <FlowCanvas />
+      </div>
+      <HermesOrbSuggestionBridge />
+
+      <OnboardingGuide />
+      <SettingsPanel
+        open={settingsOpen}
+        onClose={() => setSettingsOpen(false)}
+        initialCategory={settingsOpenRequest.category}
+        focusSectionId={settingsOpenRequest.focusSectionId}
+        openRequestNonce={settingsOpenRequest.nonce}
+        onOpenShortcuts={() => {
+          setSettingsOpen(false);
+          toggleShortcutsOverlay();
+        }}
+      />
+      {scriptFullscreenNodeId ? <ScriptNodeFullscreenOverlay /> : null}
+      {composeEditorNodeId ? <ComposeEditorOverlay /> : null}
+      <ConfirmDialog />
+      {pendingUpdate ? (
+        <AppUpdateDialog pending={pendingUpdate} onClose={dismissPendingUpdate} />
+      ) : null}
+      <HermesScriptVersionDiffOverlay />
+    </div>
+  );
+}
+
+
+/* ========== src/components/FlowCanvas.tsx ========== */
+import {
+  Background,
+  MiniMap,
+  Panel,
+  ReactFlow,
+  ReactFlowProvider,
+  useReactFlow,
+  type NodeTypes,
+  type OnConnectEnd,
+  type OnConnectStart,
+  type Viewport,
+} from "@xyflow/react";
+import { isTauri } from "@tauri-apps/api/core";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useShallow } from "zustand/react/shallow";
+
+import { nodeTypes } from "@/components/canvas/nodeTypes";
+import { FlowConnectionEdge } from "@/components/canvas/FlowConnectionEdge";
+import { FileInputHandler } from "@/components/canvas/FileInputHandler";
+
+--- 第 10 页 ---
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { MultiSelectionToolbar } from "@/components/canvas/MultiSelectionToolbar";
+import { CanvasSaveWorkflowHost } from "@/components/canvas/CanvasSaveWorkflowHost";
+import { GroupToolbar } from "@/components/canvas/GroupToolbar";
+import { NodeSelectionToolbar } from "@/components/canvas/NodeSelectionToolbar";
+import { MarkerToolbar } from "@/components/canvas/MarkerToolbar";
+import { SelectionBoundsOverlay } from "@/components/canvas/SelectionBoundsOverlay";
+import { CanvasContextMenus } from "@/components/canvas/CanvasContextMenus";
+import { FLOW_MENU } from "@/components/canvas/menuConstants";
+import type { FlowCanvasMenuState } from "@/components/canvas/flowCanvasMenuState";
+import {
+  assetNodeKindForMediaType,
+  ASSET_LIST_DEFAULT_LIMIT,
+  groupAssetsForGallery,
+} from "@/lib/canvasAssets";
+import { CustomConnectionLine } from "@/components/edges/CustomConnectionLine";
+import { FlowConnectHint } from "@/components/canvas/FlowConnectHint";
+import { PendingConnectionOverlay } from "@/components/canvas/PendingConnectionOverlay";
+import { clearAnchorMenuSession } from "@/lib/anchorMenuSession";
+import { useIsValidConnection } from "@/hooks/canvas/useIsValidConnection";
+import {
+  CANVAS_BACKGROUND_DOT,
+  CANVAS_EDGE_STYLE_DEFAULT,
+} from "@/lib/canvasColors";
+import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
+import { formatUserError } from "@/lib/errors";
+import { pickMediaPathsForImport } from "@/lib/tauriMediaPaths";
+import { useEdgeViewModel } from "@/hooks/useEdgeViewModel";
+import { useHermesCanvasHighlightStore } from "@/store/hermesCanvasHighlightStore";
+import { listAssets, type AssetSummary } from "@/shared/api/assets";
+import { queryKeys } from "@/shared/queryKeys";
+import { useProjectStore } from "@/store/projectStore";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
+import { CanvasFlowChrome } from "@/components/canvas/CanvasFlowChrome";
+import { HermesFloatPanel } from "@/components/hermes/HermesFloatPanel";
+import { HermesJobAmbientBridge } from "@/components/hermes/HermesJobAmbientBridge";
+import { HermesJobDrawer } from "@/components/hermes/HermesJobDrawer";
+import { HermesJobToastHost } from "@/components/hermes/HermesJobToastHost";
+import { HermesModelHud } from "@/components/hermes/HermesModelHud";
+import { HermesOrb } from "@/components/hermes/HermesOrb";
+import { resolveGroupSelectionIds, selectionIdsEqual } from "@/lib/canvasGroup";
+import { NodeSnapGuideOverlay } from "@/components/canvas/NodeSnapGuideOverlay";
+import { NodeMaximizedOverlay } from "@/components/canvas/NodeMaximizedOverlay";
+import { ImageGenerationPanelExpandedModal } from "@/components/nodes/ImageGenerationPanelExpandedModal";
+import { ImagePreviewExpandedModal } from "@/components/nodes/ImagePreviewExpandedModal";
+import { VideoGenerationPanelExpandedModal } from "@/components/nodes/VideoGenerationPanelExpandedModal";
+import { VideoPreviewExpandedModal } from "@/components/nodes/VideoPreviewExpandedModal";
+import { TextComposerPanelExpandedModal } from "@/components/nodes/TextComposerPanelExpandedModal";
+import { AudioTtsPanelExpandedModal } from "@/components/nodes/AudioTtsPanelExpandedModal";
+import { ScriptComposerPanelExpandedModal } from "@/components/nodes/ScriptComposerPanelExpandedModal";
+
+--- 第 11 页 ---
+import { isPassiveAudioAsset } from "@/lib/audioNodeContainerMode";
+import { SubjectCreationPanel } from "@/components/SubjectCreationPanel";
+import { LeftAddDock } from "@/components/LeftAddDock";
+import { CanvasEmptyGuide } from "@/components/canvas/CanvasEmptyGuide";
+import { CanvasReturnToWorkBanner } from "@/components/canvas/CanvasReturnToWorkBanner";
+
+import { useCanvasModifierWheelPan } from "@/hooks/canvas/useCanvasModifierWheelPan";
+import { useViewportSync } from "@/hooks/canvas/useViewportSync";
+import { useMarqueeSelection } from "@/hooks/canvas/useMarqueeSelection";
+import { useTauriDragDrop } from "@/hooks/canvas/useTauriDragDrop";
+import { useMenuHandlers } from "@/hooks/canvas/useMenuHandlers";
+import { useFitView } from "@/hooks/canvas/useFitView";
+import {
+  IMAGE_PREVIEW_FOCUS_DURATION_MS,
+  useFocusMediaNodeViewport,
+} from "@/hooks/canvas/useFocusMediaNodeViewport";
+import { useFocusScriptNodeViewport } from "@/hooks/canvas/useFocusScriptNodeViewport";
+import { CANVAS_NODE_CHROME_ROOT_ID } from "@/lib/canvasNodeChromePortal";
+import { isReactFlowSelectionEchoSuppressed } from "@/lib/reactFlowControlled";
+import { useEdgeDeleteAffordance } from "@/hooks/canvas/useEdgeDeleteAffordance";
+import { EdgeDeleteAffordance } from "@/components/canvas/EdgeDeleteAffordance";
+import { useProjectVideoJobPolling } from "@/hooks/useProjectVideoJobPolling";
+
+function FlowCanvasInner() {
+  useProjectVideoJobPolling();
+  const projectPath = useProjectStore((s) => s.projectPath);
+  const nodes = useProjectStore(useShallow((s) => s.nodes));
+  const edges = useProjectStore(useShallow((s) => s.edges));
+  const nodeRunStateById = useProjectStore(useShallow((s) => s.nodeRunStateById));
+  const viewport = useProjectStore((s) => s.viewport);
+  const onNodesChange = useProjectStore((s) => s.onNodesChange);
+  const onEdgesChange = useProjectStore((s) => s.onEdgesChange);
+  const onConnect = useProjectStore((s) => s.onConnect);
+  const selectedNodeIds = useProjectStore((s) => s.selectedNodeIds);
+  const setSelectedNodeId = useProjectStore((s) => s.setSelectedNodeId);
+  const setSelectedNodeIds = useProjectStore((s) => s.setSelectedNodeIds);
+  const setSelectedEdgeIds = useProjectStore((s) => s.setSelectedEdgeIds);
+  const selectedEdgeIds = useProjectStore((s) => s.selectedEdgeIds);
+  const commitViewport = useProjectStore((s) => s.commitViewport);
+  const undo = useProjectStore((s) => s.undo);
+  const redo = useProjectStore((s) => s.redo);
+  const selectNodesByIds = useProjectStore((s) => s.selectNodesByIds);
+  const importMediaFiles = useProjectStore((s) => s.importMediaFiles);
+  const addNode = useProjectStore((s) => s.addNode);
+  const copySelection = useProjectStore((s) => s.copySelection);
+  const pasteSelection = useProjectStore((s) => s.pasteSelection);
+  const deleteSelection = useProjectStore((s) => s.deleteSelection);
+  const deleteEdge = useProjectStore((s) => s.deleteEdge);
+  const setStatusText = useProjectStore((s) => s.setStatusText);
+  const isGraphRunning = useProjectStore((s) => s.isGraphRunning);
+
+--- 第 12 页 ---
+  const queryClient = useQueryClient();
+  const reactFlow = useReactFlow();
+  const {
+    screenToFlowPosition,
+    flowToScreenPosition,
+    getViewport,
+    setViewport,
+    getIntersectingNodes,
+  } = reactFlow;
+
+  const menuAnchorRef = useRef({ x: 0, y: 0 });
+  const wrapRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [menuState, setMenuState] = useState<FlowCanvasMenuState | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [leftAddDockOpen, setLeftAddDockOpen] = useState(false);
+  const [subjectCreationNodeId, setSubjectCreationNodeId] = useState<string | null>(null);
+  const subjectPanelNodeIdRef = useRef<string | null>(null);
+  const viewportInteractClearTimerRef = useRef<number | undefined>(undefined);
+  const lastNodeContextMenuRef = useRef<{ nodeId: string; t: number } | null>(null);
+  const setNodeDragSuppressUi = useCanvasUiStore((s) => s.setNodeDragSuppressUi);
+  const setIsNodeDragging = useCanvasUiStore((s) => s.setIsNodeDragging);
+  const isNodeDragging = useCanvasUiStore((s) => s.isNodeDragging);
+  const setMaximizedNodeId = useCanvasUiStore((s) => s.setMaximizedNodeId);
+  const setAudioTtsPanelNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelNodeId);
+  const setAudioTtsPanelPinnedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelPinnedNodeId);
+  const setAudioTtsPanelExpandedNodeId = useCanvasUiStore((s) => s.setAudioTtsPanelExpandedNodeId);
+  const setViewportInteracting = useCanvasUiStore((s) => s.setViewportInteracting);
+  const minimapVisible = useCanvasUiStore((s) => s.minimapVisible);
+  const gridDotsVisible = useCanvasUiStore((s) => s.gridDotsVisible);
+  const connectionLinesVisible = useCanvasUiStore((s) => s.connectionLinesVisible);
+  const nodeSnapVisual = useCanvasUiStore((s) => s.nodeSnapVisual);
+  const pendingAddPanelAt = useCanvasUiStore((s) => s.pendingAddPanelAt);
+  const clearPendingAddPanelAt = useCanvasUiStore((s) => s.clearPendingAddPanelAt);
+  const activeTabId = useCanvasUiStore((s) => s.activeTabId);
+  const emptyGuideDismissed = useCanvasUiStore((s) => s.emptyGuideDismissed);
+  const resetEmptyGuide = useCanvasUiStore((s) => s.resetEmptyGuide);
+  const hermesMode = useCanvasUiStore((s) => s.hermesMode);
+
+  // ── Hooks ─────────────────────────────────────────────────────────────────
+
+  const { isValidConnection } = useIsValidConnection();
+
+  const onConnectStart: OnConnectStart = useCallback((_event, params) => {
+    if (!params.nodeId || !params.handleType) return;
+    useCanvasUiStore.getState().setAnchorConnectDrag({
+      nodeId: params.nodeId,
+      handleType: params.handleType,
+    });
+  }, []);
+
+--- 第 13 页 ---
+
+  const handleConnect = useCallback(
+    (connection: Parameters<typeof onConnect>[0]) => {
+      clearAnchorMenuSession();
+      onConnect(connection);
+    },
+    [onConnect],
+  );
+
+  const onConnectEnd: OnConnectEnd = useCallback(
+    (event, connectionState) => {
+      const ui = useCanvasUiStore.getState();
+      const drag = ui.anchorConnectDrag;
+      ui.setAnchorConnectDrag(null);
+      if (!drag) return;
+
+      if (connectionState.isValid === true) {
+        ui.setPendingAnchorConnection(null);
+        return;
+      }
+
+      const clientX = "clientX" in event ? event.clientX : 0;
+      const clientY = "clientY" in event ? event.clientY : 0;
+      const releaseFlow = screenToFlowPosition({ x: clientX, y: clientY });
+      const direction = drag.handleType === "source" ? "outgoing" : "incoming";
+
+      ui.setPendingAnchorConnection({
+        anchorNodeId: drag.nodeId,
+        handleType: drag.handleType,
+        releaseFlow,
+      });
+      ui.setAnchorMenuRequest({
+        nodeId: drag.nodeId,
+        direction,
+        x: clientX,
+        y: clientY,
+      });
+    },
+    [screenToFlowPosition],
+  );
+
+  const { viewportProgrammaticSyncRef } = useViewportSync({
+    viewport,
+    getViewport,
+    setViewport,
+    syncKey: projectPath ?? `tab-${activeTabId}`,
+  });
+
+  const nodesRef = useRef(nodes);
+  nodesRef.current = nodes;
+
+--- 第 14 页 ---
+  const selectedNodeIdsRef = useRef(selectedNodeIds);
+  selectedNodeIdsRef.current = selectedNodeIds;
+  const selectedEdgeIdsRef = useRef(selectedEdgeIds);
+  selectedEdgeIdsRef.current = selectedEdgeIds;
+
+  useCanvasModifierWheelPan(wrapRef, {
+    getViewport,
+    setViewport,
+    commitViewport,
+    setViewportInteracting,
+  });
+
+  const { marqueeRect, suppressPaneContextRef } = useMarqueeSelection({
+    wrapRef,
+    screenToFlowPosition,
+    getIntersectingNodes,
+    nodes,
+    selectNodesByIds,
+  });
+
+  const { dragging, setDragging } = useTauriDragDrop({
+    wrapRef,
+    screenToFlowPosition,
+    importMediaFiles,
+    setStatusText,
+  });
+
+  const {
+    openAddPanelAt,
+    openPaneContextAt,
+    openNodeContextAt,
+    openEdgeContextAt,
+    openGalleryFromDock,
+    openSubjectCreationAt,
+  } = useMenuHandlers({
+    setMenuState,
+    setSubjectCreationNodeId,
+    subjectPanelNodeIdRef,
+  });
+
+  const { fitViewToNode } = useFitView();
+  const canvasFitRequestNodeId = useCanvasUiStore((s) => s.canvasFitRequestNodeId);
+  const requestCanvasFitToNode = useCanvasUiStore((s) => s.requestCanvasFitToNode);
+  const { focusMediaNodeAt200 } = useFocusMediaNodeViewport();
+
+  useEffect(() => {
+    if (!canvasFitRequestNodeId) return;
+    void fitViewToNode(canvasFitRequestNodeId).finally(() => {
+      requestCanvasFitToNode(null);
+    });
+
+--- 第 15 页 ---
+  }, [canvasFitRequestNodeId, fitViewToNode, requestCanvasFitToNode]);
+  const { focusScriptNodeAt200 } = useFocusScriptNodeViewport();
+
+  const focusMediaNodeViewport = useCallback(
+    async (nodeId: string) => {
+      viewportProgrammaticSyncRef.current = true;
+      const ok = await focusMediaNodeAt200(nodeId);
+      if (ok) {
+        commitViewport(getViewport());
+      }
+      window.setTimeout(() => {
+        viewportProgrammaticSyncRef.current = false;
+      }, IMAGE_PREVIEW_FOCUS_DURATION_MS + 80);
+    },
+    [commitViewport, focusMediaNodeAt200, getViewport, viewportProgrammaticSyncRef],
+  );
+
+  const focusScriptNodeViewport = useCallback(
+    async (nodeId: string) => {
+      viewportProgrammaticSyncRef.current = true;
+      const ok = await focusScriptNodeAt200(nodeId);
+      if (ok) {
+        commitViewport(getViewport());
+      }
+      window.setTimeout(() => {
+        viewportProgrammaticSyncRef.current = false;
+      }, IMAGE_PREVIEW_FOCUS_DURATION_MS + 80);
+    },
+    [commitViewport, focusScriptNodeAt200, getViewport, viewportProgrammaticSyncRef],
+  );
+
+  const pulseNodeIds = useHermesCanvasHighlightStore((s) => s.pulse?.nodeIds);
+  const hermesPulseNodeIds = useMemo(
+    () => (pulseNodeIds?.length ? new Set(pulseNodeIds) : undefined),
+    [pulseNodeIds],
+  );
+
+  const { edgeView: rawEdgeView, nodesView: rawNodesView } = useEdgeViewModel({
+    nodes,
+    edges,
+    selectedNodeIds,
+    selectedEdgeIds,
+    nodeRunStateById,
+    hermesPulseNodeIds,
+  });
+
+  // 给 nodesView 加 useDeferredValue，让 React 在用户拖拽/缩放时优先响应交互，延迟节点重渲染
+  const nodesView = useDeferredValue(rawNodesView);
+
+  const edgeView = useMemo(
+
+--- 第 16 页 ---
+    () =>
+      connectionLinesVisible ? rawEdgeView : rawEdgeView.map((e) => ({ ...e, hidden: true })),
+    [connectionLinesVisible, rawEdgeView],
+  );
+
+  // ── Gallery query ──────────────────────────────────────────────────────
+
+  const galleryOpen = Boolean(
+    menuState?.mode === "add-panel" && menuState.addPanelTab === "gallery" && projectPath,
+  );
+
+  const {
+    data: galleryAssetGroups,
+    isLoading: galleryLoading,
+    isError: galleryIsError,
+    error: galleryQueryError,
+  } = useQuery({
+    queryKey: projectPath ? queryKeys.assets.list(projectPath) : ["assets", "__none__"],
+    queryFn: () => listAssets(projectPath!, ASSET_LIST_DEFAULT_LIMIT),
+    enabled: galleryOpen && Boolean(projectPath),
+    select: (rows) => groupAssetsForGallery(rows),
+    staleTime: 15_000,
+    gcTime: 5 * 60_000,
+    retry: 1,
+  });
+
+  const galleryError =
+    galleryIsError && galleryQueryError
+      ? galleryQueryError instanceof Error
+        ? galleryQueryError
+        : new Error(String(galleryQueryError))
+      : null;
+
+  // ── Callbacks ─────────────────────────────────────────────────────────
+
+  const invalidateProjectAssets = useCallback(async () => {
+    if (projectPath) {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.assets.list(projectPath) });
+    }
+  }, [projectPath, queryClient]);
+
+  /** 桌面端用系统对话框拿绝对路径；浏览器仍走隐藏 file input */
+  const onRequestUploadFiles = useCallback(async () => {
+    if (isTauri()) {
+      const paths = await pickMediaPathsForImport(true);
+      if (!paths?.length) return;
+      const fallbackX = menuAnchorRef.current.x || 220;
+      const fallbackY = menuAnchorRef.current.y || 180;
+      const pos = screenToFlowPosition({ x: fallbackX, y: fallbackY });
+      try {
+
+--- 第 17 页 ---
+        setImporting(true);
+        await importMediaFiles(paths, pos);
+        await invalidateProjectAssets();
+      } catch (e) {
+        setStatusText(`上传导入失败：${formatUserError(e)}`);
+      } finally {
+        setImporting(false);
+      }
+    } else {
+      fileInputRef.current?.click();
+    }
+  }, [importMediaFiles, invalidateProjectAssets, screenToFlowPosition, setStatusText]);
+
+  const onMoveEnd = useCallback(
+    (_: unknown, vp: Viewport) => {
+      if (viewportInteractClearTimerRef.current !== undefined) {
+        window.clearTimeout(viewportInteractClearTimerRef.current);
+      }
+      viewportInteractClearTimerRef.current = window.setTimeout(() => {
+        setViewportInteracting(false);
+      }, 120);
+      if (viewportProgrammaticSyncRef.current) return;
+      commitViewport(vp);
+    },
+    [commitViewport, setViewportInteracting, viewportProgrammaticSyncRef],
+  );
+
+  const onMove = useCallback(() => {
+    if (viewportProgrammaticSyncRef.current) return;
+    if (viewportInteractClearTimerRef.current !== undefined) {
+      window.clearTimeout(viewportInteractClearTimerRef.current);
+      viewportInteractClearTimerRef.current = undefined;
+    }
+    setViewportInteracting(true);
+  }, [setViewportInteracting, viewportProgrammaticSyncRef]);
+
+  const onSelectionChange = useCallback(
+    ({ nodes: selNodes = [], edges: selEdges = [] }: { nodes?: { id: string }[]; edges?: { id: string }[] }) => {
+      if (isReactFlowSelectionEchoSuppressed()) return;
+      const ids = resolveGroupSelectionIds(
+        nodesRef.current,
+        selNodes.map((n) => n.id),
+      );
+      const edgeIds = selEdges.map((e) => e.id);
+      if (!selectionIdsEqual(selectedNodeIdsRef.current, ids)) {
+        setSelectedNodeIds(ids);
+        if (ids.length > 1) {
+          setAudioTtsPanelNodeId(null);
+        }
+      }
+
+--- 第 18 页 ---
+      if (!selectionIdsEqual(selectedEdgeIdsRef.current, edgeIds)) {
+        setSelectedEdgeIds(edgeIds);
+      }
+    },
+    [setSelectedNodeIds, setSelectedEdgeIds, setAudioTtsPanelNodeId],
+  );
+
+  const {
+    affordance: edgeDeleteAffordance,
+    onEdgeClick: onEdgeDeleteAffordanceClick,
+    clearAffordance: clearEdgeDeleteAffordance,
+  } = useEdgeDeleteAffordance({
+    nodes,
+    edges,
+    selectedEdgeIds,
+    flowToScreenPosition,
+    viewport,
+  });
+
+  const onDropFiles = useCallback(
+    async (ev: DragEvent<HTMLDivElement>) => {
+      ev.preventDefault();
+      setDragging(false);
+      setImporting(true);
+      try {
+        const files = Array.from(ev.dataTransfer.files ?? []);
+        const paths = files
+          .map((f) => (f as File & { path?: string }).path)
+          .filter(Boolean) as string[];
+        if (paths.length === 0) return;
+        const rect = wrapRef.current?.getBoundingClientRect();
+        const x = ev.clientX - (rect?.left ?? 0);
+        const y = ev.clientY - (rect?.top ?? 0);
+        const pos = screenToFlowPosition({ x, y });
+        await importMediaFiles(paths, pos);
+        await invalidateProjectAssets();
+      } catch (e) {
+        setStatusText(`拖拽导入失败：${formatUserError(e)}`);
+      } finally {
+        setImporting(false);
+      }
+    },
+    [importMediaFiles, invalidateProjectAssets, screenToFlowPosition, setStatusText],
+  );
+
+  const createNodeAtClientPoint = useCallback(
+    (
+      type: "textNode" | "imageNode" | "videoNode" | "audioNode" | "scriptNode" | "ffmpegConcat",
+      clientX: number,
+      clientY: number,
+
+--- 第 19 页 ---
+    ) => {
+      const pos = screenToFlowPosition({ x: clientX, y: clientY });
+      addNode({
+        id: crypto.randomUUID(),
+        type,
+        position: pos,
+        data: newNodeDataByType[type](),
+      });
+    },
+    [addNode, screenToFlowPosition],
+  );
+
+  const pickAssetFromGallery = useCallback(
+    (asset: Pick<AssetSummary, "relPath" | "mediaType" | "assetId">) => {
+      const kind = assetNodeKindForMediaType(asset.mediaType);
+      if (!kind) {
+        setStatusText("该素材无法创建为媒体块（仅支持图片 / 视频 / 音频）");
+        return;
+      }
+      const { x, y } = menuAnchorRef.current;
+      const pos = screenToFlowPosition({ x, y });
+      const labelByKind = {
+        imageNode: "图片",
+        videoNode: "视频",
+        audioNode: "音频",
+      } as const;
+      addNode({
+        id: crypto.randomUUID(),
+        type: kind,
+        position: pos,
+        data: { label: labelByKind[kind], path: asset.relPath, assetId: asset.assetId },
+      });
+      setMenuState(null);
+    },
+    [addNode, screenToFlowPosition, setStatusText],
+  );
+
+  const closeMenu = useCallback(() => setMenuState(null), []);
+
+  // ── Effects ─────────────────────────────────────────────────────────────
+
+  useEffect(() => {
+    return () => {
+      if (viewportInteractClearTimerRef.current !== undefined) {
+        window.clearTimeout(viewportInteractClearTimerRef.current);
+      }
+      setViewportInteracting(false);
+    };
+  }, [setViewportInteracting]);
+
+
+--- 第 20 页 ---
+  useEffect(() => {
+    if (menuState) {
+      menuAnchorRef.current = { x: menuState.x, y: menuState.y };
+    }
+  }, [menuState]);
+
+  useEffect(() => {
+    if (!pendingAddPanelAt) return;
+    openAddPanelAt(pendingAddPanelAt.x, pendingAddPanelAt.y);
+    clearPendingAddPanelAt();
+  }, [pendingAddPanelAt, openAddPanelAt, clearPendingAddPanelAt]);
+
+  useEffect(() => {
+    if (nodes.length > 0) {
+      resetEmptyGuide();
+    }
+  }, [nodes.length, resetEmptyGuide]);
+
+  // ReactFlow 挂载时（标签切换），若画布为空则重置引导
+  useEffect(() => {
+    const id = setTimeout(() => {
+      if (nodes.length === 0) resetEmptyGuide();
+    }, 50);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTabId]);
+
+  // ── JSX ─────────────────────────────────────────────────────────────────
+
+  return (
+    <div
+      className={`canvasWrap${nodeSnapVisual ? " canvasWrap--node-snap-active" : ""}${isNodeDragging ? " canvasWrap--node-dragging" : ""}`}
+      ref={wrapRef}
+      onDoubleClickCapture={(ev) => {
+        const target = ev.target as HTMLElement | null;
+        const onPane = Boolean(target?.closest(".react-flow__pane"));
+        const onNode = Boolean(target?.closest(".react-flow__node"));
+        const onEdge = Boolean(target?.closest(".react-flow__edge"));
+        if (onPane && !onNode && !onEdge) {
+          ev.preventDefault();
+          ev.stopPropagation();
+          openAddPanelAt(ev.clientX, ev.clientY);
+        }
+      }}
+      onDragOver={(ev) => {
+        ev.preventDefault();
+        setDragging(true);
+      }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(ev) => {
+
+--- 第 21 页 ---
+        if (isTauri()) {
+          ev.preventDefault();
+          setDragging(false);
+          return;
+        }
+        void onDropFiles(ev);
+      }}
+    >
+      <ReactFlow
+        key={projectPath ?? `tab-${activeTabId}`}
+        defaultViewport={viewport}
+        nodes={nodesView}
+        edges={edgeView}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={handleConnect}
+        onConnectStart={onConnectStart}
+        onConnectEnd={onConnectEnd}
+        isValidConnection={isValidConnection}
+        nodesConnectable={!isGraphRunning}
+        edgesReconnectable={!isGraphRunning}
+        connectionRadius={28}
+        connectionLineComponent={CustomConnectionLine}
+        onMove={onMove}
+        onMoveEnd={onMoveEnd}
+        onSelectionChange={onSelectionChange}
+        onNodeClick={(_, node) => {
+          clearAnchorMenuSession();
+          const [targetId] = resolveGroupSelectionIds(nodes, [node.id]);
+          selectNodesByIds([targetId]);
+          setSelectedEdgeIds([]);
+          clearEdgeDeleteAffordance();
+          setMenuState(null);
+          if (node.type !== "audioNode") {
+            setAudioTtsPanelNodeId(null);
+          } else {
+            const hasAsset = Boolean(node.data.path?.trim() || node.data.assetId?.trim());
+            if (!hasAsset) {
+              setAudioTtsPanelNodeId(node.id);
+            } else {
+              const opened = useCanvasUiStore.getState().audioTtsPanelNodeId;
+              if (opened && opened !== node.id) setAudioTtsPanelNodeId(null);
+            }
+          }
+        }}
+        onNodeDoubleClick={(e, node) => {
+          const t = e.target as HTMLElement | null;
+          if (
+            t?.closest("textarea") ||
+            t?.closest("input:not([type='checkbox']):not([type='radio'])") ||
+
+--- 第 22 页 ---
+            t?.closest("[contenteditable='true']")
+          ) {
+            return;
+          }
+          setSelectedNodeIds([node.id]);
+          setSelectedNodeId(node.id);
+          setSelectedEdgeIds([]);
+          setMenuState(null);
+          if (node.type !== "audioNode") {
+            setAudioTtsPanelNodeId(null);
+          }
+          if (node.type === "ffmpegConcat") {
+            useCanvasUiStore.getState().setComposeEditorNodeId(node.id);
+          } else if (node.type === "imageNode" || node.type === "videoNode") {
+            void focusMediaNodeViewport(node.id);
+          } else if (node.type === "scriptNode") {
+            void focusScriptNodeViewport(node.id);
+          } else if (node.type === "audioNode") {
+            const passive = isPassiveAudioAsset(node.id, nodes, edges);
+            if (!passive) {
+              setAudioTtsPanelNodeId(node.id);
+            }
+            void fitViewToNode(node.id);
+          } else {
+            void fitViewToNode(node.id);
+          }
+        }}
+        onEdgeClick={(ev, edge) => {
+          onEdgeDeleteAffordanceClick(ev, edge);
+          clearAnchorMenuSession();
+          setSelectedNodeIds([]);
+          setSelectedNodeId(null);
+          setSelectedEdgeIds([edge.id]);
+          setMenuState(null);
+        }}
+        onEdgeContextMenu={(ev, edge) => {
+          ev.preventDefault();
+          setSelectedNodeIds([]);
+          setSelectedNodeId(null);
+          const alreadySelected = selectedEdgeIds.includes(edge.id);
+          if (!alreadySelected) {
+            setSelectedEdgeIds([edge.id]);
+          }
+          openEdgeContextAt(ev.clientX, ev.clientY, edge.id);
+        }}
+        onPaneClick={() => {
+          clearAnchorMenuSession();
+          clearEdgeDeleteAffordance();
+          setSelectedNodeIds([]);
+          setSelectedNodeId(null);
+
+--- 第 23 页 ---
+          setSelectedEdgeIds([]);
+          setMenuState(null);
+          setAudioTtsPanelNodeId(null);
+          setAudioTtsPanelPinnedNodeId(null);
+          setAudioTtsPanelExpandedNodeId(null);
+          setLeftAddDockOpen(false);
+        }}
+        onPaneContextMenu={(ev) => {
+          ev.preventDefault();
+          if (suppressPaneContextRef.current) {
+            suppressPaneContextRef.current = false;
+            return;
+          }
+          openPaneContextAt(ev.clientX, ev.clientY);
+        }}
+        onNodeContextMenu={(ev, node) => {
+          const target = ev.target as HTMLElement | null;
+          const onEditable =
+            Boolean(
+              target?.closest(
+                "input, textarea, [contenteditable='true'], [contenteditable='plaintext-only'], .scriptGenComposerInput",
+              ),
+            ) || target?.isContentEditable === true;
+          if (onEditable) {
+            return;
+          }
+          const now = Date.now();
+          const prev = lastNodeContextMenuRef.current;
+          if (prev && prev.nodeId === node.id && now - prev.t < 480) {
+            ev.preventDefault();
+            ev.stopPropagation();
+            lastNodeContextMenuRef.current = null;
+            setMenuState(null);
+            setAudioTtsPanelNodeId(null);
+            if (node.type === "imageNode" || node.type === "videoNode") {
+              void focusMediaNodeViewport(node.id);
+            } else if (node.type === "scriptNode") {
+              void focusScriptNodeViewport(node.id);
+            } else {
+              setMaximizedNodeId(node.id);
+            }
+            return;
+          }
+          lastNodeContextMenuRef.current = { nodeId: node.id, t: now };
+
+          if (node.type === "audioNode") {
+            ev.preventDefault();
+            ev.stopPropagation();
+            setSelectedNodeIds([node.id]);
+            setSelectedNodeId(node.id);
+
+--- 第 24 页 ---
+            setSelectedEdgeIds([]);
+            setMenuState(null);
+            setAudioTtsPanelNodeId(node.id);
+            return;
+          }
+
+          ev.preventDefault();
+          setSelectedNodeIds([node.id]);
+          setSelectedNodeId(node.id);
+          setSelectedEdgeIds([]);
+          openNodeContextAt(ev.clientX, ev.clientY, node.id);
+        }}
+        onNodeDragStart={() => {
+          setNodeDragSuppressUi(true);
+          setIsNodeDragging(true);
+        }}
+        onNodeDragStop={() => {
+          setNodeDragSuppressUi(false);
+          setIsNodeDragging(false);
+        }}
+        onSelectionDragStart={() => {
+          setNodeDragSuppressUi(true);
+        }}
+        onSelectionDragStop={() => {
+          setNodeDragSuppressUi(false);
+        }}
+        nodeTypes={nodeTypes satisfies NodeTypes}
+        edgeTypes={{ default: FlowConnectionEdge }}
+        fitView={false}
+        panOnDrag={false}
+        panActivationKeyCode="Space"
+        selectionOnDrag
+        zoomOnDoubleClick={false}
+        zoomOnScroll
+        defaultEdgeOptions={{
+          animated: true,
+          style: { ...CANVAS_EDGE_STYLE_DEFAULT },
+        }}
+        proOptions={{ hideAttribution: true }}
+        onlyRenderVisibleElements
+        minZoom={0.15}
+        maxZoom={3}
+        noWheelClassName="nowheel"
+        noPanClassName="nopan"
+      >
+        {gridDotsVisible ? <Background gap={18} size={1} color={CANVAS_BACKGROUND_DOT} /> : null}
+        {minimapVisible ? (
+          <MiniMap pannable zoomable position="bottom-right" />
+        ) : null}
+        <CanvasFlowChrome />
+
+--- 第 25 页 ---
+        <CanvasReturnToWorkBanner wrapRef={wrapRef} nodeCount={nodes.length} />
+        <NodeSnapGuideOverlay />
+        {nodes.length === 0 && !emptyGuideDismissed ? (
+          <Panel position="top-center" className="canvasEmptyGuidePanel">
+            <CanvasEmptyGuide />
+          </Panel>
+        ) : null}
+        <Panel position="center-left" className="canvasLeftDock">
+          <LeftAddDock
+            open={leftAddDockOpen}
+            onOpen={() => setLeftAddDockOpen(true)}
+            onClose={() => setLeftAddDockOpen(false)}
+            projectPath={projectPath}
+            onRequestUploadFiles={onRequestUploadFiles}
+            onOpenGallery={openGalleryFromDock}
+          />
+        </Panel>
+      </ReactFlow>
+
+      <div id={CANVAS_NODE_CHROME_ROOT_ID} className="canvasNodeChromeRoot" />
+
+      <PendingConnectionOverlay />
+      <FlowConnectHint />
+      {marqueeRect ? (
+        <div
+          className="canvasMarqueeRect"
+          style={{
+            position: "fixed",
+            left: marqueeRect.x,
+            top: marqueeRect.y,
+            width: marqueeRect.w,
+            height: marqueeRect.h,
+            pointerEvents: "none",
+            zIndex: 44,
+          }}
+          aria-hidden
+        />
+      ) : null}
+      <SelectionBoundsOverlay marqueeActive={Boolean(marqueeRect)} />
+      <MultiSelectionToolbar marqueeActive={Boolean(marqueeRect)} />
+      <CanvasSaveWorkflowHost />
+      <NodeSelectionToolbar />
+      <GroupToolbar marqueeActive={Boolean(marqueeRect)} />
+      <MarkerToolbar />
+      {dragging || importing ? (
+        <div
+          className={`canvasDropOverlay${importing ? " canvasDropOverlay--import" : ""}`}
+          style={{ zIndex: FLOW_MENU.dropOverlayZIndex }}
+          aria-hidden
+        >
+
+--- 第 26 页 ---
+          {importing ? "正在导入素材，请稍候…" : "释放鼠标导入图片/视频/音频到 assets 并自动创建素材块"}
+        </div>
+      ) : null}
+      {edgeDeleteAffordance ? (
+        <EdgeDeleteAffordance
+          affordance={edgeDeleteAffordance}
+          onDelete={() => {
+            deleteEdge(edgeDeleteAffordance.edgeId);
+            clearEdgeDeleteAffordance();
+          }}
+        />
+      ) : null}
+      {menuState ? (
+        <CanvasContextMenus
+          menuState={menuState}
+          projectPath={projectPath}
+          galleryAssetGroups={galleryAssetGroups}
+          galleryLoading={galleryLoading}
+          galleryError={galleryError}
+          onDismiss={closeMenu}
+          onRequestUploadFiles={onRequestUploadFiles}
+          openAddPanelAt={openAddPanelAt}
+          createNodeAtClientPoint={createNodeAtClientPoint}
+          pickAssetFromGallery={pickAssetFromGallery}
+          copySelection={copySelection}
+          pasteSelection={pasteSelection}
+          deleteSelection={deleteSelection}
+          focusNodesByIds={async (ids) => {
+            try {
+              await reactFlow.fitView({
+                nodes: ids.map((id) => ({ id })),
+                padding: 0.18,
+                duration: 320,
+                minZoom: 0.15,
+                maxZoom: 3,
+              });
+            } catch {
+              // 忽略极端视口参数下的 fitView 失败
+            }
+          }}
+          undo={undo}
+          redo={redo}
+          setMenuState={setMenuState}
+          onOpenSubjectCreation={openSubjectCreationAt}
+        />
+      ) : null}
+      <NodeMaximizedOverlay />
+      <ImageGenerationPanelExpandedModal />
+      <ImagePreviewExpandedModal />
+      <VideoGenerationPanelExpandedModal />
+
+--- 第 27 页 ---
+      <VideoPreviewExpandedModal />
+      <TextComposerPanelExpandedModal />
+      <AudioTtsPanelExpandedModal />
+      <ScriptComposerPanelExpandedModal />
+      <SubjectCreationPanel
+        open={subjectCreationNodeId !== null}
+        nodeId={subjectCreationNodeId ?? ""}
+        onClose={() => setSubjectCreationNodeId(null)}
+        onSubjectsChanged={() => useCanvasUiStore.getState().bumpSubjectListVersion()}
+      />
+      <FileInputHandler
+        fileInputRef={fileInputRef}
+        screenToFlowPosition={screenToFlowPosition}
+        menuAnchorRef={menuAnchorRef}
+        importMediaFiles={importMediaFiles}
+        invalidateProjectAssets={invalidateProjectAssets}
+        setStatusText={setStatusText}
+      />
+      <HermesModelHud />
+      <HermesJobAmbientBridge />
+      <HermesJobToastHost />
+      <HermesJobDrawer projectPath={projectPath} />
+      <div className="hermesCanvasSpiritLayer" data-testid="hermes-canvas-spirit-layer">
+        <HermesFloatPanel wrapRef={wrapRef} />
+        {hermesMode === "idle" ? <HermesOrb wrapRef={wrapRef} /> : null}
+      </div>
+    </div>
+  );
+}
+
+export function FlowCanvas() {
+  return (
+    <ReactFlowProvider>
+      <ErrorBoundary name="画布">
+        <FlowCanvasInner />
+      </ErrorBoundary>
+    </ReactFlowProvider>
+  );
+}
+
+
+/* ========== src/store/projectStore.ts ========== */
+import { invoke, isTauri } from "@tauri-apps/api/core";
+import {
+  addEdge,
+  applyEdgeChanges,
+  applyNodeChanges,
+  type Edge,
+  type Node,
+  type NodeChange,
+
+--- 第 28 页 ---
+} from "@xyflow/react";
+import { create } from "zustand";
+import { newNodeDataByType } from "@/lib/canvasNodeDefaults";
+import { formatUserError } from "@/lib/errors";
+import { DESKTOP_SHELL_HINT } from "@/lib/tauriEnv";
+import { clearDirtyTracking, markAllDirty, markEdgeDirty, markNodeDirty } from "@/lib/incrementalSerialize";
+import {
+  serializeCanvasToBytesAsync,
+  serializeCanvasToBytesIncremental,
+  yieldToMain,
+} from "@/lib/serializeCanvasAsync";
+import { FIRST_LAST_FRAME_EXAMPLE_PROMPT } from "@/lib/firstLastFrameSetup";
+import { FIRST_FRAME_DEFAULT_PROMPT } from "@/lib/videoInputConstraints";
+import { computeNextLeftInputY, leftInputColumnX } from "@/lib/videoInputNodeLayout";
+import {
+  CANVAS_NODE_LAYOUT_GAP,
+  computeBatchImportDropPositions,
+} from "@/lib/nodeLayout";
+import { applyGridSnapToPositionChanges } from "@/lib/nodeGridSnap";
+import { snapNodePositionChanges } from "@/lib/nodeSnapAlignment";
+import {
+  alignOpLabel,
+  computeAlignedPositions,
+  computeDistributedPositions,
+  distributeOpLabel,
+} from "@/lib/nodeAlignCommands";
+import { selectionIdsEqual } from "@/lib/canvasGroup";
+import {
+  clampGroupDimensionChanges,
+  computeGroupSizeFromMembers,
+  normalizeGroupNodesForCanvas,
+  planNestedGroup,
+  ungroupNodes,
+} from "@/lib/canvasGroup";
+import { applyCanvasTidyLayout, computeLayoutPositions } from "@/lib/canvasTidyLayout";
+import {
+  applyGroupMembershipAfterDrag,
+  syncGroupStylesFromDimensions,
+} from "@/lib/canvasGroupMembership";
+import { groupKindLabel } from "@/lib/canvasGroupStoryboard";
+import { collectGroupSubtreeIds } from "@/lib/canvasGroupDuplicate";
+import { useCanvasUiStore } from "@/store/canvasUiStore";
+import {
+  connectionRejectedReason,
+  getOutputPortType,
+  hasParallelEdge,
+  isConnectionAllowed,
+  normalizeConnection,
+  sanitizeCanvasEdges,
+  validateConnection,
+
+--- 第 29 页 ---
+} from "@/lib/flowConnectionPolicy";
+import { applyTextWorkflowSyncToNodes } from "@/lib/textNodeWorkflowSync";
+import { patchVideoNodesWithUpstreamVideoPrompt } from "@/lib/videoGeneration/videoVideoPromptSync";
+import { CANVAS_EDGE_STYLE_DEFAULT } from "@/lib/canvasColors";
+import { makeFlowEdge } from "@/lib/flowEdge";
+import { edgeToggleStatusText, isEdgeDisabled } from "@/lib/edgeState";
+import {
+  buildPasteEdgesFromClipboard,
+  buildPasteNodesFromClipboard,
+} from "@/lib/buildPasteNodesFromClipboard";
+import { buildForkDuplicatePaste } from "@/lib/createNodeForkDuplicate";
+import { cloneFlowNodeData } from "@/lib/flowNodeDataClone";
+import { defaultViewport } from "@/lib/serialization";
+import { runCoalescedProjectSave } from "@/store/projectSaveRunner";
+import type { FlowNodeData } from "@/lib/types";
+import { importMediaFiles as importMediaFilesApi } from "@/shared/api/assets";
+import { defaultVideoGenerationDraft, defaultVideoNodePersisted } from "@/lib/videoNodeTypes";
+import {
+  buildComposeClipsFromScript,
+  clipsToRenderPayload,
+  composeClipToTimeline,
+  defaultExportRelPath,
+  exportEncodeToInvokePayload,
+  normalizeExportEncode,
+  parseExportFormatArg,
+  resolveExportFormat,
+  findConcatNodeForScriptVideos,
+  formatComposeMissingHint,
+  applyIncomingComposeClipSync,
+  patchComposeNodeAfterExport,
+  timelineClipsToNodePatch,
+} from "@/lib/compose";
+import { resolveNodeMediaRelPath } from "@/lib/nodeMediaRef";
+import { orderedIncomingScriptNodeIds } from "@/lib/incomingScriptBinding";
+import { extractVideoAudioToAssets } from "@/lib/videoToolbarAudioExtract";
+import { delogoVideoToAssets } from "@/lib/videoToolbarDelogo";
+import { defaultVideoSourceTrim, normalizeVideoSourceTrim } from "@/lib/videoSourceTrim";
+import { trimVideoToAssets } from "@/lib/videoToolbarTrim";
+import {
+  mergeDraftForVideoToolbarWorkflow,
+  type VideoToolbarWorkflowMode,
+} from "@/lib/videoToolbarWorkflow";
+import type { VideoSourceTrim, VideoSubtitleRegion } from "@/lib/videoNodeTypes";
+import {
+  defaultVideoSubtitleRegion,
+  normalizeVideoSubtitleRegion,
+} from "@/lib/videoSubtitleRegion";
+import { getFlowClipboard, getFlowClipboardCount, setFlowClipboard } from "./projectClipboard";
+import {
+  clearHistoryStacks,
+
+--- 第 30 页 ---
+  recordBeforeDiscreteMutation,
+  scheduleHistoryBurst,
+  viewportNearlyEqual,
+  runUndo,
+  runRedo,
+} from "./projectHistory";
+export { getUndoRedoAvailability } from "./projectHistory";
+import { flushProjectSave, scheduleSave } from "./projectSaveDebounce";
+import { focusShellAfterNativeDialog } from "./projectShellFocus";
+import type { ProjectState } from "./projectStoreTypes";
+export type { GraphSnapshot, ProjectState } from "./projectStoreTypes";
+import { exportGroupMediaImpl, runGroupSubgraphImpl } from "./projectGroupRuns";
+import {
+  convertGroupToStoryboardImpl,
+  duplicateGroupImpl,
+  insertGroupTemplateImpl,
+  runGroupHermesImagesImpl,
+  saveGroupToToolboxImpl,
+  setGroupColorTokenImpl,
+} from "./projectGroupProduction";
+import {
+  deleteWorkflowImpl,
+  insertWorkflowImpl,
+  saveWorkflowFromSelectionImpl,
+} from "./projectWorkflowProduction";
+import {
+  rerunFailedSubgraphImpl,
+  runNodeSubgraphImpl,
+  runWorkflowImpl,
+} from "./projectWorkflowRuns";
+import { rebuildShotNodeRegistry } from "@/lib/hermes";
+import { bindActiveTabToProject, persistActiveTabSnapshot, syncActiveTabUnsaved } from "@/lib/canvasTabSync";
+import { openCanvasCloseConfirm } from "@/lib/canvasCloseConfirm";
+import { reconcileVideoJobsFromDisk } from "@/lib/videoGeneration/reconcileVideoJobsFromDisk";
+import {
+  applyProjectSnapshot,
+  loadProjectFolder,
+  type ProjectGraphSnapshot,
+} from "@/lib/projectWorkspaceLoad";
+import { useProjectBibleStore } from "@/store/projectBibleStore";
+import { useHermesOrbSuggestStore } from "@/store/hermesOrbSuggestStore";
+import { rememberProjectOpened, removeRecentProject } from "@/lib/recentProjects";
+import { pickProjectFolder } from "@/lib/pickProjectFolder";
+import {
+  filterReactFlowEdgeEchoChanges,
+  isReactFlowGraphSyncLocked,
+  runIgnoringReactFlowSelectionEcho,
+  runWithReactFlowGraphSyncLock,
+  stripEphemeralNodeFields,
+} from "@/lib/reactFlowControlled";

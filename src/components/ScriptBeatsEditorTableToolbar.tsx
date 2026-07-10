@@ -29,6 +29,8 @@ type Props = {
   setFilterQuery: Dispatch<SetStateAction<string>>;
   displayRowsLength: number;
   normRowsLength: number;
+  fullscreenLayout?: "basic" | "pro";
+  onFullscreenLayoutChange?: (layout: "basic" | "pro") => void;
 };
 
 /** 脚本镜头表工具栏（只读模式：无删除/移动/全选按钮） */
@@ -59,10 +61,24 @@ export function ScriptBeatsEditorTableToolbar({
   setFilterQuery,
   displayRowsLength,
   normRowsLength,
+  fullscreenLayout = "basic",
+  onFullscreenLayoutChange,
 }: Props) {
   return (
     <div className="scriptTableFullscreenToolbar" ref={toolsRef}>
       <div className="scriptTableFullscreenToolbarBtns">
+        {onFullscreenLayoutChange ? (
+          <button
+            type="button"
+            className={`scriptTableToolBtn${fullscreenLayout === "pro" ? " scriptTableToolBtn--active" : ""}`}
+            onClick={() =>
+              onFullscreenLayoutChange(fullscreenLayout === "basic" ? "pro" : "basic")
+            }
+            title={fullscreenLayout === "basic" ? "显示全部字段与角色列" : "回到核心确认表"}
+          >
+            {fullscreenLayout === "basic" ? "专业视图" : "基本视图"}
+          </button>
+        ) : null}
         <button
           type="button"
           className={`scriptTableToolBtn${fieldsOpen ? " scriptTableToolBtn--active" : ""}`}

@@ -14,10 +14,11 @@ export type ScriptUpstreamTextSource = {
   label: string;
   charCount: number;
   preview: string;
+  isEmpty: boolean;
 };
 
-/** 已连接且启用的上游文本节点（剧本真源在文本节点，不在文件导入） */
-export function listScriptUpstreamTextSources(
+/** 已连接的上游文本节点（含正文为空的连线，供底栏标签展示） */
+export function listScriptUpstreamTextConnections(
   nodes: Node<FlowNodeData>[],
   edges: Edge[],
   scriptNodeId: string,
@@ -31,15 +32,25 @@ export function listScriptUpstreamTextSources(
     const n = nodes.find((x) => x.id === id);
     if (!n?.type || !TEXT_TYPES.has(n.type)) continue;
     const content = textContentFromUpstreamNode(n.data);
-    if (!content) continue;
+    const label = n.data.label?.trim() || (n.type === "llm" ? "LLM 节点" : "文本节点");
     out.push({
       nodeId: id,
-      label: n.data.label?.trim() || (n.type === "llm" ? "LLM 节点" : "文本节点"),
+      label,
       charCount: content.length,
       preview: content.slice(0, 120),
+      isEmpty: content.length === 0,
     });
   }
   return out;
+}
+
+/** 已连接且正文非空的上游文本（供解析 / 状态文案） */
+export function listScriptUpstreamTextSources(
+  nodes: Node<FlowNodeData>[],
+  edges: Edge[],
+  scriptNodeId: string,
+): ScriptUpstreamTextSource[] {
+  return listScriptUpstreamTextConnections(nodes, edges, scriptNodeId).filter((s) => !s.isEmpty);
 }
 
 export function totalUpstreamTextChars(sources: ScriptUpstreamTextSource[]): number {

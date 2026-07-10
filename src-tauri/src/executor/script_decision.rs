@@ -1,6 +1,8 @@
 //! 短剧分镜决策引擎：标签识别 → 景别/时长/运镜规则决策
 //! 依据「短剧分镜决策识别清单」实现可执行的规则层（不依赖 LLM 做标签提取）
 
+use super::script_parse::ScriptStyleProfile;
+use super::script_parse_requirement::{bias_shot_size, CutProfile, ScriptParseRequirementHints};
 use super::script_pipeline::{NarrativePurpose, Paragraph, ShotPlan};
 
 // ──────────────── 标签结构 ────────────────
@@ -423,10 +425,11 @@ fn detect_genre_hints(text: &str) -> Vec<String> {
 
 // ──────────────── 决策树（分层覆盖，避免规则互相踩踏） ────────────────
 
-pub(crate) struct DecideContext {
+pub(crate) struct DecideContext<'a> {
     pub is_scene_establishing: bool,
     pub is_last_in_sequence: bool,
     pub is_reaction_shot: bool,
+    pub requirement: Option<&'a ScriptParseRequirementHints>,
 }
 
 pub(crate) fn decide_shot(
@@ -435,7 +438,7 @@ pub(crate) fn decide_shot(
     dialogue_text: &str,
     context_text: &str,
     base_duration: f64,
-    ctx: &DecideContext,
+    ctx: &DecideContext<'_>,
 ) -> ShotDecision {
     if ctx.is_reaction_shot {
         return ShotDecision {
@@ -529,7 +532,119 @@ pub(crate) fn decide_shot(
 
   apply_genre_layer(&mut d, tags, context_text);
 
+    apply_requirement_layer(&mut d, tags, ctx);
+
     finalize_duration(d, tags)
+}
+
+fn apply_requirement_layer(
+    d: &mut ShotDecision,
+    tags: &ParagraphTags,
+    ctx: &DecideContext<'_>,
+) {
+    let Some(hints) = ctx.requirement else {
+        return;
+    };
+    if d.shot_size.contains("黑场") || d.shot_size.contains("主观") {
+        return;
+    }
+    if ctx.is_reaction_shot {
+        return;
+    }
+    if ctx.is_scene_establishing {
+        if hints.reduce_establishing_wides && d.shot_size.contains("全景") {
+            d.shot_size = "中景".to_string();
+            d.edit_focus = "紧凑建立（少用全景）".to_string();
+        }
+        return;
+    }
+    let has_emotion = !tags.emotion.is_empty()
+        || tags.dialogue != DialogueKind::None
+        || matches!(
+            tags.rhythm,
+            RhythmKind::ClimaxBeat | RhythmKind::HookEnding
+        );
+    d.shot_size = bias_shot_size(
+        &d.shot_size,
+        hints.shot_size_bias,
+        hints.prefer_emotion_close_up,
+        has_emotion,
+    );
+    if let Some(style) = hints.style_profile {
+        apply_style_duration_profile(d, style, ctx.is_scene_establishing);
+        apply_style_shot_profile(d, style, ctx, tags, hints);
+    }
+}
+
+fn apply_style_shot_profile(
+    d: &mut ShotDecision,
+    style: ScriptStyleProfile,
+    ctx: &DecideContext<'_>,
+    tags: &ParagraphTags,
+    hints: &ScriptParseRequirementHints,
+) {
+    if d.shot_size.contains("黑场") || d.shot_size.contains("主观") {
+        return;
+    }
+    match style {
+        ScriptStyleProfile::Film => {
+            if ctx.is_scene_establishing && !hints.reduce_establishing_wides {
+                d.shot_size = "全景".to_string();
+                d.camera_move = "缓慢推".to_string();
+                d.duration_sec = d.duration_sec.max(3.5);
+                d.edit_focus = "建立空间（电影）".to_string();
+            }
+        }
+        ScriptStyleProfile::Ad => {
+            if matches!(
+                tags.action,
+                ActionKind::Detail | ActionKind::PropInteraction
+            ) || tags.genre_hints.iter().any(|g| g.contains("产品"))
+            {
+                d.shot_size = "特写".to_string();
+                d.edit_focus = "产品/卖点展示".to_string();
+            }
+        }
+        ScriptStyleProfile::ShortDrama => {
+            if ctx.is_last_in_sequence && !ctx.is_reaction_shot {
+                d.edit_focus = "悬念钩子/卡点".to_string();
+                d.duration_sec = d.duration_sec.clamp(1.5, 3.0);
+            }
+        }
+        ScriptStyleProfile::Anime => {
+            if tags.emotion == "愤怒" || tags.emotion == "喜悦" {
+                d.shot_size = if d.shot_size.contains("特写") {
+                    d.shot_size.clone()
+                } else {
+                    "近景".to_string()
+                };
+            }
+        }
+        ScriptStyleProfile::Auto => {}
+    }
+}
+
+fn apply_style_duration_profile(
+    d: &mut ShotDecision,
+    style: ScriptStyleProfile,
+    is_scene_establishing: bool,
+) {
+    match style {
+        ScriptStyleProfile::Film => {
+            let (min, max) = if is_scene_establishing { (3.0, 8.0) } else { (2.5, 6.0) };
+            d.duration_sec = d.duration_sec.clamp(min, max);
+        }
+        ScriptStyleProfile::Ad => {
+            d.duration_sec = d.duration_sec.clamp(1.0, 3.0);
+        }
+        ScriptStyleProfile::ShortDrama => {
+            d.duration_sec = d.duration_sec.clamp(0.8, 3.5);
+        }
+        ScriptStyleProfile::Anime => {
+            d.duration_sec = d.duration_sec.clamp(1.0, 4.0);
+        }
+        ScriptStyleProfile::Auto => {}
+    }
 }
 
 fn apply_special_shot_layer(d: &mut ShotDecision, special: &str) {
@@ -728,14 +843,27 @@ pub(crate) fn expand_compound_shots(shots: Vec<ShotPlan>) -> Vec<ShotPlan> {
     out
 }
 
-pub(crate) fn inject_reaction_shots(shots: Vec<ShotPlan>) -> Vec<ShotPlan> {
+pub(crate) fn inject_reaction_shots(
+    shots: Vec<ShotPlan>,
+    boost_reactions: bool,
+) -> Vec<ShotPlan> {
     let mut out: Vec<ShotPlan> = Vec::new();
     for shot in shots {
         out.push(shot.clone());
         if shot.is_compound_step || shot.is_reaction_shot {
             continue;
         }
-        if REACTION_TRIGGERS.iter().any(|k| shot.text_segment.contains(k)) {
+        let trigger_hit = REACTION_TRIGGERS
+            .iter()
+            .any(|k| shot.text_segment.contains(k));
+        let emotion_boost_hit = boost_reactions
+            && !shot.dialogue_text.is_empty()
+            && (shot.text_segment.contains('：')
+                || shot.text_segment.contains("哭")
+                || shot.text_segment.contains("怒")
+                || shot.text_segment.contains("惊")
+                || shot.text_segment.contains("愣"));
+        if trigger_hit || emotion_boost_hit {
             let react_dur = (shot.estimated_duration_sec * 0.6).clamp(0.8, 2.5);
             let emotion = infer_reaction_emotion(&shot.text_segment);
             out.push(ShotPlan {
@@ -767,7 +895,11 @@ fn infer_reaction_emotion(text: &str) -> String {
     "听者/旁观者".to_string()
 }
 
-pub(crate) fn split_dialogue_shots(shots: Vec<ShotPlan>, paragraphs: &[Paragraph]) -> Vec<ShotPlan> {
+pub(crate) fn split_dialogue_shots(
+    shots: Vec<ShotPlan>,
+    paragraphs: &[Paragraph],
+    cut: &CutProfile,
+) -> Vec<ShotPlan> {
     let mut out: Vec<ShotPlan> = Vec::new();
     for shot in shots {
         let lines: Vec<String> = shot
@@ -777,10 +909,10 @@ pub(crate) fn split_dialogue_shots(shots: Vec<ShotPlan>, paragraphs: &[Paragraph
             .filter(|l| !l.is_empty() && l.contains('：'))
             .map(String::from)
             .collect();
-        let should_split = lines.len() >= 2
+        let should_split = lines.len() >= cut.split_dialogue_min_lines
             && shot.characters_in_shot.len() >= 2
             && !shot.is_scene_establishing
-            && shot.dialogue_text.chars().count() > 18;
+            && shot.dialogue_text.chars().count() > cut.split_dialogue_char_min;
         if should_split {
             let per = (shot.estimated_duration_sec / lines.len() as f64).max(1.0);
             for line in lines {
@@ -814,13 +946,13 @@ pub(crate) fn split_dialogue_shots(shots: Vec<ShotPlan>, paragraphs: &[Paragraph
     out
 }
 
-pub(crate) fn split_overlong_shots(shots: Vec<ShotPlan>) -> Vec<ShotPlan> {
-    const MAX_CHARS: usize = 100;
-    const MAX_DUR: f64 = 6.0;
+pub(crate) fn split_overlong_shots(shots: Vec<ShotPlan>, cut: &CutProfile) -> Vec<ShotPlan> {
+    let max_chars = cut.split_overlong_max_chars;
+    let max_dur = cut.split_overlong_max_dur_sec;
     let mut out: Vec<ShotPlan> = Vec::new();
     for shot in shots {
-        let too_long = shot.estimated_duration_sec > MAX_DUR
-            || shot.text_segment.chars().count() > MAX_CHARS;
+        let too_long = shot.estimated_duration_sec > max_dur
+            || shot.text_segment.chars().count() > max_chars;
         if !too_long || shot.is_compound_step || shot.is_reaction_shot {
             out.push(shot);
             continue;
@@ -860,7 +992,11 @@ pub(crate) fn renumber_shots(shots: &mut [ShotPlan]) {
     }
 }
 
-pub(crate) fn apply_decisions_to_shots(shots: &mut [ShotPlan], paragraphs: &[Paragraph]) {
+pub(crate) fn apply_decisions_to_shots(
+    shots: &mut [ShotPlan],
+    paragraphs: &[Paragraph],
+    requirement: Option<&ScriptParseRequirementHints>,
+) {
     let total = shots.len();
     for (idx, shot) in shots.iter_mut().enumerate() {
         let lo = shot.para_range.0.min(shot.para_range.1);
@@ -904,6 +1040,7 @@ pub(crate) fn apply_decisions_to_shots(shots: &mut [ShotPlan], paragraphs: &[Par
             is_scene_establishing: shot.is_scene_establishing,
             is_last_in_sequence: idx + 1 == total,
             is_reaction_shot: shot.is_reaction_shot,
+            requirement,
         };
         let decision = decide_shot(
             &tags,
@@ -1038,7 +1175,12 @@ pub(crate) fn smooth_adjacent_shots(shots: &mut [ShotPlan]) {
     }
 }
 
-pub(crate) fn format_shot_storyboard_block(plan: &ShotPlan, visual_desc: &str, dialogue: &str) -> String {
+pub(crate) fn format_shot_storyboard_block(
+    plan: &ShotPlan,
+    visual_desc: &str,
+    dialogue: &str,
+    lighting_mood: &str,
+) -> String {
     let dialogue_line = if dialogue.trim().is_empty() {
         "无".to_string()
     } else {
@@ -1066,6 +1208,9 @@ pub(crate) fn format_shot_storyboard_block(plan: &ShotPlan, visual_desc: &str, d
         sound,
         plan.edit_focus,
     ));
+    if !lighting_mood.trim().is_empty() {
+        block.push_str(&format!("\n光影：{}", lighting_mood.trim()));
+    }
     if !plan.composition_note.is_empty() {
         block.push_str(&format!("\n构图：{}", plan.composition_note));
     }
@@ -1233,7 +1378,7 @@ mod tests {
             estimated_duration_sec: 2.0,
             ..ShotPlan::default()
         };
-        let with_react = inject_reaction_shots(vec![shot]);
+        let with_react = inject_reaction_shots(vec![shot], false);
         assert_eq!(with_react.len(), 2);
         assert!(with_react[1].is_reaction_shot);
     }

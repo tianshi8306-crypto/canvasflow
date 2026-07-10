@@ -14,6 +14,7 @@ import {
   type ImagePreviewToolbarAction,
   type ImagePreviewToolbarGroup,
 } from "@/lib/imagePreviewToolbarActions";
+import { runImageToolbarSpawnGenerate } from "@/lib/imageGeneration/imageToolbarSpawnGenerate";
 import { IMAGE_GENERATION_PROMPT_MAX_CHARS } from "@/lib/promptLimits";
 import { MediaPromptReverseButton } from "@/components/nodes/MediaPromptReverseButton";
 import { PreviewToolbarMenuPortal } from "@/components/nodes/nodeChrome";
@@ -51,6 +52,7 @@ function ImagePreviewToolbarMenuGroup({
   menuRef,
   hasLocalImage,
   editActive,
+  spawnBusy,
   onRunAction,
 }: {
   group: ImagePreviewToolbarGroup;
@@ -60,21 +62,30 @@ function ImagePreviewToolbarMenuGroup({
   menuRef: React.RefObject<HTMLDivElement>;
   hasLocalImage: boolean;
   editActive: boolean;
+  spawnBusy: boolean;
   onRunAction: (action: ImagePreviewToolbarAction) => void;
 }) {
   const useMenu = group.actions.length > 3 || group.id === "grid";
+
+  const actionNeedsImage = (action: ImagePreviewToolbarAction) =>
+    action.kind === "edit" || action.kind === "spawnGenerate";
 
   if (!useMenu) {
     return (
       <>
         {group.actions.map((action) => {
           const pending = isPreviewToolbarActionPending(action.kind);
-          const disabled = pending || (action.kind === "edit" && !hasLocalImage);
+          const disabled =
+            pending ||
+            spawnBusy ||
+            (actionNeedsImage(action) && !hasLocalImage);
           const title = pending
             ? previewToolbarPendingTitle(action.stubMessage)
-            : action.kind === "edit" && !hasLocalImage
+            : actionNeedsImage(action) && !hasLocalImage
               ? "请先有预览图"
-              : action.label;
+              : spawnBusy
+                ? "正在生成…"
+                : action.label;
           return (
           <button
             key={action.id}
@@ -116,10 +127,17 @@ function ImagePreviewToolbarMenuGroup({
       >
         {group.actions.map((action) => {
           const pending = isPreviewToolbarActionPending(action.kind);
-          const disabled = pending || (action.kind === "edit" && !hasLocalImage);
+          const disabled =
+            pending ||
+            spawnBusy ||
+            (actionNeedsImage(action) && !hasLocalImage);
           const title = pending
             ? previewToolbarPendingTitle(action.stubMessage)
-            : action.label;
+            : actionNeedsImage(action) && !hasLocalImage
+              ? "请先有预览图"
+              : spawnBusy
+                ? "正在生成…"
+                : action.label;
           return (
           <button
             key={action.id}
@@ -148,6 +166,7 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage }: Props) {
   const setStatusText = useProjectStore((s) => s.setStatusText);
   const setImagePreviewExpandedNodeId = useCanvasUiStore((s) => s.setImagePreviewExpandedNodeId);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [spawnBusy, setSpawnBusy] = useState(false);
   const menuTriggerRef = useRef<HTMLButtonElement | null>(null);
   const menuDropRef = useRef<HTMLDivElement | null>(null);
 
@@ -259,6 +278,21 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage }: Props) {
         updateNodeData(nodeId, {
           prompt: nextPrompt.slice(0, IMAGE_GENERATION_PROMPT_MAX_CHARS),
         });
+        return;
+      }
+      if (action.kind === "spawnGenerate") {
+        if (!action.spawnId) return;
+        if (!hasLocalImage) {
+          setStatusText("请先有预览图再生成三视图");
+          return;
+        }
+        if (spawnBusy) return;
+        clearEditIntent();
+        setSpawnBusy(true);
+        void runImageToolbarSpawnGenerate({
+          sourceNodeId: nodeId,
+          spawnId: action.spawnId,
+        }).finally(() => setSpawnBusy(false));
       }
     },
     [
@@ -273,6 +307,7 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage }: Props) {
       queryClient,
       setImagePreviewExpandedNodeId,
       setStatusText,
+      spawnBusy,
       updateNodeData,
     ],
   );
@@ -314,6 +349,7 @@ export function ImagePreviewToolbar({ nodeId, hasLocalImage }: Props) {
               menuRef={menuDropRef}
               hasLocalImage={hasLocalImage}
               editActive={editActive}
+              spawnBusy={spawnBusy}
               onRunAction={runAction}
             />
           </div>

@@ -5,8 +5,11 @@ import { IgpGenerateButtonIcon } from "@/components/nodes/IgpGenerateButtonIcon"
 import { PanelCloseIcon, PanelExpandIcon, PanelPinIcon } from "@/components/nodes/nodePanelIcons";
 import { ScriptModelPicker } from "@/components/nodes/ScriptModelPicker";
 import { ScriptDocumentImportButton } from "@/components/script/ScriptDocumentImportButton";
+import {
+  UpstreamTextConnectionThumbs,
+  type UpstreamTextConnectionThumbItem,
+} from "@/components/nodes/UpstreamTextConnectionThumbs";
 import { useFocusScriptNodeViewport } from "@/hooks/canvas/useFocusScriptNodeViewport";
-import { useNodeStatus } from "@/hooks/useNodeStatus";
 import {
   getProviderSelectionPatch,
   loadEnabledProviderOptions,
@@ -17,10 +20,17 @@ import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
 import { IMAGE_GENERATION_PROMPT_MAX_CHARS } from "@/lib/promptLimits";
 import { SCRIPT_AI_PARSE_BUTTON_LABEL } from "@/lib/scriptNodeActionLabels";
+import { canStartScriptParse, resolveScriptParseRequirement } from "@/lib/scriptParseDefaults";
 import { preflightScriptNodeLlm } from "@/lib/scriptNodeLlmParams";
 import { scriptParseCompleteStatus } from "@/lib/scriptNodeFeedback";
-import { useScriptNodeTaskState } from "@/hooks/useScriptNodeTaskState";
 import {
+  beginScriptParseRun,
+  isScriptParseRunCurrent,
+} from "@/lib/scriptParseRunControl";
+import { useScriptNodeTaskState } from "@/hooks/useScriptNodeTaskState";
+import { useScriptParseCancel } from "@/hooks/useScriptParseCancel";
+import {
+  listScriptUpstreamTextConnections,
   listScriptUpstreamTextSources,
   formatUpstreamTextCharCount,
   totalUpstreamTextChars,
@@ -29,12 +39,10 @@ import {
   buildReferenceVideoPromptBlock,
   listScriptReferenceVideoSources,
 } from "@/lib/scriptReferenceVideo";
+import { SCRIPT_COMPOSER_PLACEHOLDER } from "@/lib/nodeComposerPlaceholders";
 import { useProjectStore } from "@/store/projectStore";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import "./TextNodeChrome.css";
-
-const THEME_PLACEHOLDER =
-  "描述剧情、角色与风格约束，用 @ 引用节点，按 / 呼出指令";
 
 function IconMarker() {
   return (
@@ -92,9 +100,8 @@ export function ScriptComposerPanel({
   const [slashCursorRect, setSlashCursorRect] = useState<DOMRect | null>(null);
   const [providerOptions, setProviderOptions] = useState<TextNodeProviderOption[]>([]);
   const [providersLoading, setProvidersLoading] = useState(false);
-  const genRunRef = useRef(0);
+  const cancelParse = useScriptParseCancel(nodeId);
 
-  const { clearStatus } = useNodeStatus(nodeId);
   const { isBusy, panelFeedback, clearZeroBeatsHint } = useScriptNodeTaskState(nodeId);
 
   const node = useMemo(() => nodes.find((n) => n.id === nodeId), [nodes, nodeId]);
@@ -119,10 +126,28 @@ export function ScriptComposerPanel({
 
   const isGenerating = isBusy;
 
+  const upstreamSources = useMemo(
+    () => listScriptUpstreamTextSources(nodes, edges, nodeId),
+    [edges, nodeId, nodes],
+  );
+  const upstreamConnections = useMemo(
+    () => listScriptUpstreamTextConnections(nodes, edges, nodeId),
+    [edges, nodeId, nodes],
+  );
+  const hasUpstreamScriptText = upstreamSources.length > 0;
+  const upstreamChars = totalUpstreamTextChars(upstreamSources);
+
+  const upstreamTextThumbs = useMemo((): UpstreamTextConnectionThumbItem[] => {
+    return upstreamConnections.map((s) => ({
+      nodeId: s.nodeId,
+      label: s.label,
+    }));
+  }, [upstreamConnections]);
+
   const canGenerate = useMemo(() => {
     if (!projectPath?.trim() || isBusy) return false;
-    return Boolean(prompt.trim());
-  }, [projectPath, isBusy, prompt]);
+    return canStartScriptParse(prompt, hasUpstreamScriptText);
+  }, [hasUpstreamScriptText, projectPath, isBusy, prompt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -173,32 +198,32 @@ export function ScriptComposerPanel({
   }, []);
 
   const handleCancelGenerate = useCallback(() => {
-    genRunRef.current += 1;
-    clearStatus();
-    clearZeroBeatsHint();
-    setStatusText("已取消脚本解析");
-  }, [clearStatus, clearZeroBeatsHint, setStatusText]);
+    cancelParse();
+  }, [cancelParse]);
 
   const handleGenerate = useCallback(() => {
     if (isGenerating) {
       handleCancelGenerate();
       return;
     }
-    const promptText = prompt.trim();
+    const promptText = resolveScriptParseRequirement(prompt, hasUpstreamScriptText);
     if (!projectPath?.trim()) {
       setStatusText("请先新建或打开工程目录");
       return;
     }
     if (!promptText) {
-      setStatusText("请先输入剧情主题或脚本约束");
+      setStatusText("请先输入解析要求，或连接已填写剧本的上游文本节点");
       return;
     }
 
     void (async () => {
       if (!(await preflightScriptNodeLlm(params, setStatusText))) return;
 
-      const runId = genRunRef.current + 1;
-      genRunRef.current = runId;
+      if (!prompt.trim() && hasUpstreamScriptText) {
+        updateNodeData(nodeId, { prompt: promptText });
+      }
+
+      const runId = beginScriptParseRun(nodeId);
       clearZeroBeatsHint();
       try {
         await runNodeTaskAgent(
@@ -206,7 +231,7 @@ export function ScriptComposerPanel({
           { prompt: promptText, dispatch: runNodeSubgraph },
           { nodeId, projectPath, updateNodeData, setStatusText },
         );
-        if (genRunRef.current !== runId) return;
+        if (!isScriptParseRunCurrent(nodeId, runId)) return;
         const latest = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
         const count = normalizeScriptBeats(latest?.data.scriptBeats ?? []).length;
         setStatusText(scriptParseCompleteStatus(count));
@@ -217,6 +242,7 @@ export function ScriptComposerPanel({
   }, [
     handleCancelGenerate,
     isGenerating,
+    hasUpstreamScriptText,
     nodeId,
     params,
     projectPath,
@@ -263,11 +289,6 @@ export function ScriptComposerPanel({
     .filter(Boolean)
     .join(" ");
 
-  const upstreamSources = useMemo(
-    () => listScriptUpstreamTextSources(nodes, edges, nodeId),
-    [edges, nodeId, nodes],
-  );
-  const upstreamChars = totalUpstreamTextChars(upstreamSources);
   const refVideoSources = useMemo(
     () => listScriptReferenceVideoSources(nodes, edges, nodeId),
     [edges, nodeId, nodes],
@@ -293,7 +314,7 @@ export function ScriptComposerPanel({
           ? `${beatCount} 镜头 · 参考视频 ${refVideoSources.length}`
           : `${beatCount} 条镜头`
       : upstreamSources.length > 0
-        ? `上游剧本 ${formatUpstreamTextCharCount(upstreamChars)}字${refVideoSources.length > 0 ? ` · 参考 ${refVideoSources.length}` : ""}`
+        ? `上游剧本 ${formatUpstreamTextCharCount(upstreamChars)}字 · 底栏写解析要求${refVideoSources.length > 0 ? ` · 参考 ${refVideoSources.length}` : ""}`
         : refVideoSources.length > 0
           ? `参考视频 ${refVideoSources.length}`
           : "AI 解析";
@@ -380,13 +401,17 @@ export function ScriptComposerPanel({
           </div>
         ) : null}
 
+        {upstreamTextThumbs.length > 0 ? (
+          <UpstreamTextConnectionThumbs items={upstreamTextThumbs} />
+        ) : null}
+
         <div className="igp-prompt-wrap tgp-prompt-wrap tgp-v2-zone-b">
           <MentionInput
             ref={mentionRef}
             nodeId={nodeId}
             value={prompt}
             onChange={setPrompt}
-            placeholder={THEME_PLACEHOLDER}
+            placeholder={SCRIPT_COMPOSER_PLACEHOLDER}
             className={textareaClass}
             nodeLabels={nodeLabels}
             onSlashTrigger={handleSlashTrigger}

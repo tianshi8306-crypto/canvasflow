@@ -6,10 +6,13 @@ import {
   SCRIPT_ENTRY_FULLSCREEN_LABEL,
   SCRIPT_ENTRY_FULLSCREEN_TITLE,
 } from "@/lib/scriptNodeCanvasEntries";
+import type { ScriptBeatsTableLayout } from "@/lib/scriptBeatsTableModel";
 
 type Props = {
   view: "table" | "card";
   setView: (view: "table" | "card") => void;
+  tableLayout: ScriptBeatsTableLayout;
+  setTableLayout: (layout: ScriptBeatsTableLayout) => void;
   onOpenFullscreen: () => void;
   onDraftFromTheme: () => void;
   onSendToStoryboard: () => void;
@@ -18,6 +21,8 @@ type Props = {
 export function ScriptWorkbenchPrimaryActions({
   view,
   setView,
+  tableLayout,
+  setTableLayout,
   onOpenFullscreen,
   onDraftFromTheme,
   onSendToStoryboard,
@@ -45,6 +50,28 @@ export function ScriptWorkbenchPrimaryActions({
           卡片视图
         </button>
       </div>
+      {view === "table" ? (
+        <div className="scriptViewToggle" role="group" aria-label="镜头表类型">
+          <button
+            type="button"
+            className="scriptViewToggleBtn"
+            aria-pressed={tableLayout === "basic"}
+            data-active={tableLayout === "basic" ? "true" : "false"}
+            onClick={() => setTableLayout("basic")}
+          >
+            基本表
+          </button>
+          <button
+            type="button"
+            className="scriptViewToggleBtn"
+            aria-pressed={tableLayout === "pro"}
+            data-active={tableLayout === "pro" ? "true" : "false"}
+            onClick={() => setTableLayout("pro")}
+          >
+            专业表
+          </button>
+        </div>
+      ) : null}
       <button
         type="button"
         className="btn btnPrimary"

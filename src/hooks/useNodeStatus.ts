@@ -6,6 +6,8 @@
  */
 
 import { useCallback, useEffect, useRef } from "react";
+import { listen } from "@tauri-apps/api/event";
+import { isTauri } from "@tauri-apps/api/core";
 import type { NodeAgentRuntimeEvent } from "@/lib/nodeAgentRuntime/types";
 import type { NodeExecutionStatus } from "@/lib/types";
 import { useProjectStore } from "@/store/projectStore";
@@ -98,9 +100,41 @@ export function useNodeStatus(nodeId?: string) {
  * 全局节点状态监听器
  * 在 App 或画布层级调用一次即可
  */
+type ScriptParseProgressPayload = {
+  nodeId?: string;
+  current?: number;
+  total?: number;
+};
+
 export function useNodeStatusListener() {
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const handlerRef = useRef<((evt: CustomEvent<NodeAgentRuntimeEvent>) => void) | null>(null);
+
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    void listen<ScriptParseProgressPayload>("script-parse-progress", (event) => {
+      const nodeId = event.payload.nodeId?.trim();
+      const current = event.payload.current;
+      const total = event.payload.total;
+      if (!nodeId || !current || !total || total <= 0) return;
+      const progress = 50 + Math.round((current / total) * 45);
+      updateNodeData(nodeId, {
+        status: {
+          status: "running",
+          updatedAt: Date.now(),
+          agentName: "脚本",
+          phase: "execute",
+          progress: Math.min(progress, 95),
+        },
+      });
+    }).then((fn) => {
+      unlisten = fn;
+    });
+    return () => {
+      unlisten?.();
+    };
+  }, [updateNodeData]);
 
   useEffect(() => {
     const handler = (evt: CustomEvent<NodeAgentRuntimeEvent>) => {

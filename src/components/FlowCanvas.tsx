@@ -66,6 +66,7 @@ import { ImagePreviewExpandedModal } from "@/components/nodes/ImagePreviewExpand
 import { VideoGenerationPanelExpandedModal } from "@/components/nodes/VideoGenerationPanelExpandedModal";
 import { VideoPreviewExpandedModal } from "@/components/nodes/VideoPreviewExpandedModal";
 import { TextComposerPanelExpandedModal } from "@/components/nodes/TextComposerPanelExpandedModal";
+import { TextPreviewExpandedModal } from "@/components/nodes/TextPreviewExpandedModal";
 import { AudioTtsPanelExpandedModal } from "@/components/nodes/AudioTtsPanelExpandedModal";
 import { ScriptComposerPanelExpandedModal } from "@/components/nodes/ScriptComposerPanelExpandedModal";
 import { isPassiveAudioAsset } from "@/lib/audioNodeContainerMode";
@@ -579,6 +580,7 @@ function FlowCanvasInner() {
       <ReactFlow
         key={projectPath ?? `tab-${activeTabId}`}
         defaultViewport={viewport}
+        deleteKeyCode={null}
         nodes={nodesView}
         edges={edgeView}
         onNodesChange={onNodesChange}
@@ -870,6 +872,7 @@ function FlowCanvasInner() {
       <VideoGenerationPanelExpandedModal />
       <VideoPreviewExpandedModal />
       <TextComposerPanelExpandedModal />
+      <TextPreviewExpandedModal />
       <AudioTtsPanelExpandedModal />
       <ScriptComposerPanelExpandedModal />
       <SubjectCreationPanel

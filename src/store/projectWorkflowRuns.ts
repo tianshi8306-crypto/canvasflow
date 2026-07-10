@@ -10,6 +10,7 @@ import { enabledEdges } from "@/lib/edgeState";
 import { fetchRunEvents } from "@/shared/api/runs";
 import type { GraphRunWithPatchResult, ProjectState } from "./projectStoreTypes";
 import { scheduleSave } from "./projectSaveDebounce";
+import { applyTextNodeDataPatch } from "@/lib/textNodePromptPatch";
 
 type SetState = (
   partial:
@@ -40,7 +41,7 @@ export function runWorkflowImpl(get: () => ProjectState, set: SetState) {
           nodes: s.nodes.map((n) => {
             const p = res.nodePatches.find((x) => x.nodeId === n.id);
             if (!p) return n;
-            return { ...n, data: { ...n.data, ...p.dataPatch } };
+            return applyTextNodeDataPatch(n, p.dataPatch);
           }),
         }));
         if (get().projectPath) scheduleSave(get);
@@ -101,7 +102,7 @@ export function runNodeSubgraphImpl(get: () => ProjectState, set: SetState) {
           nodes: s.nodes.map((n) => {
             const p = res.nodePatches.find((x) => x.nodeId === n.id);
             if (!p) return n;
-            return { ...n, data: { ...n.data, ...p.dataPatch } };
+            return applyTextNodeDataPatch(n, p.dataPatch);
           }),
         }));
         if (get().projectPath) scheduleSave(get);
@@ -165,7 +166,7 @@ export function rerunFailedSubgraphImpl(get: () => ProjectState, set: SetState) 
           nodes: s.nodes.map((n) => {
             const p = res.nodePatches.find((x) => x.nodeId === n.id);
             if (!p) return n;
-            return { ...n, data: { ...n.data, ...p.dataPatch } };
+            return applyTextNodeDataPatch(n, p.dataPatch);
           }),
         }));
         if (get().projectPath) scheduleSave(get);

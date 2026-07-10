@@ -2,6 +2,12 @@ import { useCallback, useMemo, useState } from "react";
 import { useScriptNodeTaskState } from "@/hooks/useScriptNodeTaskState";
 import { normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
 import {
+  canStartScriptParse,
+  resolveScriptParseRequirement,
+} from "@/lib/scriptParseDefaults";
+import { patchFromStoryboardDraftEdit } from "@/lib/storyboardDraftSync";
+import { listScriptUpstreamTextSources } from "@/lib/scriptUpstreamText";
+import {
   SCRIPT_AI_PARSE_BUSY_LABEL,
   SCRIPT_AI_REPARSE_BUTTON_LABEL,
 } from "@/lib/scriptNodeActionLabels";
@@ -97,6 +103,7 @@ function IconDownload() {
 export function ScriptPreviewToolbar({ nodeId }: Props) {
   const projectPath = useProjectStore((s) => s.projectPath);
   const nodes = useProjectStore((s) => s.nodes);
+  const edges = useProjectStore((s) => s.edges);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const setStatusText = useProjectStore((s) => s.setStatusText);
   const runNodeSubgraph = useProjectStore((s) => s.runNodeSubgraph);
@@ -111,11 +118,19 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
       : undefined;
   const llmParams = useMemo(() => scriptNodeLlmInvokeParams(nodeParams), [nodeParams]);
   const themePrompt = node?.data.prompt ?? "";
+  const storyboardDraft = node?.data.storyboardDraft ?? "";
+  const upstreamSources = useMemo(
+    () => listScriptUpstreamTextSources(nodes, edges, nodeId),
+    [edges, nodeId, nodes],
+  );
+  const hasUpstreamScriptText = upstreamSources.length > 0;
+  const canParse = canStartScriptParse(themePrompt, hasUpstreamScriptText);
   const rows = useMemo(
     () => normalizeScriptBeats(node?.data.scriptBeats ?? []),
     [node?.data.scriptBeats],
   );
   const hasBeats = rows.length > 0;
+  const hasDraft = storyboardDraft.trim().length > 0;
 
   const storyboardScope = useMemo(
     () => resolveStoryboardBeatScope(rows, node?.data.scriptBeatSelection),
@@ -127,9 +142,9 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
       setStatusText("请先打开工程目录");
       return;
     }
-    const promptText = themePrompt.trim();
-    if (!promptText) {
-      setStatusText("请先填写剧情主题或脚本约束");
+    const promptText = resolveScriptParseRequirement(themePrompt, hasUpstreamScriptText);
+    if (!canParse) {
+      setStatusText("请连接上游剧本或填写解析要求");
       return;
     }
     if (isBusy || exportBusy) {
@@ -149,7 +164,9 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
       }
     })();
   }, [
+    canParse,
     exportBusy,
+    hasUpstreamScriptText,
     isBusy,
     nodeId,
     nodeParams,
@@ -157,6 +174,38 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
     runNodeSubgraph,
     setStatusText,
     themePrompt,
+    updateNodeData,
+  ]);
+
+  const onSyncFromDraft = useCallback(() => {
+    if (!hasDraft) {
+      setStatusText("分镜稿为空，无法同步");
+      return;
+    }
+    if (isBusy || exportBusy) return;
+    const result = patchFromStoryboardDraftEdit(
+      storyboardDraft,
+      rows,
+      node?.data.scriptBeatSelection,
+    );
+    if (!result.scriptBeats) {
+      setStatusText("分镜稿格式无效，请检查 --- 分镜块");
+      if (result.storyboardDraft != null) {
+        updateNodeData(nodeId, { storyboardDraft: result.storyboardDraft });
+      }
+      return;
+    }
+    updateNodeData(nodeId, result);
+    setStatusText(`已从分镜稿同步 ${result.scriptBeats.length} 条镜头`);
+  }, [
+    exportBusy,
+    hasDraft,
+    isBusy,
+    node?.data.scriptBeatSelection,
+    nodeId,
+    rows,
+    setStatusText,
+    storyboardDraft,
     updateNodeData,
   ]);
 
@@ -255,7 +304,7 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
   const storyboardTitle =
     storyboardScope.ok
       ? storyboardScopeActionHint(storyboardScope.scope)
-      : "生成分镜（勾选优先，无勾选则全部）";
+      : "为全部镜头生成分镜文案";
 
   return (
     <div
@@ -270,7 +319,7 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
           className="scriptPreviewToolbar-labeledBtn"
           title={regenLabel}
           aria-label={regenLabel}
-          disabled={disabled || !themePrompt.trim()}
+          disabled={disabled || !canParse}
           onMouseDown={(e) => e.preventDefault()}
           onClick={onRegen}
         >
@@ -293,6 +342,18 @@ export function ScriptPreviewToolbar({ nodeId }: Props) {
             <IconStoryboard />
           </span>
           <span className="scriptPreviewToolbar-btnLabel">{storyboardLabel}</span>
+        </button>
+
+        <button
+          type="button"
+          className="scriptPreviewToolbar-labeledBtn"
+          title="将预览分镜稿解析为镜头表（保留同镜号 Seedance 等字段）"
+          aria-label="从分镜稿同步镜头表"
+          disabled={disabled || !hasDraft}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={onSyncFromDraft}
+        >
+          <span className="scriptPreviewToolbar-btnLabel">同步镜头表</span>
         </button>
 
         <button

@@ -79,13 +79,14 @@ async fn exec_node(
     outputs: &HashMap<String, String>,
     conn: &mut Connection,
     run_id: &str,
+    app: Option<&tauri::AppHandle>,
 ) -> NodeStepResult {
     let kind = node.node_type.as_str();
 
     match kind {
         "scriptNode" => {
             let (res, patch) =
-                run_script_node(http, project_root, graph, node, settings, outputs, conn, run_id).await?;
+                run_script_node(http, project_root, graph, node, settings, outputs, conn, run_id, app).await?;
             let _ = db::log_event(conn, run_id, Some(&node.id), "node_output", &json!({ "output": res }));
             let _ = db::log_event(conn, run_id, Some(&node.id), "node_patch", &patch);
             Ok((Some(res), Some(patch)))
@@ -162,6 +163,7 @@ pub(crate) async fn exec_node_loop(
     extra_start_metadata: serde_json::Value,
     script_patches: &mut Vec<(String, serde_json::Value)>,
     initial_outputs: Option<&HashMap<String, String>>,
+    app: Option<&tauri::AppHandle>,
 ) -> Result<(HashMap<String, String>, bool), String> {
     let mut outputs: HashMap<String, String> = initial_outputs.cloned().unwrap_or_default();
     let mut skip: HashSet<String> = HashSet::new();
@@ -199,7 +201,7 @@ pub(crate) async fn exec_node_loop(
 
         let _ = db::log_event(&conn, run_id, Some(node_id), "node_state", &json!({ "state": "running" }));
 
-        let step = exec_node(http, project_root, graph, node, settings, &outputs, &mut conn, run_id).await;
+        let step = exec_node(http, project_root, graph, node, settings, &outputs, &mut conn, run_id, app).await;
 
         match step {
             Ok((Some(output), data_patch)) => {

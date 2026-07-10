@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import { isTextInputTarget } from "@/lib/canvasInteraction";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { useProjectStore } from "@/store/projectStore";
 
@@ -14,6 +15,8 @@ export function isCanvasShortcutBlockedTarget(target: EventTarget | null): boole
         ".textNodeEditable--integrated:focus",
         ".textNodeExpandPanel textarea:focus",
         ".scriptGenComposerInput:focus",
+        ".mention-textarea:focus",
+        ".scriptGenComposer:focus-within",
         ".hermesShellInput:focus",
       ].join(","),
     ),
@@ -25,16 +28,7 @@ export function isCanvasShortcutBlockedTarget(target: EventTarget | null): boole
       ),
     );
   const isEditableEl = (node: HTMLElement | null) =>
-    Boolean(
-      node &&
-        (node.tagName === "INPUT" ||
-          node.tagName === "TEXTAREA" ||
-          node.tagName === "SELECT" ||
-          (typeof node.isContentEditable === "boolean" && node.isContentEditable) ||
-          node.closest(
-            "input, textarea, select, [contenteditable='true'], [contenteditable='plaintext-only'], .canvasShortcutsOverlayCard",
-          )),
-    );
+    Boolean(node && (isTextInputTarget(node) || node.closest(".canvasShortcutsOverlayCard")));
   return (
     isEditableEl(el) ||
     isEditableEl(active) ||

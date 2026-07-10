@@ -1,9 +1,11 @@
 import type { NodeTaskAgentRuntime } from "@/lib/nodeAgentRuntime/types";
+import { deriveRunFailureMessage } from "@/lib/runNodeState";
 import {
   buildTextNodeUpstreamTextRefs,
   expandPromptTextAtReferences,
   resolveMentionNodeTokens,
 } from "@/lib/promptUpstreamTextRefs";
+import { fetchRunEvents } from "@/shared/api/runs";
 import { useProjectStore } from "@/store/projectStore";
 
 type DispatchFn = (fromNodeId: string, force?: boolean) => Promise<void>;
@@ -47,8 +49,30 @@ export const scriptNodeDispatchAgentRuntime: NodeTaskAgentRuntime<
     return { prompt: text, dispatch };
   },
   execute: async (sensed, ctx) => {
-    ctx.setStatusText("正在 AI 解析镜头（DAG 调度）…");
-    await sensed.dispatch(ctx.nodeId, false);
+    ctx.setStatusText("正在 AI 解析镜头（逐镜生成，长剧本可能需要数分钟）…");
+    // 用户主动解析须 force，避免上次 succeeded 被增量跳过导致无新分镜
+    await sensed.dispatch(ctx.nodeId, true);
+    const { nodeRunStateById, lastRunId, projectPath } = useProjectStore.getState();
+    if (nodeRunStateById[ctx.nodeId] === "failed") {
+      let msg = "脚本解析失败，请打开侧栏「运行」面板查看详情";
+      if (projectPath && lastRunId) {
+        try {
+          const events = await fetchRunEvents(projectPath, lastRunId);
+          msg = deriveRunFailureMessage(events) ?? msg;
+        } catch {
+          /* 使用默认文案 */
+        }
+      }
+      ctx.updateNodeData(ctx.nodeId, {
+        status: {
+          status: "failed",
+          error: msg,
+          updatedAt: Date.now(),
+          agentName: "脚本",
+        },
+      });
+      throw new Error(msg);
+    }
     return sensed;
   },
   validate: (executed) => executed,
@@ -87,21 +111,34 @@ export const textNodeDispatchAgentRuntime: NodeTaskAgentRuntime<
     const edges = useProjectStore.getState().edges;
     const hasUpstreamText = buildTextNodeUpstreamTextRefs(nodes, edges, ctx.nodeId).length > 0;
     if (!hasUpstreamText) {
-      // 无上游：将归一化输入写入 prompt，供 DAG 直接作为 LLM 输入
-      ctx.updateNodeData(ctx.nodeId, { prompt: sensed.normalizedPrompt });
+      const node = nodes.find((n) => n.id === ctx.nodeId);
+      const params =
+        node?.data.params && typeof node.data.params === "object"
+          ? { ...(node.data.params as Record<string, unknown>) }
+          : {};
+      // 预览区 data.prompt 仅展示模型输出；输入暂存 textModelInput 供后端读取
+      ctx.updateNodeData(ctx.nodeId, {
+        params: { ...params, textModelInput: sensed.normalizedPrompt },
+      });
     }
-  // 有上游：保留 prompt 供预览展示 LLM 结果；指令在 params.textModelInput，后端单独读取
     ctx.setStatusText(
-      hasUpstreamText
-        ? "正在根据上游文本处理…"
-        : "文本 Agent 已完成输入归一化，正在请求 DAG 调度…",
+      hasUpstreamText ? "正在根据上游文本处理…" : "正在请求模型生成…",
     );
-    await sensed.dispatch(ctx.nodeId, false);
+    await sensed.dispatch(ctx.nodeId, true);
     return sensed;
   },
   validate: (executed) => executed,
-  commit: () => {
-    // 最终结果由 DAG 执行器统一回写节点记忆体。
+  commit: (_executed, ctx) => {
+    const node = useProjectStore.getState().nodes.find((n) => n.id === ctx.nodeId);
+    if (!node) return;
+    const params =
+      node.data.params && typeof node.data.params === "object"
+        ? { ...(node.data.params as Record<string, unknown>) }
+        : {};
+    const modelInput = (params.textModelInput as string | undefined)?.trim() ?? "";
+    if (modelInput) {
+      ctx.updateNodeData(ctx.nodeId, { params: { ...params, textModelInput: "" } });
+    }
   },
 };
 

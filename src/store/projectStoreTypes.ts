@@ -161,7 +161,7 @@ export type ProjectState = {
     anchorNodeId: string;
     direction: "incoming" | "outgoing";
     partnerType: keyof typeof newNodeDataByType;
-  }) => void;
+  }) => string | undefined;
   /**
    * 首尾帧工作流：在视频节点左侧补齐「首帧」「尾帧」图片节点并联线，
    * 并切换草稿为首尾帧模式、填入示例提示词（若提示词仍为空）。

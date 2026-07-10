@@ -8,6 +8,10 @@ import {
   type WheelEvent as ReactWheelEvent,
 } from "react";
 import { MentionInput } from "@/components/nodes/MentionInput";
+import {
+  UpstreamTextConnectionTags,
+  type UpstreamTextConnectionTagItem,
+} from "@/components/nodes/UpstreamTextConnectionTags";
 import { IgpGenerateButtonIcon } from "@/components/nodes/IgpGenerateButtonIcon";
 import { PanelCloseIcon, PanelExpandIcon, PanelPinIcon } from "@/components/nodes/nodePanelIcons";
 import { TextProviderPicker } from "@/components/nodes/TextProviderPicker";
@@ -25,6 +29,11 @@ import { gatherUpstreamContextForTextProcessing } from "@/lib/textNodeUpstreamPr
 import { formatUpstreamTextCharCount } from "@/lib/scriptUpstreamText";
 import { useProjectStore } from "@/store/projectStore";
 import { NodeMediaPreview } from "@/components/nodes/NodeMediaPreview";
+import {
+  TEXT_COMPOSER_PLACEHOLDER_DEFAULT,
+  TEXT_COMPOSER_PLACEHOLDER_IMAGE_TO_PROMPT,
+  TEXT_COMPOSER_PLACEHOLDER_MUSIC,
+} from "@/lib/nodeComposerPlaceholders";
 
 const MAX_CHARS = 200_000;
 
@@ -33,10 +42,8 @@ const ZONE_A_HINT_IMAGE = "图片反推提示词";
 const ZONE_A_HINT_MUSIC = "文字生音乐";
 const ZONE_A_HINT_EXPANDED = "模型对话";
 
-export const IMAGE_TO_PROMPT_COMPOSER_HINT =
-  "根据图片生成结构化中文提示词，包括主体描述、环境、光影、镜头语言、风格关键词。";
-
-export const MUSIC_COMPOSER_PLACEHOLDER = "描述您想要的音乐";
+/** 图片反推模式自动填入的默认指令（写入 textModelInput，非 placeholder） */
+export const IMAGE_TO_PROMPT_COMPOSER_HINT = TEXT_COMPOSER_PLACEHOLDER_IMAGE_TO_PROMPT;
 
 export type TextComposerPanelLayout =
   | "default"
@@ -104,6 +111,20 @@ export function TextComposerPanel({
   const modelInput = (params.textModelInput ?? "").toString();
   const selectedProviderId = (params.providerId ?? "").toString();
   const linkedAudioNodeId = (params.audioNodeId ?? "").toString();
+  const linkedScriptNodeId = (params.scriptNodeId ?? "").toString();
+  const isTextToScript = params.textWorkflow === "textToScript" && Boolean(linkedScriptNodeId);
+
+  const linkedScriptLabel = useMemo(() => {
+    if (!linkedScriptNodeId) return null;
+    const script = nodes.find((n) => n.id === linkedScriptNodeId);
+    return (script?.data.label ?? "脚本节点").toString();
+  }, [linkedScriptNodeId, nodes]);
+
+  const handleFocusLinkedScript = useCallback(() => {
+    if (!linkedScriptNodeId) return;
+    useCanvasUiStore.getState().setScriptGenPanelPinnedNodeId(linkedScriptNodeId);
+    void focusPartnerNode(linkedScriptNodeId, { label: linkedScriptLabel ?? undefined });
+  }, [focusPartnerNode, linkedScriptLabel, linkedScriptNodeId]);
 
   const linkedAudioLabel = useMemo(() => {
     if (!linkedAudioNodeId) return null;
@@ -125,6 +146,21 @@ export function TextComposerPanel({
     [edges, nodeId, nodes],
   );
   const upstreamTextChars = upstreamContextBlocks.reduce((sum, b) => sum + b.content.length, 0);
+
+  const upstreamTextTagItems = useMemo((): UpstreamTextConnectionTagItem[] => {
+    if (isImageToPrompt || isTextToMusic) return [];
+    return upstreamContextBlocks.map((block) => {
+      const textIndex = upstreamTextSources.findIndex((s) => s.nodeId === block.nodeId);
+      const token = textIndex >= 0 ? `@文本${textIndex + 1}` : undefined;
+      return {
+        nodeId: block.nodeId,
+        label: block.label,
+        charCount: block.content.length,
+        atToken: token,
+        glyph: token ? "文" : "剧",
+      };
+    });
+  }, [isImageToPrompt, isTextToMusic, upstreamContextBlocks, upstreamTextSources]);
 
   const nodeLabels = useMemo(
     () => Object.fromEntries(nodes.map((n) => [n.id, n.data.label ?? n.id])),
@@ -284,10 +320,10 @@ export function TextComposerPanel({
     : "mention-input-wrapper imageGenPanelTextarea imageGenPanelTextarea--minimal";
 
   const placeholder = isImageToPrompt
-    ? IMAGE_TO_PROMPT_COMPOSER_HINT
+    ? TEXT_COMPOSER_PLACEHOLDER_IMAGE_TO_PROMPT
     : isTextToMusic
-      ? MUSIC_COMPOSER_PLACEHOLDER
-      : "写下你想讲的故事、场景或角色设定。例如：一个来自未来的机器人，在城市屋顶看星星。";
+      ? TEXT_COMPOSER_PLACEHOLDER_MUSIC
+      : TEXT_COMPOSER_PLACEHOLDER_DEFAULT;
 
   const panelClass = [
     "scriptGenComposer",
@@ -307,11 +343,13 @@ export function TextComposerPanel({
       ? ZONE_A_HINT_IMAGE
       : isTextToMusic
         ? ZONE_A_HINT_MUSIC
-        : upstreamContextBlocks.length > 0
-          ? `已接入 ${upstreamContextBlocks.map((b) => b.label).join("、")}（${formatUpstreamTextCharCount(upstreamTextChars)} 字）`
-          : ZONE_A_HINT_DEFAULT;
+        : isTextToScript
+          ? `剧本在预览正文 · 请到下游「${linkedScriptLabel ?? "脚本节点"}」底栏点「AI 解析镜头」`
+          : upstreamContextBlocks.length > 0
+            ? `已接入 ${upstreamContextBlocks.map((b) => b.label).join("、")}（${formatUpstreamTextCharCount(upstreamTextChars)} 字）`
+            : ZONE_A_HINT_DEFAULT;
 
-  const showZoneA = isExpandedLayout || !hideChromeHead || isImageToPrompt || isTextToMusic;
+  const showZoneA = isExpandedLayout || !hideChromeHead || isImageToPrompt || isTextToMusic || isTextToScript;
   const zoneAActions = isExpandedLayout ? (
     <>
       {onRequestDock ? (
@@ -417,43 +455,38 @@ export function TextComposerPanel({
         </div>
       ) : null}
 
+      {isTextToScript ? (
+        <div className="tgp-ttm-refRow">
+          <div className="tgp-ttm-refRowInner">
+            <p className="tgp-ttm-linked">
+              已连接下游「{linkedScriptLabel}」— 剧本写在本文本节点预览区，拆解请在脚本节点点「AI 解析镜头」
+            </p>
+            <button
+              type="button"
+              className="tgp-partner-focusBtn"
+              onPointerDown={onPointerDown}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleFocusLinkedScript();
+              }}
+            >
+              打开脚本解析
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <div className="tgp-v2-stack">
         {showZoneA ? (
           <div className="tgp-v2-zone-a">
             <div className="tgp-v2-zone-a-start">
-              {upstreamContextBlocks.length > 0 && !isImageToPrompt && !isTextToMusic ? (
-                <div className="tgp-upstream-text-tags" aria-label="上游文本/脚本">
-                  {upstreamContextBlocks.map((block) => {
-                    const textIndex = upstreamTextSources.findIndex((s) => s.nodeId === block.nodeId);
-                    const token = textIndex >= 0 ? `@文本${textIndex + 1}` : null;
-                    return (
-                      <button
-                        key={block.nodeId}
-                        type="button"
-                        className="tgp-upstream-text-tag"
-                        title={
-                          token
-                            ? `${token} · Shift+单击插入 · 单击定位「${block.label}」`
-                            : `单击定位「${block.label}」`
-                        }
-                        onPointerDown={onPointerDown}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (token && e.shiftKey) {
-                            insertModelAtToken(token);
-                            return;
-                          }
-                          void focusPartnerNode(block.nodeId, { label: block.label });
-                        }}
-                      >
-                        <span className="tgp-upstream-text-tagGlyph" aria-hidden>
-                          {token ? "文" : "剧"}
-                        </span>
-                        {block.label}
-                      </button>
-                    );
-                  })}
-                </div>
+              {upstreamTextTagItems.length > 0 ? (
+                <UpstreamTextConnectionTags
+                  items={upstreamTextTagItems}
+                  onLocate={(id, label) => void focusPartnerNode(id, { label })}
+                  onInsertAtToken={insertModelAtToken}
+                  onPointerDown={onPointerDown}
+                />
               ) : null}
               <span className="tgp-v2-hint">{zoneAHint}</span>
             </div>

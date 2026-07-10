@@ -50,6 +50,8 @@ pub(crate) struct ScriptBeatOut {
     pub(crate) performance_note: String,
     #[serde(default)]
     pub(crate) bgm_hint: String,
+    #[serde(default)]
+    pub(crate) lighting_mood: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -254,7 +256,8 @@ pub(crate) fn normalize_script_beats(parsed: Vec<ScriptBeatOut>) -> Vec<serde_js
                 "dialogueType": b.dialogue_type.trim(),
                 "performanceNote": b.performance_note.trim(),
                 "bgmHint": b.bgm_hint.trim(),
-                "storyboardPrompt": b.seedance_positive.trim(),
+                "lightingMood": b.lighting_mood.trim(),
+                "storyboardPrompt": "",
                 "seedancePositive": b.seedance_positive.trim(),
                 "seedanceNegative": b.seedance_negative.trim(),
             })
@@ -376,7 +379,11 @@ pub(crate) fn detect_style_from_text(requirement: &str, source: &str) -> ScriptS
     if s.contains("电影") || s.contains("院线") || s.contains("长镜头") || s.contains("镜头语言") {
         return ScriptStyleProfile::Film;
     }
-    ScriptStyleProfile::Film
+    if s.contains("短剧") || s.contains("竖屏") || s.contains("微短剧") {
+        return ScriptStyleProfile::ShortDrama;
+    }
+    // 默认竖屏短剧（与 script_pipeline / script_decision 默认策略一致）
+    ScriptStyleProfile::ShortDrama
 }
 
 #[cfg(test)]
@@ -403,6 +410,7 @@ mod normalize_tests {
             dialogue_type: "对白".to_string(),
             performance_note: "兴奋".to_string(),
             bgm_hint: "叙事铺底（轻）".to_string(),
+            lighting_mood: "冷色侧光".to_string(),
             ..ScriptBeatOut::default()
         }]);
         let beat = &out[0];
@@ -415,6 +423,7 @@ mod normalize_tests {
         assert_eq!(beat.get("dialogueType").and_then(|v| v.as_str()), Some("对白"));
         assert_eq!(beat.get("performanceNote").and_then(|v| v.as_str()), Some("兴奋"));
         assert_eq!(beat.get("bgmHint").and_then(|v| v.as_str()), Some("叙事铺底（轻）"));
+        assert_eq!(beat.get("lightingMood").and_then(|v| v.as_str()), Some("冷色侧光"));
     }
 
     #[test]

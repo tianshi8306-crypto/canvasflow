@@ -58,6 +58,7 @@ pub async fn run_graph_with_patch(
         json!({ "nodeCount": graph.nodes.len() }),
         &mut script_patches,
         None,
+        None,
     )
     .await?;
 
@@ -87,6 +88,7 @@ async fn run_subgraph_inner(
     previous_run_id: Option<&str>,
     force: bool,
     collect_patches: bool,
+    app: Option<&tauri::AppHandle>,
 ) -> Result<(String, Vec<NodeDataPatch>), String> {
     let order = topological_order(graph)?;
     if node_by_id(graph, from_node_id).is_none() {
@@ -143,6 +145,7 @@ async fn run_subgraph_inner(
         }),
         &mut script_patches,
         Some(&_output_before),
+        app,
     )
     .await?;
 
@@ -176,6 +179,7 @@ pub async fn run_subgraph(
     from_node_id: &str,
     previous_run_id: Option<&str>,
     force: bool,
+    app: Option<&tauri::AppHandle>,
 ) -> Result<String, String> {
     let (id, _) = run_subgraph_inner(
         http,
@@ -186,6 +190,7 @@ pub async fn run_subgraph(
         previous_run_id,
         force,
         false,
+        app,
     )
     .await?;
     Ok(id)
@@ -199,6 +204,7 @@ pub async fn run_subgraph_with_patch(
     from_node_id: &str,
     previous_run_id: Option<&str>,
     force: bool,
+    app: Option<&tauri::AppHandle>,
 ) -> Result<GraphRunResult, String> {
     let (run_id, node_patches) = run_subgraph_inner(
         http,
@@ -209,6 +215,7 @@ pub async fn run_subgraph_with_patch(
         previous_run_id,
         force,
         true,
+        app,
     )
     .await?;
     Ok(GraphRunResult { run_id, node_patches })

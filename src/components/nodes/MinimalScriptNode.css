@@ -120,38 +120,6 @@
   overflow: hidden;
 }
 
-/* ── 生成中心胶囊 ── */
-.scriptGenCenterCapsuleOverlay {
-  position: absolute;
-  inset: 0;
-  z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  pointer-events: auto;
-  background: rgba(14, 14, 14, 0.48);
-  backdrop-filter: blur(1px);
-}
-
-.scriptGenCenterCapsule {
-  display: inline-flex;
-  align-items: center;
-  gap: 20px;
-  padding: 9px 18px 9px 20px;
-  border-radius: 999px;
-  background: rgba(64, 64, 64, 0.94);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(8px);
-}
-
-.scriptGenCenterCapsule-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #fff;
-  white-space: nowrap;
-}
-
 .scriptChrome-preview.nodeChrome-preview {
   display: flex;
   flex-direction: column;
@@ -161,6 +129,76 @@
   box-sizing: border-box;
   overflow: hidden;
   pointer-events: auto;
+}
+
+.scriptChrome-preview--inlineTable {
+  padding: 6px 8px 8px;
+}
+
+.scriptChrome-inlinePreview {
+  flex: 1;
+  min-height: 0;
+  gap: 6px;
+}
+
+.scriptChrome-inlineHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  padding-bottom: 2px;
+}
+
+.scriptChrome-inlineViewSelect select {
+  cursor: pointer;
+}
+
+.scriptChrome-inlineExpandBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.scriptChrome-inlineExpandBtn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+}
+
+.scriptChrome-inlinePreview .scriptNodeInlineTableWrap {
+  flex: 1;
+  min-height: 0;
+  border-radius: 8px;
+}
+
+.scriptChrome-inlinePreview .scriptNodeInlineTableWrap .scriptTable tbody td {
+  padding: 7px 8px;
+  vertical-align: top;
+}
+
+.scriptChrome-inlinePreview .scriptNodeInlineTableWrap .scriptTable textarea {
+  min-height: 72px;
+  max-height: 120px;
+  line-height: 1.55;
+  overflow-y: auto;
+  resize: none;
+}
+
+.scriptChrome-inlinePreview .scriptNodeInlineTableWrap .scriptTableCellReadonly {
+  display: block;
+  min-height: 72px;
+  max-height: 120px;
+  line-height: 1.55;
+  overflow-y: auto;
 }
 
 
@@ -358,6 +396,41 @@
 .scriptUpstreamPanel-label {
   font-weight: 600;
   color: var(--text);
+}
+
+/* ── 分镜稿大文本预览（P0）── */
+.scriptChrome-draftPreview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  min-height: 0;
+}
+
+.scriptChrome-draftTextarea {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  resize: none;
+  border: none;
+  outline: none;
+  background: rgba(0, 0, 0, 0.25);
+  color: rgba(255, 255, 255, 0.92);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 11px;
+  line-height: 1.45;
+  padding: 8px 10px;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.scriptChrome-draftTextarea:focus {
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+}
+
+.scriptChrome-draftTextarea::placeholder {
+  color: rgba(255, 255, 255, 0.35);
 }
 
 .scriptUpstreamPanel-meta {

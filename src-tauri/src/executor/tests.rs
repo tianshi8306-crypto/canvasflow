@@ -212,6 +212,7 @@ async fn subgraph_skips_already_succeeded_nodes_by_default() {
         "a",
         Some(&first_run),
         false,
+        None,
     )
     .await
     .expect("second subgraph run");

@@ -78,6 +78,18 @@ function getDownloadPlan() {
     };
   }
 
+  // 本地 Linux/macOS：若已安装 ffmpeg，直接复制进 sidecar
+  if (key === "linux-x64" || key === "darwin-arm64" || key === "darwin-x64") {
+    const probe = spawnSync("bash", ["-lc", "command -v ffmpeg"], { encoding: "utf8" });
+    if (probe.status === 0 && probe.stdout?.trim()) {
+      return {
+        kind: "system",
+        url: "",
+        extractHint: "从系统 PATH 复制 ffmpeg",
+      };
+    }
+  }
+
   // 说明：
   // - 这里的 URL 可能会随上游变动；若下载失败，请手动放置 ffmpeg 到 src-tauri/bin/ 并重试。
   if (key === "win32-x64") {
@@ -161,11 +173,29 @@ function copySystemFfmpeg(target) {
   die("[ffmpeg] CI system copy unsupported on this platform");
 }
 
+function bundleTargetsForPlatform() {
+  const p = os.platform();
+  if (p === "win32") return ["nsis"];
+  if (p === "darwin") return ["dmg"];
+  if (p === "linux") return ["deb"];
+  return ["nsis"];
+}
+
+function applyBundlePatch(conf) {
+  conf.bundle = conf.bundle ?? {};
+  conf.bundle.externalBin = ["bin/ffmpeg"];
+  conf.bundle.targets = bundleTargetsForPlatform();
+  if (!process.env.TAURI_SIGNING_PRIVATE_KEY?.trim()) {
+    conf.bundle.createUpdaterArtifacts = false;
+    console.log("[tauri] no TAURI_SIGNING_PRIVATE_KEY — skipping updater artifacts");
+  }
+  console.log(`[tauri] bundle targets: ${conf.bundle.targets.join(", ")}`);
+}
+
 function patchTauriExternalBinPermanent() {
   if (!exists(TAURI_CONF)) die(`[tauri] missing ${TAURI_CONF}`);
   const conf = readJson(TAURI_CONF);
-  conf.bundle = conf.bundle ?? {};
-  conf.bundle.externalBin = ["bin/ffmpeg"];
+  applyBundlePatch(conf);
   writeJson(TAURI_CONF, conf);
   console.log("[tauri] patched tauri.conf.json (externalBin enabled, permanent for CI)");
 }
@@ -278,10 +308,9 @@ function withPatchedTauriConf(fn) {
   process.on("exit", onExit);
 
   const conf = JSON.parse(raw);
-  conf.bundle = conf.bundle ?? {};
-  conf.bundle.externalBin = ["bin/ffmpeg"];
+  applyBundlePatch(conf);
   writeJson(TAURI_CONF, conf);
-  console.log("[tauri] patched tauri.conf.json (externalBin enabled)");
+  console.log("[tauri] patched tauri.conf.json (externalBin + platform targets)");
 
   try {
     fn();

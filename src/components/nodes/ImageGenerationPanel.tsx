@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { imageGenPromptPlaceholder } from "@/lib/nodeComposerPlaceholders";
 import { useHermesCanvasGenFailureNotify } from "@/hooks/useHermesCanvasGenFailureNotify";
 import {
   ImagePromptMentionInput,
@@ -807,11 +808,7 @@ export function ImageGenerationPanel({
           textPickerItems={textPickerItems}
           panelItems={displayPanelItems}
           nodeLabels={nodeLabels}
-          placeholder={
-            displayPanelItems.length > 0
-              ? "描述你想要生成的内容；@ 可引用 @文本1 / @图片1（序号与顶栏参考条一致），Shift+单击文本条亦可插入"
-              : "描述你想要生成的内容，使用 @ 引用已连线的上游节点，按 / 呼出指令"
-          }
+          placeholder={imageGenPromptPlaceholder(displayPanelItems.length > 0)}
           className={`image-prompt-mention--compact ${textareaClass}`}
           maxLength={IMAGE_GENERATION_PROMPT_MAX_CHARS}
           activeRefSourceNodeId={activeRefSourceNodeId}

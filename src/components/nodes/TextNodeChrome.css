@@ -81,6 +81,16 @@
   --tgp-cta-bg-generating: #ffffff;
   --tgp-cta-fg-generating: #121212;
   --tgp-cta-border-generating: var(--border-button, #4d4d4d);
+  --vgp-ref-thumb-size: var(--gen-ref-thumb-size, 37px);
+  --vgp-ref-thumb-gap: var(--gen-ref-thumb-gap, 4px);
+}
+
+.textGenPanel--v2 .upstreamTextConnectionThumbs {
+  flex: 0 0 auto;
+}
+
+.textGenPanel--v2 .upstreamTextConnectionThumbs .mmToolsAndThumbs {
+  padding: 0;
 }
 
 .textGenPanel--chrome.imageGenPanel--minimal-inner {
@@ -93,6 +103,8 @@
 .textGenPanel--chrome.tgp-layout-default {
   min-height: 0;
   gap: 2px;
+  max-height: min(42vh, 320px);
+  overflow: hidden;
 }
 
 /* ── Composer v2：四区（A 提示+图标 / B 输入 / C Chip / D 底栏）── */
@@ -138,7 +150,7 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  max-width: 120px;
+  max-width: 160px;
   padding: 2px 8px;
   border-radius: 6px;
   border: 1px solid rgba(20, 184, 166, 0.28);
@@ -171,6 +183,40 @@
   color: #99f6e4;
 }
 
+.textGenPanel--v2 .tgp-upstream-text-tagLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.textGenPanel--v2 .tgp-upstream-text-tagMeta {
+  flex-shrink: 0;
+  font-size: 9px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.textGenPanel--v2 .tgp-upstream-text-tag--empty {
+  border-color: rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fcd34d;
+}
+
+.textGenPanel--v2 .tgp-upstream-text-tag--disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.textGenPanel--v2 .tgp-upstream-text-tags--scriptRow {
+  margin: 0 0 8px;
+  max-width: 100%;
+}
+
+.textGenPanel--v2 .tgp-v2-zone-a-start .tgp-upstream-text-tags {
+  max-width: 48%;
+}
+
 .textGenPanel--v2 .tgp-v2-hint {
   flex: 1;
   min-width: 0;
@@ -189,14 +235,29 @@
   flex-shrink: 0;
 }
 
+.textGenPanel--v2.tgp-layout-default .tgp-v2-zone-b,
+.textGenPanel--v2.tgp-layout-default .tgp-prompt-wrap.tgp-v2-zone-b {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 132px;
+  overflow: hidden;
+}
+
 .textGenPanel--v2.tgp-layout-default .tgp-v2-zone-b .mention-input-wrapper {
   min-height: 72px;
   max-height: 120px;
+  overflow: hidden;
+}
+
+.textGenPanel--v2.tgp-layout-default .tgp-v2-zone-b .mention-overlay {
+  max-height: 100%;
+  overflow: hidden;
 }
 
 .textGenPanel--v2.tgp-layout-default .tgp-v2-zone-b .mention-textarea {
   min-height: 64px;
   max-height: 112px;
+  overflow-y: auto;
 }
 
 .textGenPanel--v2 .tgp-v2-zone-c {
@@ -716,11 +777,36 @@
   overflow: auto;
 }
 
+.textPreviewToolbar {
+  max-width: min(640px, 96vw);
+  background: rgba(22, 22, 22, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.42);
+  padding: 5px 8px;
+  --text-fmt-control-h: 28px;
+  --text-fmt-control-text: rgba(255, 255, 255, 0.78);
+  --text-fmt-control-text-strong: rgba(255, 255, 255, 0.92);
+}
+
+.textPreviewToolbarChrome .textPreviewToolbar {
+  max-width: min(640px, 96vw);
+}
+
+.textPreviewToolbarScroll {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
 .textPreviewToolbar .textNodeFormatBar--inline {
   display: inline-flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   padding: 0;
   margin: 0;
   border: none;
@@ -729,14 +815,75 @@
 }
 
 .textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn {
-  min-width: 26px;
-  height: 26px;
-  padding: 0 4px;
-  font-size: 10px;
+  min-width: var(--text-fmt-control-h);
+  width: var(--text-fmt-control-h);
+  height: var(--text-fmt-control-h);
+  padding: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-fmt-control-text);
+  border-radius: 6px;
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn--heading {
+  min-width: 30px;
+  width: auto;
+  padding: 0 3px;
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn--wide {
+  min-width: 28px;
+  width: 28px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn--bold {
+  font-weight: 800;
+  color: var(--text-fmt-control-text-strong);
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn--italic {
+  font-family: Georgia, "Times New Roman", serif;
+  font-style: italic;
+  font-weight: 600;
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn--icon {
+  min-width: var(--text-fmt-control-h);
+  width: var(--text-fmt-control-h);
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn--ol {
+  min-width: 36px;
+  width: 36px;
+  gap: 3px;
+}
+
+.textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtBtn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-fmt-control-text-strong);
+}
+
+.textNodeFmtHeadingLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.textNodeFmtHeadingLabel sub {
+  font-size: 0.68em;
+  font-weight: 600;
+  vertical-align: baseline;
+  position: relative;
+  bottom: -0.12em;
 }
 
 .textPreviewToolbar .textNodeFormatBar--inline .textNodeFmtSep {
-  margin: 0 2px;
+  width: 1px;
+  height: 18px;
+  margin: 0 5px;
+  background: rgba(255, 255, 255, 0.14);
 }
 
 .textNodeChrome .textNodeFormatBar {
@@ -957,6 +1104,10 @@
   overflow: hidden;
 }
 
+.textNodeChrome--editing .textNodeChrome-body--integrated {
+  overflow: auto;
+}
+
 .textNodeChrome-body--integrated:has(.textNodeEmptyShell) {
   padding: 12px;
 }
@@ -972,17 +1123,16 @@
 
 .textNodeReadOnly--integrated {
   flex: 1;
+  display: flex;
+  flex-direction: column;
   border: none;
   background: transparent;
   padding: 0;
-  font-size: 13px;
-  line-height: 1.55;
   position: relative;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 10;
-  line-clamp: 10;
+  min-height: 0;
+  cursor: text;
+  --tpd-fade-bg: var(--gen-panel-bg, #2b2b2b);
 }
 
 /* 覆盖 .textNodeChrome .textNodeReadOnly 的内层壳线框，只保留外圈节点壳 */
@@ -996,25 +1146,11 @@
 }
 
 .textNodeChrome--userSized .textNodeReadOnly--integrated {
-  display: block;
-  -webkit-line-clamp: unset;
-  line-clamp: unset;
   overflow: auto;
   max-height: none;
 }
 
 .textNodeReadOnly--integrated::after {
-  content: "";
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 24px;
-  background: linear-gradient(to bottom, transparent, var(--gen-panel-bg, #2b2b2b));
-  pointer-events: none;
-}
-
-.textNodeChrome--userSized .textNodeReadOnly--integrated::after {
   display: none;
 }
 
@@ -1146,20 +1282,35 @@
   flex-shrink: 0;
 }
 
+.textNodeChrome--integrated .textPromptDoc--editable {
+  flex: 1;
+  min-height: 80px;
+  overflow: auto;
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
+}
+
+.textNodeChrome--integrated .textPromptDoc--editable:focus,
+.textNodeChrome--integrated .textPromptDoc--editable:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  background: transparent !important;
+}
+
 .textNodeChrome--integrated .textNodeEditable--integrated,
-.textNodeChrome--integrated.textNodeChrome--editing .textNodeEditable--integrated {
+.textNodeChrome--integrated.textNodeChrome--editing .textNodeEditable--integrated,
+.textNodeChrome--integrated .textPromptMarkdownEditor.textNodeEditable--integrated {
   flex: 1;
   min-height: 80px;
   border: none !important;
   background: transparent !important;
   padding: 0;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--text-primary, #e0e0e0);
   outline: none !important;
   box-shadow: none !important;
   overflow: auto;
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
@@ -1236,7 +1387,7 @@
 /* 顶栏 Portal：外层定位 + 内层胶囊 */
 .textPreviewToolbarPortalRoot {
   width: max-content;
-  max-width: min(520px, 92vw);
+  max-width: min(640px, 96vw);
 }
 
 .textPreviewToolbarChrome {
@@ -1248,37 +1399,19 @@
   min-height: 0;
 }
 
-.textPreviewToolbarChrome .textPreviewToolbar {
-  max-width: min(520px, 92vw);
-  background: var(--gen-panel-bg, #2b2b2b);
-  border: 1px solid var(--border-button);
-  border-radius: var(--radius-md, 8px);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.35);
-  padding: 4px 6px;
-}
-
-.textPreviewToolbarScroll {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  max-width: 100%;
-  overflow-x: auto;
-  scrollbar-width: thin;
-}
-
 .textPreviewToolbar-divider {
   width: 1px;
   align-self: stretch;
-  min-height: 20px;
-  margin: 0 4px;
-  background: rgba(255, 255, 255, 0.12);
+  min-height: var(--text-fmt-control-h, 28px);
+  margin: 0 6px 0 4px;
+  background: rgba(255, 255, 255, 0.14);
   flex-shrink: 0;
 }
 
 .textPreviewToolbar-utils {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 1px;
   flex-shrink: 0;
 }
 
@@ -1286,25 +1419,25 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: var(--text-fmt-control-h, 28px);
+  height: var(--text-fmt-control-h, 28px);
   padding: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: var(--text-secondary, #b0b0b0);
+  color: var(--text-fmt-control-text, rgba(255, 255, 255, 0.78));
   cursor: pointer;
   flex-shrink: 0;
 }
 
 .textPreviewToolbar-iconBtn:hover {
   background: rgba(255, 255, 255, 0.1);
-  color: var(--text-primary, #e8e8e8);
+  color: var(--text-fmt-control-text-strong, rgba(255, 255, 255, 0.92));
 }
 
 .textPreviewToolbar-iconBtn svg {
-  width: 14px;
-  height: 14px;
+  width: 16px;
+  height: 16px;
 }
 
 /* 空态：图标 + 单行提示，整体居中 */

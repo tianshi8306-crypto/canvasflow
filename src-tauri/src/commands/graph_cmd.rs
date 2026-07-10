@@ -61,6 +61,7 @@ pub async fn execute_subgraph(
         &from_node_id,
         previous_run_id.as_deref(),
         force.unwrap_or(false),
+        Some(&app),
     )
     .await
 }
@@ -89,6 +90,7 @@ pub async fn execute_subgraph_with_patch(
         &from_node_id,
         previous_run_id.as_deref(),
         force.unwrap_or(false),
+        Some(&app),
     )
     .await
 }

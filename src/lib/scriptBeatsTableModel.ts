@@ -8,6 +8,7 @@ export type ScriptBeatStringKey = Exclude<keyof ScriptBeat, "characters">;
 export type TableColKey =
   | ScriptBeatStringKey
   | "characters"
+  | "rowIndex"
   | `roleName:${number}`
   | `roleDesc:${number}`
   | `roleImage:${number}`;
@@ -16,6 +17,7 @@ export type TableCol = { key: TableColKey; label: string; minW?: number };
 export const TEXTAREA_KEYS = new Set<ScriptBeatStringKey>([
   "description",
   "dialogue",
+  "lightingMood",
   "storyboardBlock",
   "storyboardPrompt",
   "videoMotionPrompt",
@@ -207,6 +209,24 @@ export function normalizeRoleDescDisplayText(input: string): string {
   return roleDescDisplayText(roleDescFromDisplayText(input));
 }
 
+export type ScriptBeatsTableLayout = "basic" | "pro";
+
+/** 基本镜头表（画布壳 + 全屏默认） */
+export const SCRIPT_BEATS_BASIC_VIEW_COLUMNS: TableCol[] = [
+  { key: "rowIndex", label: "编号", minW: 48 },
+  { key: "durationHint", label: "时长", minW: 64 },
+  { key: "description", label: "画面描述", minW: 360 },
+  { key: "shotSize", label: "景别", minW: 56 },
+  { key: "lightingMood", label: "光影氛围", minW: 132 },
+  { key: "dialogue", label: "对白·旁白", minW: 148 },
+  { key: "soundHint", label: "音效", minW: 108 },
+  { key: "cameraMove", label: "运镜", minW: 72 },
+  { key: "storyboardPrompt", label: "分镜提示词", minW: 220 },
+];
+
+/** 画布 inline 宽列集 = 基本表 */
+export const INLINE_COLUMNS_BASIC: TableCol[] = SCRIPT_BEATS_BASIC_VIEW_COLUMNS;
+
 /** 全屏：结构化分镜字段（P0） */
 export const SCRIPT_BEATS_FULLSCREEN_BASE_COLUMNS: TableCol[] = [
   { key: "shotNumber", label: "镜号", minW: 72 },
@@ -255,6 +275,21 @@ export const INLINE_COLUMNS_COMPACT: TableCol[] = [
   { key: "roleName:0", label: "角色1", minW: 82 },
   { key: "roleDesc:0", label: "角色描述1", minW: 140 },
 ];
+
+export function inlineFixedWidthBasic(key: TableColKey): number | undefined {
+  const map: Partial<Record<TableColKey, number>> = {
+    rowIndex: 44,
+    durationHint: 60,
+    description: 320,
+    shotSize: 52,
+    lightingMood: 120,
+    dialogue: 132,
+    soundHint: 96,
+    cameraMove: 68,
+    storyboardPrompt: 180,
+  };
+  return map[key];
+}
 
 export function inlineFixedWidthByContainer(key: TableColKey, w: number): number | undefined {
   if (w < 760) {

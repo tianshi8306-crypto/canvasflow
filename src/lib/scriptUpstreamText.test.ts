@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  listScriptUpstreamTextConnections,
   listScriptUpstreamTextSources,
   scriptUpstreamImportStatusMessage,
 } from "@/lib/scriptUpstreamText";
@@ -29,6 +30,18 @@ describe("scriptUpstreamText", () => {
       node("s1", "scriptNode", { prompt: "要求" }),
     ];
     const edges: Edge[] = [{ id: "e1", source: "t1", target: "s1", data: { disabled: true } }];
+    expect(listScriptUpstreamTextSources(nodes, edges, "s1")).toHaveLength(0);
+  });
+
+  it("lists empty upstream connections for tag UI", () => {
+    const nodes = [
+      node("t1", "textNode", { label: "空文本", prompt: "" }),
+      node("s1", "scriptNode", { prompt: "要求" }),
+    ];
+    const edges: Edge[] = [{ id: "e1", source: "t1", target: "s1" }];
+    const connections = listScriptUpstreamTextConnections(nodes, edges, "s1");
+    expect(connections).toHaveLength(1);
+    expect(connections[0]?.isEmpty).toBe(true);
     expect(listScriptUpstreamTextSources(nodes, edges, "s1")).toHaveLength(0);
   });
 });

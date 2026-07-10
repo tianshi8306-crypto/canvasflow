@@ -12,7 +12,8 @@ export function getScriptNodeFlowCenter(node: Node<FlowNodeData>): { x: number; 
   let { w, h } = nodeLayoutDimensions(node);
   if (node.measured?.width == null || node.measured.width <= 0) {
     const beatCount = node.data?.scriptBeats?.length ?? 0;
-    const frame = computeScriptNodeFrameSize(beatCount > 0, beatCount);
+    const hasPreview = beatCount > 0;
+    const frame = computeScriptNodeFrameSize(hasPreview, beatCount);
     w = frame.width;
     h = frame.height;
   }

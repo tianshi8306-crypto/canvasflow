@@ -19,8 +19,7 @@ export type ScriptDocumentExtract = {
   charCount: number;
 };
 
-const PARSE_REQUIREMENT_WITH_UPSTREAM =
-  "自动提取角色、分镜并逐镜生成 Seedance 2.0 视觉化参数。";
+import { SCRIPT_PARSE_REQUIREMENT_WITH_UPSTREAM } from "@/lib/scriptParseDefaults";
 
 export async function pickScriptDocumentPath(): Promise<string | null> {
   if (!isTauri()) return null;
@@ -120,7 +119,7 @@ export async function applyScriptDocumentImport(opts: {
     useProjectStore.setState((s) => ({
       nodes: s.nodes.map((n) => {
         if (n.id === upstreamTextId) return { ...n, data: { ...n.data, prompt: text } };
-        if (n.id === opts.scriptNodeId) return { ...n, data: { ...n.data, prompt: PARSE_REQUIREMENT_WITH_UPSTREAM } };
+        if (n.id === opts.scriptNodeId) return { ...n, data: { ...n.data, prompt: SCRIPT_PARSE_REQUIREMENT_WITH_UPSTREAM } };
         return n;
       }),
     }));
@@ -147,7 +146,7 @@ export async function applyScriptDocumentImport(opts: {
   }
 
   const promptForRun = upstreamTextId
-    ? PARSE_REQUIREMENT_WITH_UPSTREAM
+    ? SCRIPT_PARSE_REQUIREMENT_WITH_UPSTREAM
     : text;
 
   try {

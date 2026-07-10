@@ -9,6 +9,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { type NodeProps, type Node } from "@xyflow/react";
 
 import type { FlowNodeData } from "@/lib/types";
+import { isTextInputTarget } from "@/lib/canvasInteraction";
 
 import {
   computeVideoNodeFrameSize,
@@ -177,12 +178,8 @@ function MinimalVideoNodeInner({
       }
 
       if (e.key === "Delete" || e.key === "Backspace") {
-        const t = e.target;
-
-        if (t instanceof HTMLInputElement || t instanceof HTMLTextAreaElement) return;
-
+        if (isTextInputTarget(e.target)) return;
         e.preventDefault();
-
         deleteSelection();
       }
     };

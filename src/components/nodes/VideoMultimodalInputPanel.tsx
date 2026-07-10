@@ -16,6 +16,7 @@ import {
   useState,
   type KeyboardEvent,
 } from "react";
+import { videoGenPromptPlaceholder } from "@/lib/nodeComposerPlaceholders";
 import {
   VideoPromptMentionInput,
   type VideoPromptMentionInputRef,
@@ -736,11 +737,7 @@ export function VideoMultimodalInputPanel({
             onRefPillActivate={handleRefPillActivate}
             complianceByEdgeId={imageComplianceByEdge}
             onChange={(next) => patchDraft({ prompt: next })}
-            placeholder={
-              orderedIncomingRefItems.length > 0
-                ? "描述画面与动作… @ 可写 @文本1、@图片1（序号与参考条一致）或节点名"
-                : "描述你想要的画面、场景、动作…"
-            }
+            placeholder={videoGenPromptPlaceholder(orderedIncomingRefItems.length > 0)}
           />
         </div>
       </div>

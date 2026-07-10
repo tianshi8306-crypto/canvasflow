@@ -1,47 +1,51 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import { isTauri } from "@tauri-apps/api/core";
 import {
   SCRIPT_AI_PARSE_BUSY_LABEL,
   SCRIPT_AI_REPARSE_BUTTON_LABEL,
 } from "@/lib/scriptNodeActionLabels";
 import { preflightScriptNodeLlm, scriptNodeLlmInvokeParams } from "@/lib/scriptNodeLlmParams";
 import type { ScriptBeat } from "@/lib/types";
-import { normalizeScriptBeat, normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
+import { normalizeScriptBeats } from "@/lib/scriptBeatHelpers";
 import {
   buildScriptNodeExportPayload,
   downloadScriptNodeExportJson,
 } from "@/lib/scriptNodeExport";
 import { ScriptBeatsEditorTable } from "@/components/ScriptBeatsEditorTable";
-import { ScriptCreativeViewGrid } from "@/components/ScriptCreativeViewGrid";
+import type { ScriptBeatsTableLayout } from "@/lib/scriptBeatsTableModel";
+import { patchBeatsWithSynthesizedPrompts } from "@/lib/scriptPromptSynthesis";
+import { polishStoryboardPromptsWithLlm } from "@/lib/scriptPromptPolish";
 import { useProjectStore } from "@/store/projectStore";
 import { runNodeTaskAgent } from "@/lib/nodeAgentRuntime/runNodeTaskAgent";
 import { scriptNodeDispatchAgentRuntime } from "@/lib/nodeAgentRuntime/dagnodeDispatchAgents";
 import { scriptStoryboardGenerateAgentRuntime } from "@/lib/nodeAgentRuntime/scriptStoryboardAgent";
 import { resolveStoryboardBeatScope } from "@/lib/scriptStoryboardScope";
 import { scriptParseCompleteStatus } from "@/lib/scriptNodeFeedback";
+import {
+  canStartScriptParse,
+  resolveScriptParseRequirement,
+} from "@/lib/scriptParseDefaults";
+import { patchFromScriptBeatsEdit, patchFromStoryboardDraftEdit } from "@/lib/storyboardDraftSync";
+import { listScriptUpstreamTextSources } from "@/lib/scriptUpstreamText";
 import { useScriptNodeTaskState } from "@/hooks/useScriptNodeTaskState";
-import { pickImagePathsForImport } from "@/lib/tauriMediaPaths";
-import { importStoryboardImageForBeat } from "@/lib/scriptStoryboardImageImport";
-import { formatUserError } from "@/lib/errors";
 import { useCanvasUiStore } from "@/store/canvasUiStore";
 import { ScriptDocumentImportButton } from "@/components/script/ScriptDocumentImportButton";
 
-/** 脚本节点全屏：脚本表格（只读） / 创意分镜缩略图网格（保留选图功能） */
+/** 脚本节点全屏：基本/专业脚本镜头表 */
 export function ScriptNodeFullscreenOverlay() {
   const nodeId = useProjectStore((s) => s.scriptFullscreenNodeId);
   const nodes = useProjectStore((s) => s.nodes);
+  const edges = useProjectStore((s) => s.edges);
   const projectPath = useProjectStore((s) => s.projectPath);
   const setStatusText = useProjectStore((s) => s.setStatusText);
   const updateNodeData = useProjectStore((s) => s.updateNodeData);
   const closeScriptFullscreen = useProjectStore((s) => s.closeScriptFullscreen);
   const runNodeSubgraph = useProjectStore((s) => s.runNodeSubgraph);
 
-  const [tab, setTab] = useState<"script" | "creative">("script");
+  const [scriptTableLayout, setScriptTableLayout] = useState<ScriptBeatsTableLayout>("basic");
   const [exportBusy, setExportBusy] = useState(false);
+  const [polishBusy, setPolishBusy] = useState(false);
   const [highlightBeatId, setHighlightBeatId] = useState<string | null>(null);
-  const pendingPickBeatIdRef = useRef<string | null>(null);
-  const creativeImageInputRef = useRef<HTMLInputElement | null>(null);
   const inspectorStoryboardFocus = useCanvasUiStore((s) => s.inspectorStoryboardFocus);
   const setInspectorStoryboardFocus = useCanvasUiStore((s) => s.setInspectorStoryboardFocus);
   const node = useMemo(() => nodes.find((n) => n.id === nodeId) ?? null, [nodes, nodeId]);
@@ -56,8 +60,15 @@ export function ScriptNodeFullscreenOverlay() {
   }, [nodeId, nodes, closeScriptFullscreen]);
 
   const beats = node?.data.scriptBeats ?? [];
+  const storyboardDraft = node?.data.storyboardDraft ?? "";
   const storedSelection = node?.data.scriptBeatSelection;
   const themePrompt = node?.data.prompt ?? "";
+  const upstreamSources = useMemo(
+    () => (nodeId ? listScriptUpstreamTextSources(nodes, edges, nodeId) : []),
+    [edges, nodeId, nodes],
+  );
+  const hasUpstreamScriptText = upstreamSources.length > 0;
+  const canParse = canStartScriptParse(themePrompt, hasUpstreamScriptText);
   const nodeParams =
     node?.data.params && typeof node.data.params === "object"
       ? (node.data.params as Record<string, unknown>)
@@ -67,28 +78,11 @@ export function ScriptNodeFullscreenOverlay() {
     node?.data.label?.trim() || (themePrompt.trim() ? themePrompt.slice(0, 80) : "脚本生成器");
 
   const rows = useMemo(() => normalizeScriptBeats(beats.length ? beats : []), [beats]);
-  const selectedIds = useMemo(
-    () => (storedSelection ?? []).filter((id) => rows.some((r) => r.id === id)),
-    [storedSelection, rows],
-  );
 
   const persistBeats = (next: ScriptBeat[]) => {
     if (!nodeId) return;
-    const normalized = next.map((b) => normalizeScriptBeat(b));
-    const valid = new Set(normalized.map((b) => b.id));
-    const prunedSel = (storedSelection ?? []).filter((id) => valid.has(id));
-    updateNodeData(nodeId, { scriptBeats: normalized, scriptBeatSelection: prunedSel });
-  };
-
-  const setSelection = (next: string[]) => {
-    if (!nodeId) return;
-    const allowed = new Set(rows.map((r) => r.id));
-    updateNodeData(nodeId, { scriptBeatSelection: next.filter((id) => allowed.has(id)) });
-  };
-
-  const toggleSelect = (id: string) => {
-    const next = selectedIds.includes(id) ? selectedIds.filter((x) => x !== id) : [...selectedIds, id];
-    setSelection(next);
+    const patch = patchFromScriptBeatsEdit(next, storedSelection);
+    updateNodeData(nodeId, patch);
   };
 
   useEffect(() => {
@@ -103,22 +97,20 @@ export function ScriptNodeFullscreenOverlay() {
     return () => window.removeEventListener("keydown", onKey);
   }, [nodeId, closeScriptFullscreen]);
 
-  const focusBeatInCreative = useCallback(
+  const locateBeatInScript = useCallback(
     (beatId: string) => {
-      const beat = rows.find((b) => b.id === beatId);
-      if (!beat) {
-        setTab("creative");
-        setStatusText("已切换到创意视图");
-        return;
-      }
-      setTab("creative");
       setHighlightBeatId(beatId);
+      const beat = rows.find((b) => b.id === beatId);
+      setStatusText(
+        beat
+          ? `已定位到第 ${rows.findIndex((b) => b.id === beatId) + 1} 镜`
+          : "已定位镜头",
+      );
       requestAnimationFrame(() => {
         document
           .querySelector(`[data-beat-id="${beatId}"]`)
-          ?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          ?.scrollIntoView({ block: "center", behavior: "smooth" });
       });
-      setStatusText(`已在创意视图聚焦镜号 ${beat.shotNumber || "—"}`);
     },
     [rows, setStatusText],
   );
@@ -129,107 +121,73 @@ export function ScriptNodeFullscreenOverlay() {
     }
     const beatId = inspectorStoryboardFocus.beatId;
     setInspectorStoryboardFocus(null);
-    focusBeatInCreative(beatId);
-  }, [
-    focusBeatInCreative,
-    inspectorStoryboardFocus,
-    nodeId,
-    setInspectorStoryboardFocus,
-  ]);
-
-  const applyImportedImage = useCallback(
-    (beatId: string, filePaths: string[]) => {
-      if (!nodeId || !projectPath?.trim() || filePaths.length === 0) return;
-      void (async () => {
-        try {
-          const latestNode = useProjectStore.getState().nodes.find((n) => n.id === nodeId);
-          const latestShots = latestNode?.data.storyboardShots;
-          const result = await importStoryboardImageForBeat(
-            projectPath,
-            filePaths,
-            latestShots,
-            beatId,
-          );
-          if (!result) return;
-          updateNodeData(nodeId, { storyboardShots: result.shots });
-          setStatusText(`已关联分镜图：${result.relPath}`);
-        } catch (e) {
-          setStatusText(`导入分镜图失败：${formatUserError(e)}`);
-        }
-      })();
-    },
-    [nodeId, projectPath, setStatusText, updateNodeData],
-  );
-
-  const onPickCreativeImage = useCallback(
-    (beatId: string) => {
-      if (!projectPath?.trim()) {
-        setStatusText("请先打开工程后再关联分镜图");
-        return;
-      }
-      pendingPickBeatIdRef.current = beatId;
-      void (async () => {
-        if (isTauri()) {
-          const paths = await pickImagePathsForImport(false);
-          if (paths?.length) applyImportedImage(beatId, paths);
-          pendingPickBeatIdRef.current = null;
-        } else {
-          creativeImageInputRef.current?.click();
-        }
-      })();
-    },
-    [applyImportedImage, projectPath, setStatusText],
-  );
+    locateBeatInScript(beatId);
+  }, [inspectorStoryboardFocus, locateBeatInScript, nodeId, setInspectorStoryboardFocus]);
 
   if (!nodeId || !node) return null;
 
-  const failedShotCount = (node.data.storyboardShots ?? []).filter((s) => s.status === "failed").length;
+  const taskLocked = isBusy || exportBusy || polishBusy;
+  const parseBusy = isGraphRunning || (isBusy && !isStoryboardBusy);
+  const canRegen = Boolean(projectPath?.trim() && canParse && !taskLocked);
+  const canStoryboard = Boolean(projectPath?.trim() && rows.length > 0 && !taskLocked);
+  const canSynthesizePrompts = Boolean(rows.length > 0 && !taskLocked);
+  const canPolishPrompts = Boolean(rows.length > 0 && !taskLocked);
+  const canExport = Boolean(rows.length > 0 && !exportBusy);
+  const canSyncDraft = Boolean(storyboardDraft.trim() && !taskLocked);
 
-  const locateBeatInScript = (beatId: string) => {
-    setTab("script");
-    setHighlightBeatId(beatId);
-    const beat = rows.find((b) => b.id === beatId);
-    setStatusText(
-      beat
-        ? `已定位到脚本表：镜号 ${beat.shotNumber || "—"}（可参考后重新生成分镜）`
-        : "已切换到脚本视图",
-    );
+  const onSynthesizePrompts = () => {
+    if (!nodeId || rows.length === 0) return;
+    const next = patchBeatsWithSynthesizedPrompts(rows);
+    persistBeats(next);
+    setStatusText(`已为 ${next.length} 个镜头合成分镜提示词`);
   };
 
-  const onCreativeImageFiles = (ev: ChangeEvent<HTMLInputElement>) => {
-    const beatId = pendingPickBeatIdRef.current;
-    const input = ev.currentTarget;
-    const files = Array.from(input.files ?? []);
-    input.value = "";
-    pendingPickBeatIdRef.current = null;
-    if (!beatId || files.length === 0) return;
-    const paths = files
-      .map((f) => (f as File & { path?: string }).path)
-      .filter((p): p is string => Boolean(p && typeof p === "string"));
-    if (paths.length === 0) {
-      setStatusText("未拿到本地文件路径：请在 Tauri 桌面端选择文件");
+  const onPolishPrompts = () => {
+    if (!nodeId || rows.length === 0) return;
+    void (async () => {
+      setPolishBusy(true);
+      try {
+        if (!(await preflightScriptNodeLlm(nodeParams, setStatusText))) return;
+        setStatusText("正在润色分镜提示词…");
+        const { beats: next, polishedCount, usedLlm } = await polishStoryboardPromptsWithLlm(
+          rows,
+          llmParams,
+        );
+        persistBeats(next);
+        if (!usedLlm) {
+          setStatusText(`已用规则合成 ${next.length} 条分镜提示词（非桌面端未调用 LLM）`);
+        } else if (polishedCount === 0) {
+          setStatusText("润色未返回有效结果，已保留规则合成稿");
+        } else {
+          setStatusText(`已润色 ${polishedCount}/${next.length} 条分镜提示词`);
+        }
+      } catch {
+        setStatusText("润色分镜提示词失败，请检查模型配置");
+      } finally {
+        setPolishBusy(false);
+      }
+    })();
+  };
+
+  const onSyncFromDraft = () => {
+    if (!nodeId) return;
+    const result = patchFromStoryboardDraftEdit(storyboardDraft, rows, storedSelection);
+    if (!result.scriptBeats) {
+      setStatusText("分镜稿格式无效，请检查 --- 分镜块");
       return;
     }
-    applyImportedImage(beatId, paths);
+    updateNodeData(nodeId, result);
+    setStatusText(`已从分镜稿同步 ${result.scriptBeats.length} 条镜头`);
   };
-
-  const selectAllBeats = () => setSelection(rows.map((r) => r.id));
-  const clearBeatSelection = () => setSelection([]);
-
-  const taskLocked = isBusy || exportBusy;
-  const parseBusy = isGraphRunning || (isBusy && !isStoryboardBusy);
-  const canRegen = Boolean(projectPath?.trim() && themePrompt.trim() && !taskLocked);
-  const canStoryboard = Boolean(projectPath?.trim() && rows.length > 0 && !taskLocked);
-  const canExport = Boolean(rows.length > 0 && !exportBusy);
 
   const onRegen = () => {
     if (!projectPath?.trim()) {
       setStatusText("请先打开工程目录");
       return;
     }
-    const promptText = themePrompt.trim();
-    if (!promptText) {
-      setStatusText("请先填写脚本生成要求或剧本文本");
+    const promptText = resolveScriptParseRequirement(themePrompt, hasUpstreamScriptText);
+    if (!canParse) {
+      setStatusText("请连接上游剧本或填写解析要求");
       return;
     }
     void (async () => {
@@ -278,7 +236,7 @@ export function ScriptNodeFullscreenOverlay() {
           },
           { nodeId, projectPath, updateNodeData, setStatusText },
         );
-        setTab("creative");
+        setStatusText(`分镜文案已生成，请在 Inspector 查看分镜缩略图`);
       } catch {
         /* runNodeTaskAgent 已写入状态 */
       }
@@ -337,14 +295,50 @@ export function ScriptNodeFullscreenOverlay() {
           <button
             type="button"
             className="scriptLibFloatActionBtn"
+            disabled={!canSynthesizePrompts}
+            onClick={onSynthesizePrompts}
+            title="根据画面描述等字段合成分镜提示词"
+          >
+            <span className="scriptLibFloatActionIco" aria-hidden>
+              ✦
+            </span>
+            合成提示词
+          </button>
+          <button
+            type="button"
+            className="scriptLibFloatActionBtn"
+            disabled={!canPolishPrompts}
+            onClick={onPolishPrompts}
+            title="用 LLM 润色中文分镜提示词（先规则合成再优化）"
+          >
+            <span className="scriptLibFloatActionIco" aria-hidden>
+              ✎
+            </span>
+            {polishBusy ? "润色中…" : "润色提示词"}
+          </button>
+          <button
+            type="button"
+            className="scriptLibFloatActionBtn"
             disabled={!canStoryboard}
             onClick={onGenerateStoryboard}
-            title="为选中镜头（无选中则全部）生成分镜文案，并切换到创意视图"
+            title="为全部镜头生成分镜文案"
           >
             <span className="scriptLibFloatActionIco" aria-hidden>
               ⊞
             </span>
             生成分镜
+          </button>
+          <button
+            type="button"
+            className="scriptLibFloatActionBtn"
+            disabled={!canSyncDraft}
+            onClick={onSyncFromDraft}
+            title="将分镜稿同步为镜头表"
+          >
+            <span className="scriptLibFloatActionIco" aria-hidden>
+              ⇄
+            </span>
+            同步镜头表
           </button>
           {nodeId ? (
             <ScriptDocumentImportButton
@@ -372,17 +366,7 @@ export function ScriptNodeFullscreenOverlay() {
               {displayTitle}
             </div>
             <div className="scriptLibFullscreenHeadRight">
-              <label className="scriptLibFullscreenSelect">
-                <span className="srOnly">视图</span>
-                <select
-                  value={tab}
-                  onChange={(e) => setTab(e.target.value as "script" | "creative")}
-                  aria-label="脚本视图或创意视图"
-                >
-                  <option value="script">脚本视图</option>
-                  <option value="creative">创意视图</option>
-                </select>
-              </label>
+              <span className="scriptLibViewBadge">脚本视图</span>
               <button
                 type="button"
                 className="scriptNodeExpandBtn scriptNodeExpandBtn--inHead"
@@ -401,23 +385,6 @@ export function ScriptNodeFullscreenOverlay() {
               </button>
             </div>
           </div>
-
-          <div className="scriptLibFullscreenSubTabs">
-            <button
-              type="button"
-              className={`scriptLibSubTab${tab === "script" ? " scriptLibSubTab--active" : ""}`}
-              onClick={() => setTab("script")}
-            >
-              脚本视图
-            </button>
-            <button
-              type="button"
-              className={`scriptLibSubTab${tab === "creative" ? " scriptLibSubTab--active" : ""}`}
-              onClick={() => setTab("creative")}
-            >
-              创意视图
-            </button>
-          </div>
         </div>
 
         {panelFeedback ? (
@@ -430,65 +397,20 @@ export function ScriptNodeFullscreenOverlay() {
         ) : null}
 
         <div className="scriptLibFullscreenBody">
-          {tab === "creative" ? (
-            <div className="scriptCreativeWrap">
-              <input
-                ref={creativeImageInputRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp,image/gif,.png,.jpg,.jpeg,.webp,.gif"
-                style={{ display: "none" }}
-                onChange={onCreativeImageFiles}
-              />
-              <div className="scriptCreativeToolbar" role="status">
-                <span>
-                  已选 {selectedIds.length} / {rows.length} 镜（与脚本表、生成分镜勾选一致）
-                </span>
-                <div className="scriptCreativeToolbarActions">
-                  {selectedIds.length < rows.length ? (
-                    <button type="button" className="btn" onClick={selectAllBeats}>
-                      全选
-                    </button>
-                  ) : null}
-                  {selectedIds.length > 0 ? (
-                    <button type="button" className="btn" onClick={clearBeatSelection}>
-                      清空勾选
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-              {failedShotCount > 0 ? (
-                <p className="scriptCreativeFailedBar" role="status">
-                  {failedShotCount} 条分镜失败 — 点击「定位镜头」回到脚本表修改，或在创意视图「聚焦镜头」后重试
-                </p>
-              ) : null}
-              <ScriptCreativeViewGrid
-                beats={rows}
-                shots={node.data.storyboardShots}
-                projectPath={projectPath}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                highlightBeatId={highlightBeatId}
-                onLocateBeatInScript={locateBeatInScript}
-                onPickImage={onPickCreativeImage}
-                onFocusStoryboardBeat={focusBeatInCreative}
-              />
-            </div>
-          ) : (
-            <div className="scriptTableWrap scriptTableWrapFullscreenInner">
-              <ScriptBeatsEditorTable
-                variant="fullscreen"
-                readOnly
-                rows={rows}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                onPersistRows={persistBeats}
-                projectPath={projectPath}
-                onStatusText={setStatusText}
-                highlightBeatId={highlightBeatId}
-                onHighlightDone={() => setHighlightBeatId(null)}
-              />
-            </div>
-          )}
+          <div className="scriptTableWrap scriptTableWrapFullscreenInner">
+            <ScriptBeatsEditorTable
+              variant="fullscreen"
+              tableMode={scriptTableLayout}
+              onFullscreenLayoutChange={setScriptTableLayout}
+              readOnly={parseBusy}
+              rows={rows}
+              onPersistRows={persistBeats}
+              projectPath={projectPath}
+              onStatusText={setStatusText}
+              highlightBeatId={highlightBeatId}
+              onHighlightDone={() => setHighlightBeatId(null)}
+            />
+          </div>
         </div>
       </div>
     </div>,

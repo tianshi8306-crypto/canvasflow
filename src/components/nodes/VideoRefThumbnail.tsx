@@ -33,6 +33,9 @@ export type VideoRefThumbnailProps = {
   isReorderDropTarget?: boolean;
   onReorderPointerDown?: (e: ReactPointerEvent<HTMLElement>) => void;
   consumeReorderClickSuppressed?: () => boolean;
+  /** 仅作连线示意标签，无删除钮、无 Shift 插入说明 */
+  hideDelete?: boolean;
+  tagOnly?: boolean;
 };
 
 export function VideoRefThumbnail({
@@ -62,6 +65,8 @@ export function VideoRefThumbnail({
   isReorderDropTarget = false,
   onReorderPointerDown,
   consumeReorderClickSuppressed,
+  hideDelete = false,
+  tagOnly = false,
 }: VideoRefThumbnailProps) {
   const setRootRef = useCallback(
     (el: HTMLDivElement | null) => {
@@ -74,7 +79,9 @@ export function VideoRefThumbnail({
   const isText = kind === "text";
   const isPendingMedia = !isText && !hasMedia;
 
-  const title = isText
+  const title = tagOnly && isText
+    ? (atToken ?? `@文本${badgeLabel}`)
+    : isText
     ? `${nodeLabel} · ${atToken ?? `@文本${badgeLabel}`} · Shift+单击插入`
     : isPendingMedia
       ? `${nodeLabel}（待出片）`
@@ -95,7 +102,9 @@ export function VideoRefThumbnail({
   const thumbEl = (
     <div
       ref={setRootRef}
-      className={`mmThumb mmThumb--clickable mmThumb--${kind}${
+      className={`mmThumb mmThumb--${kind}${
+        !tagOnly ? " mmThumb--clickable" : ""
+      }${
         isSelected || isActive ? " mmThumb--selected" : ""
       }${isHoverPreviewActive ? " mmThumb--hovered" : ""}${isPendingMedia ? " mmThumb--pending" : ""}${
         isReorderDragging ? " mmThumb--reorder-dragging" : ""
@@ -110,6 +119,7 @@ export function VideoRefThumbnail({
       }}
       onClick={(e) => {
         e.stopPropagation();
+        if (tagOnly) return;
         if (consumeReorderClickSuppressed?.()) return;
         if (useFocusLoop) {
           if (e.shiftKey) {
@@ -132,9 +142,10 @@ export function VideoRefThumbnail({
         if (!isText && hasMedia && kind !== "audio") onHoverStart?.();
       }}
       onMouseLeave={() => onHoverEnd?.()}
-      role="button"
-      tabIndex={0}
+      role={tagOnly ? undefined : "button"}
+      tabIndex={tagOnly ? -1 : 0}
       onKeyDown={(e) => {
+        if (tagOnly) return;
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           if (useFocusLoop) {
@@ -149,6 +160,7 @@ export function VideoRefThumbnail({
       }}
     >
       <span className="mmThumbBadge">{badgeLabel}</span>
+      {!hideDelete ? (
       <button
         type="button"
         className="mmThumbDelete"
@@ -165,6 +177,7 @@ export function VideoRefThumbnail({
       >
         ×
       </button>
+      ) : null}
       <div className="mmThumbInner">
         {isText ? (
           <div className="mmThumbTextGlyph" aria-hidden>

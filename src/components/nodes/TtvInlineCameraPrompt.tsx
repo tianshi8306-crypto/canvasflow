@@ -31,8 +31,10 @@ type Props = {
   hasCamera: boolean;
 };
 
-const PLAIN_PLACEHOLDER = "描述画面、镜头与风格；生成结果将出现在视频节点中。";
-const FLOW_PLACEHOLDER = "描述画面、镜头与风格；运镜标签与正文同一行，可拖动或 Alt+点击调整位置。";
+import {
+  TTV_INLINE_CAMERA_PLACEHOLDER_FLOW,
+  TTV_INLINE_CAMERA_PLACEHOLDER_PLAIN,
+} from "@/lib/nodeComposerPlaceholders";
 
 export const TtvInlineCameraPrompt = forwardRef<TtvInlineCameraPromptHandle, Props>(
   function TtvInlineCameraPrompt({ nodeId, draft, patchDraft, cameraLabel, hasCamera }, ref) {
@@ -196,7 +198,7 @@ export const TtvInlineCameraPrompt = forwardRef<TtvInlineCameraPromptHandle, Pro
               nodeId={nodeId}
               value={prompt}
               onChange={(value) => patchDraft({ prompt: value })}
-              placeholder={PLAIN_PLACEHOLDER}
+              placeholder={TTV_INLINE_CAMERA_PLACEHOLDER_PLAIN}
               className={`textNodeTtvPrompt textNodeTtvPromptInput textNodeTtvPromptInput--composer mono ${RF_NODE_INPUT_CLASS}`}
               nodeLabels={nodeLabels}
             />
@@ -217,7 +219,7 @@ export const TtvInlineCameraPrompt = forwardRef<TtvInlineCameraPromptHandle, Pro
                 role="textbox"
                 aria-multiline="true"
                 aria-label="文生视频提示词"
-                data-placeholder={FLOW_PLACEHOLDER}
+                data-placeholder={TTV_INLINE_CAMERA_PLACEHOLDER_FLOW}
                 onPointerDown={(e) => e.stopPropagation()}
                 onPointerUp={onFlowPointerUp}
               >

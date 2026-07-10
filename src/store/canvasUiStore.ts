@@ -118,6 +118,12 @@ type CanvasUiState = {
   textGenPanelExpandedNodeId: string | null;
   setTextGenPanelExpandedNodeId: (id: string | null) => void;
 
+  /** 文本节点：预览正文全屏展开（Markdown 阅读） */
+  textPreviewExpandedNodeId: string | null;
+  /** 打开全屏正文时是否直接进入 Markdown 编辑 */
+  textPreviewExpandedEditOnOpen: boolean;
+  setTextPreviewExpandedNodeId: (id: string | null, editOnOpen?: boolean) => void;
+
   /** 脚本节点：钉住主题/生成底栏 */
   scriptGenPanelPinnedNodeId: string | null;
   setScriptGenPanelPinnedNodeId: (id: string | null) => void;
@@ -395,6 +401,14 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
 
   textGenPanelExpandedNodeId: null,
   setTextGenPanelExpandedNodeId: (id) => set({ textGenPanelExpandedNodeId: id }),
+
+  textPreviewExpandedNodeId: null,
+  textPreviewExpandedEditOnOpen: false,
+  setTextPreviewExpandedNodeId: (id, editOnOpen = false) =>
+    set({
+      textPreviewExpandedNodeId: id,
+      textPreviewExpandedEditOnOpen: id ? editOnOpen : false,
+    }),
 
   scriptGenPanelPinnedNodeId: null,
   setScriptGenPanelPinnedNodeId: (id) => set({ scriptGenPanelPinnedNodeId: id }),
@@ -678,6 +692,8 @@ export const useCanvasUiStore = create<CanvasUiState>((set, get) => ({
       videoPreviewExpandedNodeId: null,
       textGenPanelPinnedNodeId: null,
       textGenPanelExpandedNodeId: null,
+      textPreviewExpandedNodeId: null,
+      textPreviewExpandedEditOnOpen: false,
       scriptGenPanelPinnedNodeId: null,
       scriptGenPanelExpandedNodeId: null,
       videoTrimEditingNodeId: null,
