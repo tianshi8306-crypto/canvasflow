@@ -1,0 +1,17 @@
+{
+  "product": "CanvasFlow AI Studio",
+  "version": "0.5.0",
+  "platform": "windows-x64",
+  "builtAt": "2026-06-25T09:22:19.614Z",
+  "host": {
+    "platform": "win32",
+    "arch": "x64"
+  },
+  "artifacts": [
+    {
+      "file": "CanvasFlow AI Studio_0.5.0_x64-setup.exe",
+      "bytes": 51982126,
+      "source": "src-tauri\\target\\release\\bundle\\nsis\\CanvasFlow AI Studio_0.5.0_x64-setup.exe"
+    }
+  ]
+}
