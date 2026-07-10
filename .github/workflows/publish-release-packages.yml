@@ -1,0 +1,75 @@
+name: Publish Release Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version folder under release-packages (e.g. v0.5.0)"
+        required: true
+        default: "v0.5.0"
+  push:
+    branches:
+      - master
+    paths:
+      - "release-packages/**"
+      - ".github/workflows/publish-release-packages.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-release-packages-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: bash
+        run: |
+          VERSION="${{ github.event_name == 'workflow_dispatch' && inputs.version || 'v0.5.0' }}"
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+          if [ ! -d "release-packages/$VERSION" ]; then
+            echo "::error::Missing release-packages/$VERSION"
+            exit 1
+          fi
+
+      - name: Collect artifacts
+        id: artifacts
+        shell: bash
+        run: |
+          VERSION="${{ steps.ver.outputs.tag }}"
+          mapfile -t FILES < <(find "release-packages/$VERSION" -type f \( -name '*.exe' -o -name '*.deb' -o -name 'MANIFEST.json' -o -name 'README.md' \) | sort)
+          if [ "${#FILES[@]}" -eq 0 ]; then
+            echo "::error::No installer files under release-packages/$VERSION"
+            exit 1
+          fi
+          {
+            echo "files<<EOF"
+            printf '%s\n' "${FILES[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: CanvasFlow AI Studio ${{ steps.ver.outputs.tag }}
+          make_latest: true
+          generate_release_notes: true
+          body: |
+            桌面安装包（仓库 `release-packages/` 同步发布）。
+
+            | 平台 | 文件 |
+            |------|------|
+            | Windows x64 | `CanvasFlow AI Studio_0.5.0_x64-setup.exe` |
+            | Linux amd64 | `CanvasFlow AI Studio_0.5.0_amd64.deb` |
+
+            完整打包说明见 [docs/release/DESKTOP_PACKAGING.md](https://github.com/${{ github.repository }}/blob/master/docs/release/DESKTOP_PACKAGING.md)。
+          files: ${{ steps.artifacts.outputs.files }}

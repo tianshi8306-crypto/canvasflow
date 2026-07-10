@@ -50,3 +50,4 @@ wsl -e bash /mnt/d/vibevideo/scripts/wsl-package-linux.sh
 - 产品名：CanvasFlow AI Studio
 - 版本：0.5.0
 - 许可证：Apache-2.0
+- GitHub Release：由 `publish-release-packages` 工作流从本目录发布
